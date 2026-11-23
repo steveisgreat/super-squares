@@ -276,9 +276,10 @@ async function run() {
 
   await check('GET /api/session reports the mode without leaking anything', async () => {
     withAuth(null);
-    eq((await call('GET', '/api/session')).json, { authRequired: false, host: true }, 'auth off');
+    const { version } = require('./package.json');
+    eq((await call('GET', '/api/session')).json, { authRequired: false, host: true, version }, 'auth off');
     withAuth(PASSWORD);
-    eq((await call('GET', '/api/session')).json, { authRequired: true, host: false }, 'auth on, anonymous');
+    eq((await call('GET', '/api/session')).json, { authRequired: true, host: false, version }, 'auth on, anonymous');
   });
 
   await check('signing in issues a cookie that then authorizes a guarded route', async () => {

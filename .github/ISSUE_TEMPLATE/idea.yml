@@ -1,0 +1,10 @@
+name: Idea
+description: A rough thought to triage later
+labels: [idea]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+    validations:
+      required: true

@@ -4,11 +4,10 @@
 NFL championship game on **2027-02-14**. Written 2026-11-23 from a design
 session; Steve owns the order.
 
-**Profile:** hosted app (not yet recorded — the repo has no `CLAUDE.md`; see R0).
+**Profile:** hosted app (recorded in `CLAUDE.md`; decision 010).
 There is no BRD yet, so items cite this roadmap's IDs instead of FR IDs.
 
-**Standing decisions from the 2026-11-23 session** (001 is written; R0 writes the rest
-under `docs/decisions/`):
+**Standing decisions from the 2026-11-23 session** (decisions 001–005 in `docs/decisions/`):
 - **Web app first.** No native iOS, Android or Apple TV app before 2027-02-14.
   Phone wrappers are reconsidered after (see Later).
 - **The host pays; players never do.** Free board up to ~25 players with a
@@ -29,7 +28,7 @@ under `docs/decisions/`):
 
 ### Milestone 1 — Launch blockers (target 2026-12-21)
 
-**R0. Port to the RileySoft model** — `Sonnet` — Depends on: none.
+**R0. Port to the RileySoft model** — `Sonnet` — ✅ shipped 2026-11-23.
 Run the `port-project` skill: `CLAUDE.md` with profile and where-to-look table,
 decisions 002–005 for the other standing decisions above (001 exists), `ARCHITECTURE.md`,
 `docs/runbook.md`, version visible in the footer. Folds `MIGRATION-PLAN.md`
@@ -170,13 +169,15 @@ office-pool groups.
 
 ## Recently shipped
 
+- R0: ported to the RileySoft model: `CLAUDE.md`, `ARCHITECTURE.md`, runbook,
+  decisions 002–010, issue templates, version in the Home footer (2026-11-23)
 - Postgres tests for store-pg, skipped without `DATABASE_URL` (d8fa14b)
 - Atomic-save rename retried instead of losing the write (5d272f3)
 - Lower poll load; ESPN look-up stampede closed (a6dc651)
 - Code-review fixes across server, store and client (9e2c655)
 - TV grid winner glow no longer clipped on the bottom row (bf9bff4)
 - Cloud migration Phases 1–4: storage interface, Postgres backend, Vercel
-  entry point, host sign-in (see `MIGRATION-PLAN.md`)
+  entry point, host sign-in (see `docs/archive/migration-plan.md`)
 
 ## Open questions for Steve
 

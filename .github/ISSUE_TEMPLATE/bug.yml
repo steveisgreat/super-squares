@@ -1,0 +1,27 @@
+name: Bug
+description: Something is broken
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown at the bottom of the Home screen.
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - S1 - data loss, security, production down
+        - S2 - broken with no workaround
+        - S3 - workaround exists or cosmetic
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What happened, and how to reproduce it
+    validations:
+      required: true

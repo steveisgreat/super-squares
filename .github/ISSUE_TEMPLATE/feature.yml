@@ -1,0 +1,10 @@
+name: Feature
+description: A specific change to build
+labels: [feature]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What should it do, and why?
+    validations:
+      required: true

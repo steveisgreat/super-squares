@@ -315,6 +315,15 @@
     actions.appendChild(newBtn);
     main.appendChild(actions);
 
+    // Build version, from the server (package.json is the only source).
+    // Non-blocking and silent: Home never waits on it.
+    const versionNote = el('div', 'footer-note');
+    versionNote.id = 'app-version';
+    main.appendChild(versionNote);
+    SBS.api.getSession().then(s => {
+      if (s && s.version) versionNote.textContent = 'Super Squares v' + s.version;
+    }).catch(() => {});
+
     // Games are created/edited/deleted from other devices in the room (a
     // phone setting up a new pool while the TV sits on Home), and there's no
     // push channel — so poll and re-render Home if the saved-games list has
