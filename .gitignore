@@ -12,3 +12,6 @@ data/*.json
 !.env.example
 
 .vercel
+
+# Scratch: briefs, ledgers, probe logs (project-docs layout)
+docs/working/
