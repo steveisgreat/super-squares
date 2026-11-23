@@ -7,8 +7,8 @@ session; Steve owns the order.
 **Profile:** hosted app (not yet recorded — the repo has no `CLAUDE.md`; see R0).
 There is no BRD yet, so items cite this roadmap's IDs instead of FR IDs.
 
-**Standing decisions from the 2026-11-23 session** (each needs a decision entry
-under `docs/decisions/` when R0 creates that folder):
+**Standing decisions from the 2026-11-23 session** (001 is written; R0 writes the rest
+under `docs/decisions/`):
 - **Web app first.** No native iOS, Android or Apple TV app before 2027-02-14.
   Phone wrappers are reconsidered after (see Later).
 - **The host pays; players never do.** Free board up to ~25 players with a
@@ -18,8 +18,10 @@ under `docs/decisions/` when R0 creates that folder):
   "entertainment and tracking only".
 - **No NFL marks.** No team logos, and marketing says "the Big Game", never
   "Super Bowl". Team names and colors stay.
-- **Manual scoring is the launch default.** The unofficial ESPN feed is off in
-  the cloud until a licensed feed replaces it.
+- **Manual scoring is the launch default; Live mode uses two providers.** A
+  primary and a secondary score API (not yet chosen) feed one shared cache, so
+  call volume doesn't grow with the number of boards
+  ([decision 001](decisions/001-score-providers.md)).
 
 ---
 
@@ -29,10 +31,10 @@ under `docs/decisions/` when R0 creates that folder):
 
 **R0. Port to the RileySoft model** — `Sonnet` — Depends on: none.
 Run the `port-project` skill: `CLAUDE.md` with profile and where-to-look table,
-`docs/decisions/` with the five standing decisions above, `ARCHITECTURE.md`,
+decisions 002–005 for the other standing decisions above (001 exists), `ARCHITECTURE.md`,
 `docs/runbook.md`, version visible in the footer. Folds `MIGRATION-PLAN.md`
 into decisions and archive.
-*Done:* CLAUDE.md under 15 KB, decisions 1–5 written, version shows in the app.
+*Done:* CLAUDE.md under 15 KB, decisions 002–005 written, version shows in the app.
 
 **R1. Host accounts design** — `Opus` — Depends on: R0.
 Replace the single `HOST_PASSWORD` with one account per host: magic-link email
@@ -70,12 +72,25 @@ host check for an owner check).
 *Done:* tests for the quarter-end, undo, edit and overtime state transitions
 (money logic, so test-first); browser check of TV, phone and My Squares views.
 
-**R4. Remove NFL logos and ESPN calls from the cloud path** — `Sonnet` —
-Depends on: R3.
+**R4. Remove NFL logos** — `Haiku` — Depends on: none.
 Drop the ESPN logo CDN; keep team colors and abbreviations with the generic
-badge. Disable Live mode and `/api/todays-games` in the cloud build (LAN build
-may keep them).
-*Done:* no request to any ESPN host from the cloud build during a full game.
+badge.
+*Done:* no request to any logo CDN during a full game; browser check of TV,
+grid and setup.
+
+**R4a. Score provider layer and shared cache** — `Sonnet` (design done in
+[decision 001](decisions/001-score-providers.md)) — Depends on: R3 (the
+`scoring` field).
+Adapters for ESPN and BALLDONTLIE behind one `LiveGame` shape;
+`SCORE_PRIMARY` / `SCORE_SECONDARY` with failover; `live_slates` table and
+fs equivalent; one claimed refresh per league and date every 15 s; boards merge
+the slate into `liveScore` on read and write only on quarter completion; the
+"live feed unavailable" fallback to the manual panel; `/api/todays-games` reads
+the slate.
+*Done:* fixture tests from the 2026-11-23 probe for both adapters, failover,
+quarter-end detection with and without `period`, host-wins, and claim
+concurrency in both stores; `/code-review medium` clean; a simulated 50-board
+run makes ≤4 provider calls a minute.
 
 **R5. Payments** — `Opus` — Depends on: R2.
 Stripe Checkout for Big Game Pass and Season Pass, a signed webhook that grants
@@ -98,10 +113,10 @@ name (GleanMark connector needs `/mcp` sign-in).
 
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
 
-**R8. Cache board reads at the edge** — `Opus` — Depends on: R3, R4.
+**R8. Cache board reads at the edge** — `Opus` — Depends on: R3, R4a.
 `GET /api/game/:id` currently reads Neon on every poll (ETag is computed after
-the read) and may write (auto-cutoff, live claim). Move server-owned writes off
-the read path, then send `s-maxage=2, stale-while-revalidate` so eight screens
+the read) and may write (auto-cutoff; R4a already removes the live-score
+writes). Move the remaining server-owned writes off the read path, then send `s-maxage=2, stale-while-revalidate` so eight screens
 on one board cost about one function call. Host writes return the fresh
 document directly.
 *Done:* at 8 pollers per board, function invocations per board fall to
@@ -149,8 +164,6 @@ office-pool groups.
 
 - Phone app wrappers (Capacitor) for App Store and Google Play discovery —
   check Apple's real-money gaming guideline first.
-- Licensed live-score feed, looked up **once per real game** and shared by
-  every board, to bring back Live mode.
 - Spring basketball tournament push (NBA/Other already supported).
 - Unlimited squares after a grid sells out (open questions in memory notes).
 - Apple TV: not planned — AirPlay and smart-TV browsers cover it.
