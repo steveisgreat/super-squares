@@ -205,39 +205,39 @@
     app.innerHTML = '';
     const reopen = () => SBS.go({ screen: 'board', game });
     const phone = isPhone();
-    const manageBtn = phone
-      ? el('button', 'icon-btn', PEOPLE_ICON)
-      : el('button', 'secondary', 'Manage Players');
-    manageBtn.type = 'button';
-    if (phone) { manageBtn.setAttribute('aria-label', 'Manage Players'); manageBtn.title = 'Manage Players'; }
+    // Phone: labeled actions (icon + short text) instead of bare icons.
+    function actionBtn(icon, phoneLabel, fullLabel, aria) {
+      const b = phone
+        ? el('button', 'gd-action', `${icon}<span>${phoneLabel}</span>`)
+        : el('button', 'secondary', fullLabel);
+      b.type = 'button';
+      if (phone) { b.setAttribute('aria-label', aria || fullLabel); b.title = aria || fullLabel; }
+      return b;
+    }
+    const manageBtn = actionBtn(PEOPLE_ICON, 'Players', 'Manage Players');
     manageBtn.addEventListener('click', () => openManagePlayersModal(game, reopen));
-    const tvBtn = phone
-      ? el('button', 'icon-btn', TV_ICON)
-      : el('button', 'secondary', 'Open TV Grid View');
-    tvBtn.type = 'button';
-    if (phone) { tvBtn.setAttribute('aria-label', 'Open TV Grid View'); tvBtn.title = 'Open TV Grid View'; }
+    const tvBtn = actionBtn(TV_ICON, 'TV view', 'Open TV Grid View');
     tvBtn.addEventListener('click', () => {
       window.open(`${location.origin}${location.pathname}#tv-${game.id}`, '_blank');
     });
-    const phoneBtn = phone
-      ? el('button', 'icon-btn', PHONE_ICON)
-      : el('button', 'secondary', 'Phone Score Entry');
-    phoneBtn.type = 'button';
-    if (phone) { phoneBtn.setAttribute('aria-label', 'Phone Score Entry'); phoneBtn.title = 'Phone Score Entry'; }
+    const phoneBtn = actionBtn(PHONE_ICON, 'Score on phone', 'Phone Score Entry');
     phoneBtn.addEventListener('click', () => showPhoneLink(game.id));
     // Players scan this to open the read-only companion view (their squares,
     // quarter winners, live status) — separate from the host's own score-entry
     // link above, and safe to hand out to anyone in the room.
-    const playerBtn = phone
-      ? el('button', 'icon-btn', QR_ICON)
-      : el('button', 'secondary', 'Player View QR');
-    playerBtn.type = 'button';
-    if (phone) { playerBtn.setAttribute('aria-label', 'Player View QR'); playerBtn.title = 'Player View QR'; }
+    const playerBtn = actionBtn(QR_ICON, 'Share', 'Player View QR', 'Share player view QR');
     playerBtn.addEventListener('click', () => SBS.playerView.showPlayerLink(game.id));
     const headerMeta = [SBS.ui.leagueBadge(game.league), escapeHtml(game.description || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
-    app.appendChild(topbar('', [manageBtn, tvBtn, phoneBtn, playerBtn], { hideIcon: true, homeLeft: true }));
-    const main = el('div', 'main');
+    const actionBtns = [manageBtn, tvBtn, phoneBtn, playerBtn];
+    // The topbar keeps the four desktop buttons; on a phone they sit in a labeled row below it.
+    app.appendChild(topbar('', phone ? [] : actionBtns, { hideIcon: true, homeLeft: true }));
+    const main = el('div', 'main' + (phone ? ' gd-phone' : ''));
     app.appendChild(main);
+    if (phone) {
+      const row = el('div', 'gd-actions');
+      actionBtns.forEach(b => row.appendChild(b));
+      main.appendChild(row);
+    }
 
     main.appendChild(el('h2', 'gameday-heading', headerMeta));
 
@@ -288,6 +288,11 @@
     });
 
     const layout = el('div', 'pick-layout board-first');
+    // Phone: banner for a down feed, then tabs; each tab shows one panel.
+    const feedBanner = phone ? el('div', 'gd-feed-banner') : null;
+    if (feedBanner) { feedBanner.hidden = true; feedBanner.setAttribute('role', 'status'); main.appendChild(feedBanner); }
+    const tabBar = phone ? el('div', 'gd-tabs') : null;
+    if (tabBar) { tabBar.setAttribute('role', 'tablist'); tabBar.setAttribute('aria-label', 'Game Day'); main.appendChild(tabBar); }
     main.appendChild(layout);
 
     // ---- Board ----
@@ -316,6 +321,119 @@
     });
     resultsCard.appendChild(scorePanel.el);
     scorePanel.update();
+
+    // ---- Phone tabs: Score | Board | Players ----
+    let playersCard = null;
+    let updateFeedBanner = () => {};
+    if (phone) {
+      playersCard = el('div', 'card');
+      playersCard.innerHTML = '<h3 style="margin-top:0">Players</h3><p class="gd-players-note"></p>';
+      const openBtn = el('button', '', 'Manage players');
+      openBtn.type = 'button';
+      openBtn.addEventListener('click', () => openManagePlayersModal(game, reopen));
+      playersCard.appendChild(openBtn);
+      layout.appendChild(playersCard);
+      const refreshPlayersNote = () => {
+        const sold = game.squares.filter(s => s).length;
+        const unpaid = unpaidTotal(game);
+        playersCard.querySelector('.gd-players-note').textContent =
+          `${sold} of 100 squares claimed. ` + (unpaid > 0 ? `${money(unpaid)} still unpaid.` : 'Everyone is paid up.');
+      };
+      refreshPlayersNote();
+
+      const panels = { score: resultsCard, board: boardCard, players: playersCard };
+      const names = { score: 'Score', board: 'Board', players: 'Players' };
+      const order = ['score', 'board', 'players'];
+      const mode = window.GameLogic.scoringMode(game);
+      let tab = SBS.gamedayTab && SBS.gamedayTab.id === game.id
+        ? SBS.gamedayTab.tab
+        : (mode === 'manual' ? 'score' : 'board');
+      const tabEls = {};
+      order.forEach(k => {
+        const t = el('button', 'gd-tab', names[k]);
+        t.type = 'button';
+        t.id = `gd-tab-${k}`;
+        t.setAttribute('role', 'tab');
+        t.setAttribute('aria-controls', `gd-panel-${k}`);
+        panels[k].id = `gd-panel-${k}`;
+        panels[k].setAttribute('role', 'tabpanel');
+        panels[k].setAttribute('aria-labelledby', t.id);
+        t.addEventListener('click', () => select(k, false));
+        t.addEventListener('keydown', (e) => {
+          const i = order.indexOf(k);
+          let n = null;
+          if (e.key === 'ArrowRight') n = order[(i + 1) % 3];
+          else if (e.key === 'ArrowLeft') n = order[(i + 2) % 3];
+          else if (e.key === 'Home') n = order[0];
+          else if (e.key === 'End') n = order[2];
+          if (n) { e.preventDefault(); select(n, true); }
+        });
+        tabEls[k] = t;
+        tabBar.appendChild(t);
+      });
+      function select(k, focus) {
+        tab = k;
+        SBS.gamedayTab = { id: game.id, tab: k };
+        order.forEach(o => {
+          const on = o === k;
+          tabEls[o].setAttribute('aria-selected', on ? 'true' : 'false');
+          tabEls[o].tabIndex = on ? 0 : -1;
+          panels[o].hidden = !on;
+        });
+        if (focus) tabEls[k].focus();
+        if (k === 'board') fitTeamBadges(boardHolder);
+      }
+      select(tab, false);
+
+      // ---- Feed-down banner (live boards only) ----
+      // Signal: the server marks a live board's response liveFeed.available === false
+      // when the shared slate is stale or erroring (lib/api.js readLiveGame); the poll
+      // below replaces `game`, so this just re-reads it. Take over = a score op with
+      // override (what the first tap in the score panel does anyway); Resume = op 'resume'.
+      async function runOp(op) {
+        try {
+          const saved = await SBS.api.patchScore(game.id, op);
+          // Resume drops liveOverride from the document; assign alone would keep the old one.
+          if (!('liveOverride' in saved)) delete game.liveOverride;
+          Object.assign(game, saved);
+          const c = computeGame(game);
+          SBS.board.renderFullBoard(boardHolder, game, c);
+          fitTeamBadges(boardHolder);
+          refreshQuarterCards(c);
+          scorePanel.update();
+          updateFeedBanner();
+        } catch (e) {
+          if (await SBS.handleConflict(e, game.id)) return;
+          showAlert('Could not switch scoring: ' + e.message);
+        }
+      }
+      updateFeedBanner = () => {
+        refreshPlayersNote();
+        const live = window.GameLogic.scoringMode(game) === 'live' && game.status === 'started';
+        const holding = game.liveOverride === true;
+        const down = !!(game.liveFeed && game.liveFeed.available === false);
+        feedBanner.innerHTML = '';
+        feedBanner.hidden = !(live && (down || holding));
+        if (feedBanner.hidden) return;
+        const msg = el('span', 'gd-feed-msg');
+        const b = el('button', '');
+        b.type = 'button';
+        if (holding) {
+          msg.textContent = 'You are entering scores by hand.';
+          b.textContent = 'Resume live';
+          b.addEventListener('click', () => runOp({ op: 'resume' }));
+        } else {
+          msg.innerHTML = '<strong>Live scores are down.</strong>';
+          b.textContent = 'Take over';
+          b.addEventListener('click', () => {
+            const cur = window.GameLogic.manualState(game);
+            runOp({ op: 'set', a: cur.a, b: cur.b, override: true });
+          });
+        }
+        feedBanner.append(msg, b);
+      };
+      updateFeedBanner();
+    }
     resultsCard.appendChild(el('h3', '', 'Quarterly Results'));
     const qgrid = el('div', 'quarters');
     resultsCard.appendChild(qgrid);
@@ -517,7 +635,10 @@
       syncing = true;
       try {
         const fresh = await SBS.api.getGame(game.id);
+        const feedChanged = !!(fresh.liveFeed && fresh.liveFeed.available === false) !== !!(game.liveFeed && game.liveFeed.available === false);
+        if (feedChanged) { game.liveFeed = fresh.liveFeed; updateFeedBanner(); scorePanel.update(); }
         if (fresh.updatedAt !== game.updatedAt) {
+          if (!('liveOverride' in fresh)) delete game.liveOverride;
           Object.assign(game, fresh);
           checkDrawSync(game);
           const newComputed = computeGame(game);
@@ -525,6 +646,7 @@
           fitTeamBadges(boardHolder);
           refreshQuarterCards(newComputed);
           scorePanel.update();
+          updateFeedBanner();
         }
       } catch (e) {
         // Deleted on another device — nothing left here to show.

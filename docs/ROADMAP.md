@@ -182,7 +182,7 @@ Manual is the fallback (no game picked, or Other). "Auto Fetch Score" becomes "L
 the raw-ESPN Details button goes.
 *Done:* browser check at 375, 1366 and 1920 px.
 
-**R20. Phone Game Day** — `Sonnet` — Depends on: R18.
+**R20. Phone Game Day** — `Sonnet` — Depends on: R18 ✅ — ✅ shipped 2026-11-24.
 Tabs Score | Board | Players (Score first on Manual boards, Board first on Live); the
 whole 10×10 grid fits a 360 px phone; labeled actions instead of four bare icons;
 feed-down banner (s3) with take over and resume.

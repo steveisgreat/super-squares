@@ -2284,3 +2284,37 @@ body.player-mode #app { padding: 0; }
 .live-updated { color: var(--muted); font-size: 0.8rem; font-weight: 600; }
 .tv-header .live-updated { font-size: 0.6em; }
 .pill.disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---- Phone Game Day (R20): tabs, labeled actions, feed-down banner ---- */
+.gd-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+button.gd-action {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 6px 10px; font-size: 0.9rem;
+  background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+}
+button.gd-action:hover { background: var(--panel3); border-color: var(--border-strong); }
+button.gd-action svg { width: 18px; height: 18px; flex: none; color: var(--accent); }
+.gd-tabs { display: flex; gap: 4px; margin: 4px 0 12px; border-bottom: 1px solid var(--border); }
+button.gd-tab {
+  flex: 1; min-height: 44px; background: transparent; color: var(--muted);
+  border: 0; border-bottom: 3px solid transparent; border-radius: 0; font-weight: 700;
+}
+button.gd-tab:hover { background: var(--panel2); color: var(--text); }
+button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.gd-feed-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  margin: 0 0 12px; padding: 10px 12px; border-radius: var(--radius);
+  background: var(--panel2); border: 1px solid var(--warn); color: var(--text);
+}
+.gd-feed-banner[hidden], .gd-phone .pick-layout > [hidden] { display: none; }
+.gd-feed-banner button { min-height: 40px; }
+.gd-phone .pick-layout { display: block; }
+.gd-phone .card { padding: 10px; }
+/* The 10x10 grid and its axis numbers fit a 360 px viewport: no minimum cell width. */
+.gd-phone .board-table { grid-template-columns: repeat(11, minmax(0, 1fr)); }
+.gd-phone .cell { min-height: 0; aspect-ratio: 1; font-size: 0.7rem; padding: 0; }
+.gd-phone .cell.head { font-size: 0.8rem; }
+.gd-phone .cell .name-txt { font-size: 0.5rem; padding-top: 6px; line-height: 1; overflow: hidden; max-width: 100%; white-space: nowrap; text-overflow: ellipsis; }
+.gd-phone .cell .badge { font-size: 0.45rem; padding: 0 2px; }
+.gd-phone .cell .badges { top: 0; right: 1px; }
+.gd-phone .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }

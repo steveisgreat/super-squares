@@ -217,7 +217,9 @@
         const inner = sq ? nameTxt(game, sq.name) : (hasPush ? '<div class="name-txt">PUSH</div>' : '');
         const badges = !labels.length ? '' : `<div class="badges">${labels.map(l => `<span class="badge">${l.label === 'FINAL' ? TROPHY_SVG : l.label}</span>`).join('')}</div>`;
 
-        table.appendChild(el('div', cls, badges + inner));
+        const cellEl = el('div', cls, badges + inner);
+        if (sq && !document.body.classList.contains('tv-mode')) cellEl.title = sq.name; // full name on tap/hover; TV view stays as it was
+        table.appendChild(cellEl);
       }
     }
 
