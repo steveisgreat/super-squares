@@ -241,6 +241,30 @@ localhost-only dev server. Removed the certificates, LAN discovery, `/api/hosts`
 `.bat` scripts, the `selfsigned` dependency and the LAN README.
 *Done:* tests pass; preview runs on 127.0.0.1; pop-ups and the TV corner QR use the page's origin.
 
+**R28. Guests pick their own squares** — `Opus` decision and review (first guest write),
+`Sonnet` build — Depends on: R22 ✅. **Launch must-have** (Steve, 2026-11-24). Build after
+R24, before R25.
+The host shares the `/<code>` link (for example in an Evite) and guests claim squares
+before the party.
+- **Setup flag:** "Let guests pick their own squares" when creating a game (off by default).
+- **Identity (Steve chose option A):** the guest types their name; their browser keeps a
+  private device key, so that device can release or change its own picks. No email, no
+  account. Accepted limits: the cap is honor-system (a new name or a private window gets
+  around it), and a lost device key means the host fixes the picks.
+- **Cap:** the host sets a maximum number of squares per person. It lifts at a time the
+  host sets, or when the host flips a switch. Enforced on the server in the same atomic
+  write as the pick (decision 008), so two phones can't race past it.
+- **Rules:** a guest can claim or release only their own empty squares, only while the
+  board is picking; never scores, settings or anyone else's squares. Guest picks start
+  unpaid; the host marks paid as today (decision 004).
+- **Host oversight:** every pick shows its name and time; the host can remove or
+  reassign any pick.
+- **Later (not for launch):** a per-board "Require email" switch (option D) using the
+  host sign-in code.
+*Done:* a decision entry approved by Steve before code; server tests for the cap, the
+lift time and switch, own-squares-only, and picking-only; `/code-review high`; browser
+check at 360 px and on the TV view.
+
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
 
 **R8. Cache board reads at the edge** — `Opus` — Depends on: R3, R4a.
