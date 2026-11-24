@@ -80,7 +80,7 @@
       const row = el('div', 'sp-team');
       const name = side === 'a' ? g.teamA : g.teamB;
       const head = el('div', 'sp-head badge-fit');
-      head.innerHTML = teamBadge(g, side === 'a' ? 'A' : 'B', { cls: 'team-badge-sm' });
+      head.innerHTML = teamBadge(g, side === 'a' ? 'A' : 'B', { logoSize: 18, cls: 'team-badge-sm' });
       row.appendChild(head);
 
       const input = el('input', 'sp-input');

@@ -15,8 +15,9 @@ There is no BRD yet, so items cite this roadmap's IDs instead of FR IDs.
   **$24.99**. Prices are a hypothesis to test in the January soft launch.
 - **We never hold or move pool money.** We sell software. Terms of Service say
   "entertainment and tracking only".
-- **No NFL marks.** No team logos, and marketing says "the Big Game", never
-  "Super Bowl". Team names and colors stay.
+- **No NFL marks in marketing.** Marketing says "the Big Game", never "Super Bowl".
+  Team names, colors and logos stay in the app (decision 013 restored the logos,
+  accepting the trademark risk).
 - **Manual scoring is the launch default; Live mode uses two providers.** A
   primary and a secondary score API (ESPN, with BALLDONTLIE
   as backup) feed one shared cache, so
@@ -84,7 +85,7 @@ host check for an owner check.
 *Done:* tests for the quarter-end, undo, edit and overtime state transitions
 (money logic, so test-first); browser check of TV, phone and My Squares views.
 
-**R4. Remove NFL logos** — `Haiku` — ✅ shipped 2026-11-23.
+**R4. Remove NFL logos** — `Haiku` — ✅ shipped 2026-11-23; reversed 2026-11-24 ([decision 013](decisions/013-team-logos-restored.md)): logos are back.
 Drop the ESPN logo CDN; keep team colors and abbreviations with the generic
 badge.
 *Done:* no request to any logo CDN during a full game; browser check of TV,
@@ -216,6 +217,9 @@ office-pool groups.
 
 ## Recently shipped
 
+- Decision 013: team and league logos restored (ESPN logo CDN, helmet fallback, CSP
+  `img-src` widened); the same-millisecond save race fixed in both stores, issue #3
+  (2026-11-24)
 - R1: host accounts designed and approved, decision 012 (2026-11-23)
 - Issue #2: the phone keypad keeps the drawn final winner; the TV reveal ignores a stale
   draw (2026-11-23)

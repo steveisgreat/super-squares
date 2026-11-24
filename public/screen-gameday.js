@@ -153,12 +153,12 @@
         <div class="draw-reveal-label">Spinning the grid&hellip;</div>
         <div class="draw-wheels">
           <div class="draw-wheel">
-            ${teamBadge(game, 'A', { cls: 'team-badge-sm' })}
+            ${teamBadge(game, 'A', { logoSize: 20, cls: 'team-badge-sm' })}
             <div class="draw-wheel-num spinning" style="${wheelVars(styleA)}">0</div>
           </div>
           <div class="draw-wheel-sep">&ndash;</div>
           <div class="draw-wheel">
-            ${teamBadge(game, 'B', { cls: 'team-badge-sm' })}
+            ${teamBadge(game, 'B', { logoSize: 20, cls: 'team-badge-sm' })}
             <div class="draw-wheel-num spinning" style="${wheelVars(styleB)}">0</div>
           </div>
         </div>
@@ -335,12 +335,12 @@
         const scoreRow = el('div', 'score-inputs');
         scoreRow.innerHTML = `
           <div class="score-team badge-fit">
-            ${teamBadge(game, 'A', { cls: 'team-badge-sm' })}
+            ${teamBadge(game, 'A', { logoSize: 16, cls: 'team-badge-sm' })}
             <input type="number" min="0" id="score-${q}-a" value="${res.a === null ? '' : res.a}">
           </div>
           <span class="vs">–</span>
           <div class="score-team badge-fit">
-            ${teamBadge(game, 'B', { cls: 'team-badge-sm' })}
+            ${teamBadge(game, 'B', { logoSize: 16, cls: 'team-badge-sm' })}
             <input type="number" min="0" id="score-${q}-b" value="${res.b === null ? '' : res.b}">
           </div>
         `;
@@ -1121,9 +1121,9 @@
       head.appendChild(el('div', 'tvfs-eyebrow', 'Game Complete'));
       const scoreLine = el('div', 'tvfs-score badge-fit');
       scoreLine.innerHTML = `
-        ${teamBadge(lastGame, 'A', { cls: 'team-badge-sm' })}
+        ${teamBadge(lastGame, 'A', { logoSize: 26, cls: 'team-badge-sm' })}
         <span class="tvfs-score-digits">${finalRes.a}&ndash;${finalRes.b}</span>
-        ${teamBadge(lastGame, 'B', { cls: 'team-badge-sm' })}
+        ${teamBadge(lastGame, 'B', { logoSize: 26, cls: 'team-badge-sm' })}
       `;
       head.appendChild(scoreLine);
       head.appendChild(el('div', 'tvfs-sub', `Final pot <span class="tvfs-pot">${money(computed.pot)}</span> &middot; ${winners.length} winner${winners.length === 1 ? '' : 's'}`));
@@ -1177,8 +1177,8 @@
     // (matching the rest of the app) but no score inputs, so the board
     // underneath keeps almost all of the screen.
     function renderTvQuarters(game, computed) {
-      const badgeA = teamBadge(game, 'A', { cls: 'team-badge-sm' });
-      const badgeB = teamBadge(game, 'B', { cls: 'team-badge-sm' });
+      const badgeA = teamBadge(game, 'A', { logoSize: 18, cls: 'team-badge-sm' });
+      const badgeB = teamBadge(game, 'B', { logoSize: 18, cls: 'team-badge-sm' });
       tvQuarters.innerHTML = QUARTERS.map(q => {
         const res = computed.results[q];
         const scoreTxt = (res.a === null || res.b === null) ? '– – –' : `${res.a}–${res.b}`;

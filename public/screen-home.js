@@ -3,7 +3,7 @@
   'use strict';
 
   const SBS = window.SBS = window.SBS || {};
-  const { el, escapeHtml, topbar, statusLabel, leagueBadge, showAlert, showConfirm, teamMeta, teamBadge, resetTeamColors, fitTeamBadges, isTvBrowser, TV_ICON, PHONE_ICON, PEOPLE_ICON } = SBS.ui;
+  const { el, escapeHtml, topbar, statusLabel, leagueBadge, showAlert, showConfirm, teamMeta, teamLogoTag, teamBadge, resetTeamColors, fitTeamBadges, isTvBrowser, TV_ICON, PHONE_ICON, PEOPLE_ICON } = SBS.ui;
   const { emptyGrid } = window.GameLogic;
   const { openManagePlayersModal } = SBS.players;
 
@@ -149,7 +149,7 @@
       </div>
       ${g.description ? `<div class="game-card-desc">${escapeHtml(g.description)}</div>`
         : `<div class="game-card-desc">${escapeHtml(g.teamA || '')} @ ${escapeHtml(g.teamB || '')}</div>`}
-      <div class="teams">${teamBadge(g, 'A', { cls: 'team-badge-sm mode-abbr' })}<span class="vs-sep">vs</span>${teamBadge(g, 'B', { cls: 'team-badge-sm mode-abbr' })}</div>
+      <div class="teams">${teamBadge(g, 'A', { logoSize: 18, cls: 'team-badge-sm mode-abbr' })}<span class="vs-sep">vs</span>${teamBadge(g, 'B', { logoSize: 18, cls: 'team-badge-sm mode-abbr' })}</div>
       <div class="game-card-kickoff">${g.kickoffTime ? `Kickoff: ${escapeHtml(SBS.ui.formatKickoffTime(g.kickoffTime))}` : ''}</div>
       ${statusMarkup(g)}
       ${isTv ? '' : `
@@ -613,7 +613,9 @@
       if (!name) { box.innerHTML = ''; return; }
       const meta = teamMeta(name, league);
       if (meta) {
-        box.innerHTML = `<span class="swatch" style="background:${meta.primary}"></span><span class="swatch" style="background:${meta.secondary}"></span><span class="match-txt">Matched: ${meta.names[0].replace(/\b\w/g, c => c.toUpperCase())}</span>`;
+        const pgame = currentPreviewGame();
+        const logo = teamLogoTag(pgame, side, 24);
+        box.innerHTML = `${logo}<span class="swatch" style="background:${meta.primary}"></span><span class="swatch" style="background:${meta.secondary}"></span><span class="match-txt">Matched: ${meta.names[0].replace(/\b\w/g, c => c.toUpperCase())}</span>`;
       } else {
         box.innerHTML = `<span class="match-txt muted">No ${league.toUpperCase()} team matched — using default colors.</span>`;
       }

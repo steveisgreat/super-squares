@@ -5,7 +5,7 @@
   'use strict';
 
   const SBS = window.SBS = window.SBS || {};
-  const { el, escapeHtml, isColor, teamColor, readableTextColor, teamBadge, teamStyle } = SBS.ui;
+  const { el, escapeHtml, isColor, teamLogoTag, teamColor, readableTextColor, teamBadge, teamStyle } = SBS.ui;
 
   // "Qn" for regulation, "OT" (or "2OT", etc.) once the game runs past four
   // quarters — ESPN numbers overtime periods 5, 6, ...
@@ -63,9 +63,9 @@
         <span class="live-label">${live.simulation ? 'SIMULATION' : live.manual ? 'MANUAL' : 'LIVE'}</span>
       </span>
       <span class="live-center">
-        ${teamBadge(game, 'A', { cls: 'team-badge-sm' })}
+        ${teamBadge(game, 'A', { logoSize: 16, cls: 'team-badge-sm' })}
         <span class="live-score-digits">${escapeHtml(live.a)}–${escapeHtml(live.b)}</span>
-        ${teamBadge(game, 'B', { cls: 'team-badge-sm' })}
+        ${teamBadge(game, 'B', { logoSize: 16, cls: 'team-badge-sm' })}
         <span class="live-period">${escapeHtml(clockTxt)}</span>
         ${live.manual && live.updatedAt ? `<span class="live-updated" data-updated="${escapeHtml(live.updatedAt)}">${updatedAgo(live.updatedAt)}</span>` : ''}
       </span>
@@ -163,11 +163,11 @@
     // with the top of the grid's own blank corner cell — not stretched up
     // alongside teamB's bar, which used to leave it starting a row too low.
     const outer = el('div', 'board-grid-outer');
-    const teamALabel = el('div', 'teamA-label', `<span class="teamA-label-text">${escapeHtml(game.teamA)}</span>`);
+    const teamALabel = el('div', 'teamA-label', `<span class="teamA-label-text">${escapeHtml(game.teamA)}</span>${teamLogoTag(game, 'A', 32)}`);
     teamALabel.style.cssText = badgeStyle(game, 'A', 'y');
     outer.appendChild(teamALabel);
 
-    const teamBLabel = el('div', 'teamB-label', `<span>${escapeHtml(game.teamB)}</span>`);
+    const teamBLabel = el('div', 'teamB-label', `${teamLogoTag(game, 'B', 32)}<span>${escapeHtml(game.teamB)}</span>`);
     teamBLabel.style.cssText = badgeStyle(game, 'B', 'x');
     outer.appendChild(teamBLabel);
 

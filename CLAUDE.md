@@ -61,8 +61,8 @@ GitHub Issues on `steveisgreat/super-squares` (labels `bug`, `feature`, `idea`, 
   (decision 007).
 - **Secrets:** `.env.local` holds the real Neon string and is ignored; only
   `.env.example` is committed. Never print or commit real values.
-- **No NFL marks** (decision 005): no team logos; marketing says "the Big Game". Team
-  names and colors stay. **We never hold or move pool money** (decision 004).
+- **No NFL marks in marketing** (decision 005): it says "the Big Game". Team names,
+  colors and logos stay in the app (decision 013: ESPN logo CDN, helmet fallback). **We never hold or move pool money** (decision 004).
 - **New dependencies** need a stated reason and a decision entry (global rule).
 - **American English** everywhere. Client code is plain scripts loaded in order from
   `public/index.html`; keep that shape, no bundler.

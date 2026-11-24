@@ -91,8 +91,9 @@ there. Never delete it while `HOST_PASSWORD` is the only defense.
 
 The Content-Security-Policy is in `vercel.json` and nowhere else; `server.js` reads it
 from there. It allows scripts from this origin only: no inline script, no `on…=`
-attributes, no third-party script. A new font, script, image or API host needs a change
-there. On previews it blocks the Vercel toolbar, which is expected.
+attributes, no third-party script. Images may come from this origin, `data:` and
+`https://a.espncdn.com` (team logos, decision 013). A new font, script, image or API host
+needs a change there. On previews it blocks the Vercel toolbar, which is expected.
 
 ## Deploy (Vercel)
 

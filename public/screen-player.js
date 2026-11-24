@@ -154,14 +154,14 @@
         tickerHtml = `
           <div class="player-ticker">
             <div class="pt-team badge-fit">
-              ${teamBadge(game, 'A', { cls: 'team-badge-sm' })}
+              ${teamBadge(game, 'A', { logoSize: 20, cls: 'team-badge-sm' })}
               <div class="pt-pts">${escapeHtml(scoreA)}</div>
             </div>
             <div class="pt-mid">
               <div class="${statusCls}">${statusTxt}</div>
             </div>
             <div class="pt-team badge-fit">
-              ${teamBadge(game, 'B', { cls: 'team-badge-sm' })}
+              ${teamBadge(game, 'B', { logoSize: 20, cls: 'team-badge-sm' })}
               <div class="pt-pts">${escapeHtml(scoreB)}</div>
             </div>
           </div>
