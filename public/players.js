@@ -6,7 +6,7 @@
   const SBS = window.SBS = window.SBS || {};
   const { el, escapeHtml, money, overlayEl, showChoice, showConfirm, showAlert } = SBS.ui;
 
-  const { isPlayerName } = window.GameLogic;
+  const { isPlayerName, pickPlayerColor } = window.GameLogic;
 
   const MAX_NAME_LEN = 10;
 
@@ -27,26 +27,13 @@
     return game.players;
   }
 
-  // Bright, saturated colors chosen to stay readable as text against the
-  // dark grid background (--panel2 #232e38) — no dim or near-black hues,
-  // and nothing too close to the red used for the unpaid-square warning.
-  const PLAYER_COLORS = [
-    '#feca57', '#48dbfb', '#1dd1a1', '#a29bfe', '#ff9ff3', '#54a0ff',
-    '#00d2d3', '#f368e0', '#ff9f43', '#10ac84', '#c56cf0', '#7bed9f',
-    '#70a1ff', '#eccc68', '#ffdd59', '#34e7e4'
-  ];
-
   // Assigns a color the first time a name appears, and never reassigns it
-  // afterward — each player keeps one color for the life of the game.
+  // afterward — each player keeps one color for the life of the game. The palette and the
+  // pick rule live in compute.js, which the server shares for guest picks.
   function ensurePlayerColor(game, name) {
     const players = ensurePlayers(game);
     if (!players[name]) players[name] = { paid: false };
-    if (!players[name].color) {
-      const used = new Set(Object.values(players).map(p => p.color).filter(Boolean));
-      let color = PLAYER_COLORS.find(c => !used.has(c));
-      if (!color) color = PLAYER_COLORS[Object.keys(players).length % PLAYER_COLORS.length];
-      players[name].color = color;
-    }
+    if (!players[name].color) players[name].color = pickPlayerColor(players);
     return players[name].color;
   }
 
@@ -57,7 +44,11 @@
     const players = ensurePlayers(game);
     const alreadyPaid = !!(players[name] && players[name].paid);
     const existingColor = players[name] && players[name].color;
-    players[name] = { paid: alreadyPaid || !!paidChecked, color: existingColor };
+    // Keeps fields the host screens don't know (a guest's tag, `g`). Marking a name paid
+    // settles it in full, so a part-paid count (`paidSquares`) is dropped.
+    const next = Object.assign({}, players[name], { paid: alreadyPaid || !!paidChecked, color: existingColor });
+    if (next.paid) delete next.paidSquares;
+    players[name] = next;
     ensurePlayerColor(game, name);
   }
 
@@ -212,6 +203,7 @@
           row.querySelector('input[type=checkbox]').addEventListener('change', async (e) => {
             const players = ensurePlayers(game);
             players[p.name] = Object.assign({}, players[p.name], { paid: e.target.checked });
+            delete players[p.name].paidSquares; // paid or unpaid in full, the host's word
             await persistAndRefresh();
           });
           row.querySelector('.player-rename').addEventListener('click', () => {

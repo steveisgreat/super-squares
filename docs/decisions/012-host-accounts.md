@@ -216,5 +216,5 @@ R2 part 3 (2026-11-23: escaping audit, Content-Security-Policy, body limit, scri
   keeps `'unsafe-inline'` for `style=""` attributes; `style-src-elem` does not, so
   current browsers refuse injected `<style>` blocks.
 - A full simulated board measures 9.6 KB (12.8 KB with names in a three-byte script). The
-  limit is 28 KB, and 4 KB for a score operation. Over it is 413.
+  limit is 40 KB (28 KB before decision 019), and 4 KB for a score operation. Over it is 413.
 - The Postgres tests in CI read the secret `TEST_DATABASE_URL` and are skipped without it.

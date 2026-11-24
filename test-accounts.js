@@ -542,13 +542,15 @@ async function run() {
     const full = Object.assign(board(GAME_A), {
       scoring: 'simulation', simulation: true, status: 'picking',
       description: 'Washington Commanders @ Tampa Bay Buccaneers', potOverride: 1000,
-      autoCutoffTime: '2027-02-14T18:45', kickoffTime: '2027-02-14T23:30Z'
+      autoCutoffTime: '2027-02-14T18:45', kickoffTime: '2027-02-14T23:30Z',
+      guestPick: { on: true, max: 100, liftAt: '2027-02-14T18:45:00.000Z', lifted: false }
     });
     // The longest name the form allows, at three bytes a character.
     full.squares.forEach((s, i) => {
       const name = '字'.repeat(8) + String(i).padStart(2, '0') + '₁₂';
-      full.squares[i] = { name };
-      full.players[name] = { paid: false, color: '#feca57' };
+      full.squares[i] = { name, at: 1787441568 };
+      // A guest's tag and a part-paid count, as decision 019 stores them.
+      full.players[name] = { paid: false, color: '#feca57', g: 'abcdefghijklmnopqrstuv', paidSquares: 100 };
     });
     G.lockGame(full);
     while (full.simPlan.events.length < 14) full.simPlan.events.push({ team: 'a', atMs: 479999, points: 7 });
@@ -556,11 +558,11 @@ async function run() {
     full.results.final.autoResolve = { key: '5-6', row: 4, col: 7, drawnAt: 1787441568511 };
     full.liveScore = { a: 34, b: 31, period: 4, clock: '0:00', state: 'post', completed: true, simulation: true, updatedAt: full.updatedAt };
     const size = Buffer.byteLength(JSON.stringify(full));
-    assert(size * 2 <= 28 * 1024, `a full board is ${size} bytes`);
+    assert(size * 2 <= 40 * 1024, `a full board is ${size} bytes`);
     eq((await call('PUT', `/api/game/${GAME_A}`, { as: A, body: full })).statusCode, 200, 'a full board saves');
 
     reset();
-    const huge = Object.assign(board(GAME_A), { padding: 'x'.repeat(28 * 1024) });
+    const huge = Object.assign(board(GAME_A), { padding: 'x'.repeat(40 * 1024) });
     eq((await call('PUT', `/api/game/${GAME_A}`, { as: A, body: huge })).statusCode, 413, 'PUT');
     eq((await call('POST', '/api/game', { as: A, body: huge })).statusCode, 413, 'POST');
     eq((await call('PATCH', `/api/game/${GAME_A}/score`, { as: A, body: { op: 'end', padding: 'x'.repeat(4096) } })).statusCode, 413, 'PATCH');

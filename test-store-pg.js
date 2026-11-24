@@ -199,6 +199,24 @@ async function main() {
     assert(Array.isArray(after.axisX) && after.axisX.length === 10, 'the lock must have drawn axes');
   });
 
+  await check('readers that meet at the cutoff all get the same numbers', async () => {
+    const game = makeGame({
+      status: 'picking',
+      autoCutoffEnabled: true,
+      autoCutoffTime: new Date(Date.now() - 60000).toISOString(),
+      squares: new Array(100).fill(null)
+    });
+    await store.createGame(game);
+    // Opens the connections first, so the twelve reads really overlap.
+    await Promise.all(Array.from({ length: 12 }, () => store.getGame(crypto.randomUUID())));
+    const reads = await Promise.all(Array.from({ length: 12 }, () => store.getGame(game.id)));
+    const stored = await store.getGame(game.id);
+    reads.forEach(r => {
+      eq(r.status, 'started', 'locked');
+      eq([r.axisX, r.axisY, r.updatedAt], [stored.axisX, stored.axisY, stored.updatedAt], 'one draw for everyone');
+    });
+  });
+
   await check('a status-only write during listGames preserves simPlan exactly', async () => {
     const simPlan = { startedAt: new Date().toISOString(), quarterMs: 1000, events: [{ team: 'a', atMs: 1, points: 7 }] };
     const squares = new Array(100).fill(null);
@@ -274,8 +292,9 @@ async function main() {
 
     // Race the losing write against the row disappearing. Whether the row
     // survives long enough to be re-read is timing-dependent; what must never
-    // happen is a TypeError reading current[0].doc.
-    const pending = store.updateGame(game.id, makeGame({ id: game.id, teamA: 'Racer' }), '2020-01-01T00:00:00.000Z');
+    // happen is a TypeError reading current[0].doc. mustExist: without it, a delete that
+    // lands first turns the write into a legitimate insert.
+    const pending = store.updateGame(game.id, makeGame({ id: game.id, teamA: 'Racer' }), '2020-01-01T00:00:00.000Z', { mustExist: true });
     await sql`delete from games where id = ${game.id}`;
     const result = await pending;
 

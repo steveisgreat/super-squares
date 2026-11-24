@@ -26,7 +26,7 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `lib/auth.js` | Mode (`authMode`: accounts, password, off, misconfigured), signed cookies `sbs_session` (accounts) and `sbs_host` (password), sign-in tokens and codes, `identify(req)` (decisions 009, 012) |
 | `lib/mailer.js` | The sign-in email, one `fetch` to Resend |
 | `lib/store.js` | Storage contract and backend switch (decision 008) |
-| `lib/store-fs.js`, `lib/store-pg.js` | The two backends; both apply auto-cutoff on read |
+| `lib/store-fs.js`, `lib/store-pg.js` | The two backends; both apply auto-cutoff on read (Postgres: only if the row is unchanged since it was read) |
 | `lib/version.js` | App version from `package.json`; adds `+<short hash>` on Vercel non-production |
 | `lib/scores/` | Score providers (decision 001): `espn.js` and `balldontlie.js` adapters, `index.js` (config, failover, no-backward merge, quarter completion), `slate.js` (the shared slate: one claimed refresh per league and date every 15 s, merge into a board, `listGames` for the picker) |
 | `server-livescore.js` | Simulation scoring (`applySimulatedData`) via `refreshLiveScore`. Its ESPN lookup (`findEvent`, `getTodaysGames`) is no longer called by the API and remains only for `test-livescore.js` |
@@ -57,6 +57,8 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `POST /api/tv/follow` | owner of `gameId`; moves all the caller's paired TVs to that board |
 | `GET /api/tv/mine` | signed in; `{ count }` of the caller's paired TVs |
 | `GET /api/join/:code` | public; a join code resolves to `{ id }` (decision 016); 400 malformed, 404 unknown |
+| `POST /api/game/:id/guest` | anyone with the board id; `{ name }` this device holds, sets `sbs_guest` (180 d, `Path=/api/game/<id>`) if it has none; 409 unless guest picks are on and the board is picking (decision 019) |
+| `PATCH /api/game/:id/guest` | a device with that key; claim or release its own squares, one atomic write → `{ game, name }`; 400, 401 (never the host prompt), 409 with the current `game` |
 | `GET /<code>` (6 characters) | static; serves `index.html`, which resolves the code and opens the guest view |
 | `PATCH /api/game/:id/payout` | host only; mark a quarter paid out, undo, or settle (decision 015); a record only, no money moves |
 
@@ -65,7 +67,7 @@ list holds only the caller's boards. A foreign `Origin` on any write gets 403. A
 sign-in setup gets 503, as does a Vercel deploy with no sign-in set up at all.
 
 `PUT` sends the whole document with `updatedAt`; a stale `updatedAt` returns 409 with the
-current document. Game bodies over 28 KB and other bodies over 4 KB get 413.
+current document. Game bodies over 40 KB and other bodies over 4 KB get 413.
 `validateGame` (`compute.js`) holds every field that reaches markup to an exact type.
 
 ## Data

@@ -415,6 +415,22 @@
       if (!isRecord(p)) return 'Each player must be an object.';
       if (p.paid !== undefined && typeof p.paid !== 'boolean') return 'A player can only be paid or unpaid.';
       if (!isUnset(p.color) && !isColor(p.color)) return 'A player color must be a hex color (e.g. #336699).';
+      if (p.g !== undefined && !(typeof p.g === 'string' && GUEST_TAG_RE.test(p.g))) return 'A player guest tag is not valid.';
+      if (p.paidSquares !== undefined && !isWhole(p.paidSquares, 100)) return 'A player paid-squares count must be a whole number from 0 to 100.';
+    }
+    return null;
+  }
+
+  // The host's switch for guest picks (decision 019 section 3). Exact keys and types:
+  // the picking screen of every guest reads it.
+  function invalidGuestPick(gp) {
+    const bad = 'The guest-pick setting is not valid.';
+    if (!isRecord(gp)) return bad;
+    if (Object.keys(gp).some(k => ['on', 'max', 'liftAt', 'lifted'].indexOf(k) === -1)) return bad;
+    if (typeof gp.on !== 'boolean' || typeof gp.lifted !== 'boolean') return bad;
+    if (!Number.isInteger(gp.max) || gp.max < 1 || gp.max > 100) return bad;
+    if (!isUnset(gp.liftAt)) {
+      if (typeof gp.liftAt !== 'string' || !DATETIME_RE.test(gp.liftAt) || !ZONED_RE.test(gp.liftAt) || isNaN(Date.parse(gp.liftAt))) return bad;
     }
     return null;
   }
@@ -497,6 +513,8 @@
       if (typeof sq !== 'object' || Array.isArray(sq)) return 'Each square must be null or an object.';
       if (typeof sq.name !== 'string' || !sq.name.trim()) return 'Each claimed square must have a non-empty name.';
       if (!isPlayerName(sq.name)) return 'A player name is not allowed.';
+      // When a guest claimed it, in whole seconds since 1970 (decision 019 section 6).
+      if (sq.at !== undefined && !isWhole(sq.at, 1e11)) return 'A square claim time is not valid.';
     }
 
     if (!isRecord(game.payouts)) return 'Payouts are required.';
@@ -523,6 +541,7 @@
       || (!isUnset(game.liveScore) && invalidLiveScore(game.liveScore))
       || (!isUnset(game.simPlan) && invalidSimPlan(game.simPlan))
       || (!isUnset(game.paidOut) && invalidPaidOut(game.paidOut))
+      || (!isUnset(game.guestPick) && invalidGuestPick(game.guestPick))
       || null;
   }
 
@@ -826,7 +845,231 @@
     game.results[quarter][side] = value;
   }
 
+  // ---------- Player colors ----------
+  // Bright, saturated colors chosen to stay readable as text against the
+  // dark grid background (--panel2 #232e38) — no dim or near-black hues,
+  // and nothing too close to the red used for the unpaid-square warning.
+  const PLAYER_COLORS = [
+    '#feca57', '#48dbfb', '#1dd1a1', '#a29bfe', '#ff9ff3', '#54a0ff',
+    '#00d2d3', '#f368e0', '#ff9f43', '#10ac84', '#c56cf0', '#7bed9f',
+    '#70a1ff', '#eccc68', '#ffdd59', '#34e7e4'
+  ];
+
+  // The color for a player just added to `players` (the entry is already in the map): the
+  // first one nobody uses, else a repeat by count. The browser and the server share it.
+  function pickPlayerColor(players) {
+    const used = new Set(Object.values(players).map(p => p && p.color).filter(Boolean));
+    return PLAYER_COLORS.find(c => !used.has(c)) || PLAYER_COLORS[Object.keys(players).length % PLAYER_COLORS.length];
+  }
+
+  // ---------- Guest picks (R28, decision 019) ----------
+  // A guest claims and releases their own squares from one device. The device's key lives in
+  // a cookie; the board holds only its tag (players[name].g). Everything here is pure: the
+  // route reads the document, applies one op and writes it conditionally (decision 008).
+  const GUEST_TAG_RE = /^[A-Za-z0-9_-]{22}$/;
+  // Built on first use, never as literals: an old TV browser that can't parse \p would reject
+  // this whole file. Only the server and a guest's phone ever run them.
+  const guestRe = {};
+  const uni = (source) => guestRe[source] || (guestRe[source] = new RegExp(source, 'gu'));
+  const NAME_JUNK = "[^\\p{L}\\p{Nd} .'&-]|\\p{Default_Ignorable_Code_Point}"; // some letters are invisible
+  const INVISIBLE = '\\p{Cf}|\\p{Default_Ignorable_Code_Point}';
+  const MAX_GUEST_NAME = 10;
+  const DEFAULT_GUEST_MAX = 5;
+  const SUBSCRIPT_DIGITS_RE = /[₀-₉]/g;
+
+  const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const playerOf = (game, name) => (isRecord(game.players) && hasOwn(game.players, name) && isRecord(game.players[name]) ? game.players[name] : null);
+
+  // How taken-ness is judged: ignoring case, spacing, width forms, invisible characters and
+  // the host's ₁₂ suffix, so "ann", "Ann ₂" and "ＡＮＮ" are one name.
+  function nameKey(name) {
+    return String(name).replace(SUBSCRIPT_DIGITS_RE, '').normalize('NFKC').replace(uni(INVISIBLE), '')
+      .replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  // The typed name as it would be stored, or { error }. 1-10 code points after NFC; letters,
+  // digits, space and . ' - & only (no control, invisible or subscript characters).
+  function cleanGuestName(raw) {
+    if (typeof raw !== 'string' || raw.length > 100) return { error: 'Type a name of 1 to 10 letters or digits.' };
+    // Phones type a curly apostrophe.
+    const name = raw.normalize('NFC').replace(/[‘’]/g, "'").replace(/^ +| +$/g, '').replace(/ {2,}/g, ' ');
+    const length = Array.from(name).length;
+    if (!length || length > MAX_GUEST_NAME || name.replace(uni(NAME_JUNK), '') !== name
+      || name.search(uni('[\\p{L}\\p{Nd}]')) === -1 || !isPlayerName(name)) {
+      return { error: 'Use 1 to 10 letters, digits, spaces or . \' - & in your name.' };
+    }
+    return { name };
+  }
+
+  // The name this device holds on the board: the one whose players entry carries its tag and
+  // that still has a square. A name with no squares left is nobody's.
+  function guestNameOf(game, tag) {
+    if (typeof tag !== 'string' || !GUEST_TAG_RE.test(tag) || !isRecord(game.players) || !Array.isArray(game.squares)) return null;
+    const holding = new Set(game.squares.filter(Boolean).map(s => s.name));
+    for (const name of Object.keys(game.players)) {
+      const p = game.players[name];
+      if (isRecord(p) && p.g === tag && holding.has(name)) return name;
+    }
+    return null;
+  }
+
+  // How many squares one guest may hold right now, or Infinity. Judged at write time from the
+  // server's clock: there is no timer (decision 007).
+  function guestCap(game, now) {
+    const gp = isRecord(game.guestPick) ? game.guestPick : {};
+    if (gp.lifted === true) return Infinity;
+    if (typeof gp.liftAt === 'string') {
+      const t = Date.parse(gp.liftAt);
+      if (!isNaN(t) && (now === undefined ? Date.now() : now) >= t) return Infinity;
+    }
+    return Number.isInteger(gp.max) && gp.max >= 1 ? gp.max : DEFAULT_GUEST_MAX;
+  }
+
+  function squaresOf(game, name) {
+    const out = [];
+    game.squares.forEach((s, i) => { if (s && s.name === name) out.push(i); });
+    return out;
+  }
+
+  // How many of a name's squares the host has been paid for. A name marked paid is paid in
+  // full; otherwise players[name].paidSquares says how many (decision 019 section 5).
+  function paidSquareCount(game, name) {
+    const count = squaresOf(game, name).length;
+    const p = playerOf(game, name);
+    if (p && p.paid) return count;
+    return Math.min(p && isWhole(p.paidSquares, 100) ? p.paidSquares : 0, count);
+  }
+
+  // Indexes of the squares not paid for. Per name the oldest claims count as paid first
+  // (a square with no claim time is the oldest, then by index).
+  function unpaidSquares(game) {
+    const byName = new Map();
+    game.squares.forEach((s, i) => {
+      if (!s) return;
+      if (!byName.has(s.name)) byName.set(s.name, []);
+      byName.get(s.name).push({ i, at: typeof s.at === 'number' ? s.at : -1 });
+    });
+    const out = new Set();
+    byName.forEach((list, name) => {
+      list.sort((a, b) => a.at - b.at || a.i - b.i);
+      list.slice(paidSquareCount(game, name)).forEach(x => out.add(x.i));
+    });
+    return out;
+  }
+
+  const validSquareList = (v) => Array.isArray(v) && v.length >= 1 && v.length <= 100
+    && v.every(n => Number.isInteger(n) && n >= 0 && n <= 99) && new Set(v).size === v.length;
+
+  // One guest operation. Returns { game, name, changed } (a fresh copy; the input is never
+  // mutated; `name` is the name the device holds afterward, null for none) or
+  // { error, code } with code 'invalid' (HTTP 400) or 'illegal' (409). A refusal over taken
+  // squares also carries `taken`. ctx = { tag, now (ms), random (optional, for tests) }.
+  //   claim   { name, squares }       all or nothing; one already yours counts as done
+  //   claim   { name, count, have }   random open squares; `have` makes a retry safe
+  //   release { squares }             own squares only, never below the paid ones
+  // Only `squares` and `players` ever change.
+  function applyGuestOp(game, op, ctx) {
+    const c = ctx || {};
+    const now = typeof c.now === 'number' ? c.now : Date.now();
+    const random = typeof c.random === 'function' ? c.random : Math.random;
+    const refuse = (error, extra) => Object.assign(failure('illegal', error), extra);
+
+    if (!isRecord(op)) return failure('invalid', 'Pick operation must be an object.');
+    if (op.op !== 'claim' && op.op !== 'release') return failure('invalid', 'Unknown pick operation.');
+    if (typeof c.tag !== 'string' || !GUEST_TAG_RE.test(c.tag)) return failure('invalid', 'This device has no pick key.');
+    const release = op.op === 'release';
+    const bySquares = op.squares !== undefined;
+    const byCount = op.count !== undefined;
+    if (release && (!bySquares || byCount || op.have !== undefined)) return failure('invalid', 'Say which squares to release.');
+    if (!release && bySquares === byCount) return failure('invalid', 'Pick squares, or a count of squares.');
+    if (bySquares && !validSquareList(op.squares)) return failure('invalid', 'Pick from 1 to 100 different squares of the grid.');
+    if (byCount && (!Number.isInteger(op.count) || op.count < 1 || op.count > 100 || !Number.isInteger(op.have) || op.have < 0 || op.have > 100)) {
+      return failure('invalid', 'The count must be a whole number from 1 to 100.');
+    }
+
+    if (!game || game.status !== 'picking' || cutoffPassed(game, now)) return refuse('Picking is closed.');
+    if (!isRecord(game.guestPick) || game.guestPick.on !== true) return refuse('The host has not opened picking to guests.');
+    if (!release) {
+      const mode = game.pickMode || 'both';
+      if (byCount && mode === 'manual') return refuse('This board is Manual Only: pick your squares one by one.');
+      if (bySquares && mode === 'auto') return refuse('This board is Auto Only: ask for a number of squares.');
+    }
+
+    const g = JSON.parse(JSON.stringify(game));
+    if (!isRecord(g.players)) g.players = {};
+    const bound = guestNameOf(g, c.tag);
+    const mine = bound ? squaresOf(g, bound) : [];
+
+    if (release) {
+      if (!bound) return refuse('You have no squares on this board.');
+      const own = new Set(mine);
+      const drop = op.squares.filter(i => g.squares[i] !== null);
+      if (drop.some(i => !own.has(i))) return refuse('You can only release your own squares.');
+      if (!drop.length) return { game: g, name: bound, changed: false };
+      const left = mine.length - drop.length;
+      if (left < paidSquareCount(g, bound)) return refuse('Those squares are paid for. Ask the host.');
+      drop.forEach(i => { g.squares[i] = null; });
+      if (left === 0) {
+        delete g.players[bound];
+        return { game: g, name: null, changed: true };
+      }
+      return { game: g, name: bound, changed: true };
+    }
+
+    // A claim: a bound device keeps its name whatever the op says.
+    let name = bound;
+    if (!name) {
+      const clean = cleanGuestName(op.name);
+      if (clean.error) return failure('invalid', clean.error);
+      const key = nameKey(clean.name);
+      if (g.squares.some(s => s && nameKey(s.name) === key)) return refuse('That name is taken. Add a last initial, or ask the host.');
+      name = clean.name;
+    }
+
+    let fresh;
+    if (bySquares) {
+      const taken = op.squares.filter(i => g.squares[i] && g.squares[i].name !== name);
+      if (taken.length) return refuse('Some of those squares were just taken.', { taken });
+      fresh = op.squares.filter(i => g.squares[i] === null);
+    } else {
+      if (op.have !== mine.length) return refuse('Your squares changed since your screen updated. Check them and try again.');
+      const open = [];
+      g.squares.forEach((s, i) => { if (!s) open.push(i); });
+      if (op.count > open.length) return refuse(open.length ? `Only ${open.length} squares are open.` : 'No squares are open.');
+      for (let i = 0; i < op.count; i++) {
+        const j = i + Math.floor(random() * (open.length - i));
+        [open[i], open[j]] = [open[j], open[i]];
+      }
+      fresh = open.slice(0, op.count);
+    }
+    if (!fresh.length) return { game: g, name, changed: false };
+
+    const cap = guestCap(g, now);
+    if (mine.length + fresh.length > cap) {
+      const room = Math.max(0, cap - mine.length);
+      return refuse(`You can pick up to ${cap} squares. ${room ? `You have room for ${room} more.` : 'You have all of them.'}`);
+    }
+
+    const paidBefore = bound ? paidSquareCount(g, name) : 0;
+    const at = Math.floor(now / 1000);
+    fresh.forEach(i => { g.squares[i] = { name, at }; });
+    if (bound) {
+      // More squares than were paid for: the paid ones stay paid, the new ones are owed.
+      const p = g.players[name];
+      p.paid = false;
+      if (paidBefore > 0) p.paidSquares = paidBefore; else delete p.paidSquares;
+    } else {
+      // A fresh entry. Nothing a name left behind (a mark, a count, a tag) carries over.
+      Object.keys(g.players).forEach(n => { if (isRecord(g.players[n]) && g.players[n].g === c.tag) delete g.players[n]; });
+      g.players[name] = { paid: false, g: c.tag };
+      g.players[name].color = pickPlayerColor(g.players);
+    }
+    return { game: g, name, changed: true };
+  }
+
   return {
+    PLAYER_COLORS, pickPlayerColor,
+    applyGuestOp, guestCap, guestNameOf, paidSquareCount, unpaidSquares, cleanGuestName, nameKey,
     QUARTERS, QLABEL, STATUSES, LEAGUES, SCORING_MODES,
     scoringMode, manualEntry, applyScoreOp, setQuarterScore, belowEndedQuarter, manualState, hasResult,
     shuffle, shuffledDigits, emptyGrid,
