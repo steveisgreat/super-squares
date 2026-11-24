@@ -206,6 +206,27 @@ async function main() {
     }
   });
 
+  // ---------- no accounts in this backend ----------
+
+  await check('listGames needs { all: true } and throws on anything else', async () => {
+    for (const scope of [undefined, null, {}, { all: false }, { all: 1 }, { ownerId: crypto.randomUUID() }, { all: true, ownerId: 'x' }]) {
+      let threw = false;
+      await store.listGames(scope).catch(() => { threw = true; });
+      if (!threw) throw new Error(`must throw for ${JSON.stringify(scope)}`);
+    }
+    await store.listGames({ all: true });
+  });
+
+  await check('createGame refuses an owner and the account functions throw', async () => {
+    const g = makeGame();
+    for (const fn of [() => store.createGame(g, crypto.randomUUID()), () => store.getGameAccess(g.id, g.id), () => store.getHost(g.id)]) {
+      let threw = false;
+      await fn().catch(() => { threw = true; });
+      if (!threw) throw new Error('must throw');
+    }
+    eq(await store.getGame(g.id), null, 'nothing written');
+  });
+
   // ---------- report ----------
 
   for (const id of cleanupIds) {

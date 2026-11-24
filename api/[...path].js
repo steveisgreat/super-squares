@@ -6,6 +6,11 @@
 // location.origin (see screen-gameday.js / screen-player.js).
 'use strict';
 
+// Vercel sets VERCEL only when a project exposes its system variables. This
+// file runs nowhere else, so say so ourselves: auth.js must never fall back to
+// "no sign-in" on the public internet (decision 012).
+process.env.VERCEL = process.env.VERCEL || '1';
+
 const { handleApi, sendJSON } = require('../lib/api.js');
 
 module.exports = async function handler(req, res) {

@@ -31,7 +31,7 @@
 //   ... run the tests ...
 //   npx neonctl branches delete <branch-id> --project-id <id>
 //
-// The schema is applied from migrations/001_games.sql on startup, so a fresh
+// The schema is applied from migrations/*.sql on startup, so a fresh
 // branch needs no preparation.
 'use strict';
 
@@ -109,8 +109,10 @@ function makeGame(overrides) {
 // refuses multiple commands in one prepared statement, so it goes across one
 // statement at a time.
 async function applySchema() {
-  const file = path.join(__dirname, 'migrations', '001_games.sql');
-  const statements = fs.readFileSync(file, 'utf8')
+  const dir = path.join(__dirname, 'migrations');
+  const statements = fs.readdirSync(dir).sort()
+    .map(name => fs.readFileSync(path.join(dir, name), 'utf8'))
+    .join('\n')
     .split('\n')
     .filter(line => !line.trim().startsWith('--'))
     .join('\n')
@@ -179,7 +181,7 @@ async function main() {
     });
     await store.createGame(game);
 
-    const row = (await store.listGames()).find(g => g.id === game.id);
+    const row = (await store.listGames({ all: true })).find(g => g.id === game.id);
     assert(row, 'the game must appear in the listing');
     eq(row.status, 'started', 'the cutoff must have fired and locked the game');
 
@@ -216,7 +218,7 @@ async function main() {
     });
     await store.createGame(game);
 
-    const row = (await store.listGames()).find(g => g.id === game.id);
+    const row = (await store.listGames({ all: true })).find(g => g.id === game.id);
     eq(row.status, 'finished', 'syncStatus must have flipped the status, forcing a write');
 
     const after = await store.getGame(game.id);
@@ -237,7 +239,7 @@ async function main() {
     });
     await store.createGame(game);
 
-    const row = (await store.listGames()).find(g => g.id === game.id);
+    const row = (await store.listGames({ all: true })).find(g => g.id === game.id);
     assert(row, 'the game must be listed');
     for (const field of ['teamA', 'teamB', 'league', 'gameDate', 'status', 'updatedAt']) {
       assert(row[field] !== undefined && row[field] !== null, `${field} must be present`);
@@ -281,6 +283,151 @@ async function main() {
     assert(result.game === null || typeof result.game === 'object',
       'game must be null or a document, never a throw');
   });
+
+  // ---------- host accounts (decision 012) ----------
+
+  const hash = (v) => crypto.createHash('sha256').update(v).digest('hex');
+  const tag = crypto.randomUUID().slice(0, 8);
+  const address = (name) => `${name}-${tag}@test.invalid`;
+  const HUGE = 1000000;
+  async function ask(name, limits) {
+    const r = Object.assign({
+      id: crypto.randomUUID(), email: address(name),
+      tokenHash: hash(crypto.randomUUID()), codeHash: hash(crypto.randomUUID()),
+      perEmail: 5, perSite: HUGE
+    }, limits);
+    r.stored = await store.createLoginRequest(r);
+    return r;
+  }
+  async function signIn(name) {
+    const r = await ask(name);
+    return store.useLoginToken(r.tokenHash);
+  }
+
+  try {
+    await check('listGames needs a scope and throws on anything else', async () => {
+      for (const scope of [undefined, null, {}, { all: false }, { ownerId: undefined }, { ownerId: null }, { ownerId: '' }, { ownerId: 'x' },
+        { all: true, ownerId: crypto.randomUUID() }, { all: false, ownerId: crypto.randomUUID() }]) {
+        let threw = false;
+        await store.listGames(scope).catch(() => { threw = true; });
+        assert(threw, `must throw for ${JSON.stringify(scope)}`);
+      }
+    });
+
+    await check('each host lists only their own boards, and getGameAccess names the owner', async () => {
+      const a = await signIn('a');
+      const b = await signIn('b');
+      const mine = await store.createGame(makeGame(), a.id);
+      const unowned = await store.createGame(makeGame());
+      eq((await store.listGames({ ownerId: a.id })).map(g => g.id), [mine.id], 'host A');
+      eq(await store.listGames({ ownerId: b.id }), [], 'host B');
+      eq(await store.getGameAccess(mine.id, b.id), { exists: true, ownerId: a.id, sessionVersion: 1 }, 'owned');
+      eq(await store.getGameAccess(unowned.id, a.id), { exists: true, ownerId: null, sessionVersion: 1 }, 'unowned');
+      eq(await store.getGameAccess(crypto.randomUUID(), a.id), { exists: false, ownerId: null, sessionVersion: 1 }, 'unknown board');
+      eq(await store.getGameAccess('-'.repeat(36), a.id), { exists: false, ownerId: null, sessionVersion: 1 }, 'not an id');
+      eq((await store.getGameAccess(mine.id, crypto.randomUUID())).sessionVersion, null, 'unknown host');
+      assert(!JSON.stringify(await store.getGame(mine.id)).includes(a.id), 'the owner must not be in the document');
+
+      // A save keeps the owner.
+      const saved = await store.updateGame(mine.id, { ...mine, teamA: 'Bills' }, mine.updatedAt, { mustExist: true });
+      assert(saved.ok, 'save');
+      eq((await store.getGameAccess(mine.id, a.id)).ownerId, a.id, 'owner after a save');
+    });
+
+    await check('mustExist never creates a row, and keeps the conditional write', async () => {
+      const g = makeGame();
+      eq(await store.updateGame(g.id, g, null, { mustExist: true }), { ok: false, game: null }, 'unknown id');
+      eq(await store.getGame(g.id), null, 'nothing created');
+      const made = await store.createGame(g);
+      eq((await store.updateGame(g.id, g, '2020-01-01T00:00:00.000Z', { mustExist: true })).ok, false, 'stale');
+      const ok = await store.updateGame(g.id, g, made.updatedAt, { mustExist: true });
+      eq([ok.ok, ok.game.createdAt], [true, made.createdAt], 'current');
+      eq((await store.updateGame(g.id, g, null, { mustExist: true })).ok, true, 'no token');
+    });
+
+    await check('a link works once, and the account is created on the first sign-in only', async () => {
+      const r = await ask('link');
+      eq((await sql`select 1 from hosts where email = ${r.email}`).length, 0, 'no account before sign-in');
+      const host = await store.useLoginToken(r.tokenHash);
+      eq([host.email, host.sessionVersion], [r.email, 1], 'host');
+      eq(await store.getHost(host.id), { email: r.email, sessionVersion: 1 }, 'getHost');
+      eq(await store.useLoginToken(r.tokenHash), null, 'second use');
+      eq(await store.useLoginToken(hash('never issued')), null, 'unknown token');
+      eq((await signIn('link')).id, host.id, 'the same account next time');
+    });
+
+    await check('a link spent by many requests at once signs in exactly one', async () => {
+      const r = await ask('race');
+      const got = await Promise.all(Array.from({ length: 8 }, () => store.useLoginToken(r.tokenHash)));
+      eq(got.filter(Boolean).length, 1, 'winners');
+    });
+
+    await check('an expired link and code fail', async () => {
+      const r = await ask('expired');
+      await sql`update login_requests set expires_at = now() - interval '1 second' where id = ${r.id}`;
+      eq(await store.useLoginToken(r.tokenHash), null, 'link');
+      eq(await store.useLoginCode(r.id, r.codeHash, 5), null, 'code');
+    });
+
+    await check('a code works once, only under its own request, and uses up the link', async () => {
+      const r = await ask('code');
+      const other = await ask('code-other');
+      eq(await store.useLoginCode(other.id, r.codeHash, 5), null, 'another request');
+      eq((await store.useLoginCode(r.id, r.codeHash, 5)).email, r.email, 'right');
+      eq(await store.useLoginCode(r.id, r.codeHash, 5), null, 'second use');
+      eq(await store.useLoginToken(r.tokenHash), null, 'the link afterwards');
+    });
+
+    await check('four wrong tries leave the fifth; a sixth fails even if right; the link still works', async () => {
+      const four = await ask('four');
+      for (let i = 0; i < 4; i++) eq(await store.useLoginCode(four.id, hash('wrong' + i), 5), null, 'wrong');
+      eq((await store.useLoginCode(four.id, four.codeHash, 5)).email, four.email, 'fifth, right');
+      const five = await ask('five');
+      for (let i = 0; i < 5; i++) await store.useLoginCode(five.id, hash('wrong' + i), 5);
+      eq(await store.useLoginCode(five.id, five.codeHash, 5), null, 'sixth, right');
+      eq((await store.useLoginToken(five.tokenHash)).email, five.email, 'link');
+    });
+
+    await check('parallel tries cannot get past the limit', async () => {
+      const r = await ask('parallel');
+      await Promise.all(Array.from({ length: 12 }, (_, i) => store.useLoginCode(r.id, hash('wrong' + i), 5)));
+      eq((await sql`select attempts from login_requests where id = ${r.id}`)[0].attempts, 5, 'attempts');
+      eq(await store.useLoginCode(r.id, r.codeHash, 5), null, 'right, too late');
+    });
+
+    await check('parallel sign-in requests cannot get past the per-email limit', async () => {
+      const got = await Promise.all(Array.from({ length: 12 }, () => ask('flood')));
+      eq(got.filter(r => r.stored).length, 5, 'stored');
+      const refused = got.find(r => !r.stored);
+      eq(await store.useLoginToken(refused.tokenHash), null, 'a refused request has no link');
+      // An hour later there is room again.
+      await sql`update login_requests set created_at = now() - interval '61 minutes' where email = ${address('flood')}`;
+      assert((await ask('flood')).stored, 'room after an hour');
+    });
+
+    await check('the site-wide cap refuses, and rows over a day old are cleared', async () => {
+      const now = (await sql`select count(*)::int as n from login_requests where created_at > now() - interval '1 hour'`)[0].n;
+      eq((await ask('cap', { perSite: now })).stored, false, 'at the cap');
+      const old = await ask('old', { perSite: now + 1 });
+      assert(old.stored, 'one under the cap');
+      await sql`update login_requests set created_at = now() - interval '25 hours' where id = ${old.id}`;
+      await ask('sweep');
+      eq((await sql`select 1 from login_requests where id = ${old.id}`).length, 0, 'old rows');
+    });
+
+    await check('revoking needs the current version and moves it on by one', async () => {
+      const host = await signIn('revoke');
+      eq(await store.revokeSessions(host.id, 1), true, 'current');
+      eq((await store.getHost(host.id)).sessionVersion, 2, 'version');
+      eq(await store.revokeSessions(host.id, 1), false, 'old session');
+      eq((await signIn('revoke')).sessionVersion, 2, 'the next sign-in carries the new version');
+    });
+  } finally {
+    const mine = `%-${tag}@test.invalid`;
+    await sql`delete from games where owner_id in (select id from hosts where email like ${mine})`;
+    await sql`delete from hosts where email like ${mine}`;
+    await sql`delete from login_requests where email like ${mine}`;
+  }
 
   // ---------- report ----------
 

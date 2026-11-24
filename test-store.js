@@ -103,7 +103,7 @@ async function main() {
   await check('listGames includes a created game with the trimmed summary shape', async () => {
     const g = makeGame({ teamA: 'Bills', teamB: 'Dolphins', description: 'Test matchup' });
     await store.createGame(g);
-    const games = await store.listGames();
+    const games = await store.listGames({ all: true });
     const found = games.find(x => x.id === g.id);
     assert(found, 'created game should appear in listGames');
     eq(found.teamA, 'Bills', 'teamA');
@@ -185,6 +185,18 @@ async function main() {
     await store.createGame(g);
     const read = await store.getGame(g.id);
     eq(read.status, 'picking', 'should remain unlocked before the cutoff');
+  });
+
+  await check('updateGame with mustExist writes an existing game and never creates one', async () => {
+    const missing = makeGame();
+    eq(await store.updateGame(missing.id, missing, null, { mustExist: true }), { ok: false, game: null }, 'unknown id');
+    eq(await store.getGame(missing.id), null, 'nothing created');
+
+    const g = await store.createGame(makeGame());
+    const ok = await store.updateGame(g.id, { ...g, teamA: 'Bills' }, g.updatedAt, { mustExist: true });
+    eq([ok.ok, ok.game.teamA, ok.game.createdAt], [true, 'Bills', g.createdAt], 'current token');
+    const stale = await store.updateGame(g.id, { ...g, teamA: 'Rams' }, '2020-01-01T00:00:00.000Z', { mustExist: true });
+    eq([stale.ok, stale.game.teamA], [false, 'Bills'], 'stale token');
   });
 
   for (const id of cleanupIds) {

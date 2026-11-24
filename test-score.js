@@ -372,7 +372,7 @@ async function main() {
       const g = await mk();
       const real = store.updateGame;
       let first = true;
-      store.updateGame = async (id, doc, token) => {
+      store.updateGame = async (id, doc, token, opts) => {
         if (first) {
           first = false;
           // Someone else writes between our read and our write.
@@ -380,7 +380,7 @@ async function main() {
           cur.description = 'changed elsewhere';
           await real(id, cur, cur.updatedAt);
         }
-        return real(id, doc, token);
+        return real(id, doc, token, opts);
       };
       try {
         const res = await call('PATCH', `/api/game/${g.id}/score`, { op: 'add', side: 'a', points: 3 });

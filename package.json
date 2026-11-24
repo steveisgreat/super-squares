@@ -5,9 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test.js && node test-store.js && node test-auth.js && node test-livescore.js && node test-score.js && node test-store-fs.js && node test-store-pg.js",
+    "test": "node test.js && node test-store.js && node test-auth.js && node test-accounts.js && node test-livescore.js && node test-score.js && node test-store-fs.js && node test-store-pg.js",
     "test:store": "node test-store.js",
     "test:auth": "node test-auth.js",
+    "test:accounts": "node test-accounts.js",
     "test:livescore": "node test-livescore.js",
     "test:score": "node test-score.js",
     "test:store-fs": "node test-store-fs.js",

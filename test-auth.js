@@ -12,6 +12,8 @@
 // Must be settled before lib/store.js is required — it picks its backend once,
 // at require time, and these tests must never touch a real database.
 delete process.env.DATABASE_URL;
+delete process.env.AUTH_MODE;
+delete process.env.VERCEL;
 
 const crypto = require('crypto');
 const auth = require('./lib/auth.js');
@@ -177,7 +179,7 @@ async function run() {
   await check('malformed cookies are rejected without throwing', () => {
     withAuth(PASSWORD);
     const junk = [
-      '', 'sbs_host=', 'sbs_host=.', 'sbs_host=abc', 'sbs_host=abc.def',
+      '', 'sbs_host=', 'sbs_host=%', '%=%', 'sbs_host=.', 'sbs_host=abc', 'sbs_host=abc.def',
       'sbs_host=123', 'sbs_host=' + 'z'.repeat(64), 'nonsense', '=', ';;;',
       'sbs_host=' + mintToken(Math.floor(Date.now() / 1000) + 600, 'wrong key')
     ];
@@ -277,9 +279,9 @@ async function run() {
   await check('GET /api/session reports the mode without leaking anything', async () => {
     withAuth(null);
     const { version } = require('./package.json');
-    eq((await call('GET', '/api/session')).json, { authRequired: false, host: true, version }, 'auth off');
+    eq((await call('GET', '/api/session')).json, { authRequired: false, host: true, mode: 'off', version }, 'auth off');
     withAuth(PASSWORD);
-    eq((await call('GET', '/api/session')).json, { authRequired: true, host: false, version }, 'auth on, anonymous');
+    eq((await call('GET', '/api/session')).json, { authRequired: true, host: false, mode: 'password', version }, 'auth on, anonymous');
   });
 
   await check('signing in issues a cookie that then authorizes a guarded route', async () => {

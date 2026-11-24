@@ -175,3 +175,15 @@ then set `AUTH_MODE=accounts`. Roll back by unsetting it.
   possible). Per-board scorekeeper links are not in R2.
 - Not in R2: teams or co-hosts, changing an email, self-service account deletion (by hand
   from the runbook until built), social sign-in.
+
+## Build notes
+R2 part 1 (2026-11-23: migration 002, store, `lib/auth.js`, `lib/mailer.js`, routes, tests):
+- §7's 404 for `PUT` on an unknown id, and update-only writes, apply in accounts mode
+  only. Password and off modes keep the old upsert, so the LAN build is unchanged.
+- Accounts mode requires a `SESSION_SECRET` of 32+ characters and an `https` `APP_ORIGIN`
+  on Vercel. An unrecognized `AUTH_MODE` fails closed (503). `api/[...path].js` sets
+  `VERCEL` itself, because Vercel sets it only when system variables are exposed.
+- Over either email limit the answer is 429, the same for known and unknown addresses.
+- "Sign out everywhere" includes the device that asked. `GET /api/session` also returns
+  `mode`. The cross-site check applies in every mode.
+- `LOGIN_EMAILS_PER_HOUR` defaults to 200. Password mode runs without migration 002.

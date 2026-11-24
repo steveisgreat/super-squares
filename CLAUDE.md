@@ -17,7 +17,7 @@ Node 24, no build step, vanilla JS front end in `public/`, two runtime dependenc
 |---|---|
 | Run (LAN build, fs storage) | `npm start` (port 3000), or `start-app.bat` |
 | All tests | `npm test` (Postgres tests skip without `DATABASE_URL`) |
-| One suite | `npm run test:store`, `test:auth`, `test:livescore`, `test:store-fs`, `test:store-pg` |
+| One suite | `npm run test:store`, `test:auth`, `test:accounts`, `test:livescore`, `test:store-fs`, `test:store-pg` |
 | Preview pane | `preview_start` with name `super-squares` (`.claude/launch.json`) |
 
 Details for env vars, deploy and rollback: `docs/runbook.md`.
@@ -52,9 +52,10 @@ GitHub Issues on `steveisgreat/super-squares` (labels `bug`, `feature`, `idea`, 
   multiplexer) stays in `server.js`.
 - **Storage goes through `lib/store.js` only.** Never read `data/` or call Postgres
   from a route. `updateGame` is the one atomic check-and-write (decision 008).
-- **Authorization is route-level** in `lib/api.js` (`denyUnlessHost`), never in the
-  store. A game id is a read capability only (decision 009). `HOST_PASSWORD` unset
-  means auth off, and the LAN build must keep working with auth off.
+- **Authorization is route-level** in `lib/api.js` (`denyUnlessSignedIn`,
+  `denyUnlessOwner`), never in the store. A game id is a read capability only
+  (decisions 009, 012). With nothing set, auth is off off-Vercel only, and the LAN build
+  must keep working that way. `owner_id` is a column, never in `doc`.
 - **Never add a keepalive, cron ping or poller** for Neon. Design for the cold start
   (global rule). No timer-based server work: Vercel has no long-lived process
   (decision 007).
