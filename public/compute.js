@@ -180,13 +180,15 @@
     return { pot, results: out, cellLabels, unallocated: carry };
   }
 
-  // Deltas covering every realistic next scoring play: safety (2), field goal
-  // (3), touchdown without the kick (6), touchdown with the kick (7), or a
-  // two-point conversion (8). Kept flat rather than trying to detect the
-  // brief window between a TD landing (+6) and the PAT resolving (+7/+8) —
-  // the 2-point square is already highlighted before the snap, and nothing
-  // needs to change when the PAT resolves either way.
-  const NEAR_SCORE_DELTAS = [2, 3, 6, 7, 8];
+  // Deltas covering every realistic next scoring play, per league.
+  // NFL: safety (2), field goal (3), touchdown without the kick (6), touchdown
+  // with the kick (7), or a two-point conversion (8). Kept flat rather than
+  // trying to detect the brief window between a TD landing (+6) and the PAT
+  // resolving (+7/+8): the 2-point square is already highlighted before the
+  // snap, and nothing needs to change when the PAT resolves either way.
+  // NBA: free throw (1), field goal (2), three (3).
+  // Other: the sport is unknown, so no near squares, only the current winner.
+  const NEAR_SCORE_DELTAS = { nfl: [2, 3, 6, 7, 8], nba: [1, 2, 3], other: [] };
 
   // The square that would win right now if the live/simulated score ended
   // exactly as-is, plus every square one probable score away for either
@@ -205,7 +207,7 @@
 
     const winnerKey = `${liveRow}-${liveCol}`;
     const nearKeys = new Set();
-    NEAR_SCORE_DELTAS.forEach(delta => {
+    (NEAR_SCORE_DELTAS[game.league] || NEAR_SCORE_DELTAS.other).forEach(delta => {
       const row = findRow(game, lastDigit(live.a + delta));
       if (row >= 0) {
         const key = `${row}-${liveCol}`;
@@ -535,9 +537,13 @@
   // The manual current score; a game nobody has tapped yet reads 0-0, Q1.
   function manualState(game) {
     const live = game.liveScore;
-    // A Live board seeds the host's entry from the feed's last score.
+    // A Live board seeds the host's entry from the feed's last score. A feed numbers each
+    // overtime as its own period (5, 6, ...); the host has one OT period, so cap it there.
     if (live && (live.manual || scoringMode(game) === 'live')) {
-      return { a: Number.isFinite(live.a) ? live.a : 0, b: Number.isFinite(live.b) ? live.b : 0, period: live.period || 1 };
+      return {
+        a: Number.isFinite(live.a) ? live.a : 0, b: Number.isFinite(live.b) ? live.b : 0,
+        period: Math.min(live.period || 1, OT_PERIOD)
+      };
     }
     return { a: 0, b: 0, period: 1 };
   }

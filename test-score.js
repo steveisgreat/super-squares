@@ -271,6 +271,126 @@ async function main() {
     eq([G.hasResult({ a: 0, b: 0 }), G.hasResult({ a: 1 }), G.hasResult(undefined), G.hasResult({ a: '', b: 2 })], [true, false, false, false]);
   });
 
+  // ---------- Live board: host takeover and resume (decision 001 section 6) ----------
+  // A Live board as the GET route hands it over: liveScore merged from the feed, not manual.
+  function liveGame(feed, extra) {
+    return baseGame(Object.assign({
+      scoring: 'live',
+      liveScore: feed === null ? null : Object.assign({
+        a: 0, b: 0, period: 1, clock: '12:00', state: 'in', completed: false, provider: 'espn'
+      }, feed)
+    }, extra || {}));
+  }
+  const takeover = (op) => Object.assign({ override: true }, op);
+
+  await check('live: a tap without override is illegal while the feed holds the score', () => {
+    for (const op of [add('a', 3), { op: 'set', a: 1, b: 1 }, { op: 'end' }, { op: 'final' }, { op: 'undo' }, { op: 'edit', quarter: 'q1', a: 1, b: 1 }]) {
+      eq(G.applyScoreOp(liveGame({ a: 7, b: 3 }), op).code, 'illegal', JSON.stringify(op));
+    }
+  });
+  await check('live: override seeds from the feed score and period, then holds it', () => {
+    const g = run(liveGame({ a: 14, b: 10, period: 3 }), [takeover(add('a', 3))]);
+    eq([g.liveOverride, g.liveScore.a, g.liveScore.b, g.liveScore.period, g.liveScore.manual, g.liveScore.state],
+      [true, 17, 10, 3, true, 'in']);
+    eq(g.liveScore.provider, undefined, 'feed fields are not kept on the host score');
+  });
+  await check('live: once held, later ops need no override', () => {
+    const g = run(liveGame({ a: 14, b: 10, period: 3 }), [takeover(add('a', 3)), add('b', 7), { op: 'end' }]);
+    eq([g.results.q3.a, g.results.q3.b, g.liveScore.period, g.liveOverride], [17, 17, 4, true]);
+  });
+  await check('live: override with no feed score starts at 0-0, Q1', () => {
+    const g = run(liveGame(null), [takeover(add('b', 2))]);
+    eq([g.liveScore.a, g.liveScore.b, g.liveScore.period], [0, 2, 1]);
+  });
+  await check('live: a pre-game feed (period 0, no scores) seeds 0-0, Q1', () => {
+    const g = run(liveGame({ a: null, b: null, period: 0, state: 'pre' }), [takeover(add('a', 7))]);
+    eq([g.liveScore.a, g.liveScore.b, g.liveScore.period, g.liveScore.state], [7, 0, 1, 'in']);
+  });
+  await check('live: end after takeover keeps feed-filled quarters and writes the next one', () => {
+    const feedQ1 = { a: 7, b: 0 };
+    const g = run(liveGame({ a: 10, b: 3, period: 2 }, { results: { q1: feedQ1 } }), [takeover({ op: 'end' })]);
+    eq([g.results.q1, g.results.q2.a, g.results.q2.b], [feedQ1, 10, 3]);
+  });
+  await check('live: undo after takeover can reopen a feed-filled quarter', () => {
+    const g = run(liveGame({ a: 10, b: 3, period: 2 }, { results: { q1: { a: 7, b: 0 } } }), [takeover({ op: 'undo' })]);
+    eq([g.results.q1, g.liveScore.period, g.liveOverride], [undefined, 1, true]);
+  });
+  await check('live: override is illegal on Manual and Simulation boards the same as without it', () => {
+    eq(G.applyScoreOp(baseGame({ scoring: 'simulation' }), takeover(add('a', 3))).code, 'illegal');
+    const manual = G.applyScoreOp(baseGame(), takeover(add('a', 3)));
+    eq([manual.error, manual.game.liveOverride], [undefined, undefined], 'a Manual board never gets liveOverride');
+  });
+  await check('live: override is still illegal before the board is locked', () => {
+    eq(G.applyScoreOp(liveGame({ a: 0, b: 0 }, { status: 'picking' }), takeover(add('a', 3))).code, 'illegal');
+  });
+  await check('live: the takeover does not mutate its input', () => {
+    const g = liveGame({ a: 14, b: 10, period: 3 });
+    const before = JSON.stringify(g);
+    run(g, [takeover(add('a', 3))]);
+    eq(JSON.stringify(g), before);
+  });
+  await check('live: resume clears the host score and liveOverride, keeps every result', () => {
+    const held = run(liveGame({ a: 14, b: 10, period: 2 }), [takeover({ op: 'end' }), add('a', 3)]);
+    const back = run(held, [{ op: 'resume' }]);
+    eq([back.liveOverride, back.liveScore, back.results.q2], [undefined, null, { a: 14, b: 10 }]);
+    eq(G.manualEntry(back), false, 'the score panel hides again while the feed is up');
+  });
+  await check('live: resume on a finished game keeps the final and the status', () => {
+    const held = run(liveGame({ a: 24, b: 17, period: 4 }), [takeover({ op: 'final' })]);
+    eq(held.status, 'finished');
+    const back = run(held, [{ op: 'resume' }]);
+    eq([back.status, back.results.final, back.liveOverride], ['finished', { a: 24, b: 17 }, undefined]);
+  });
+  await check('live: resume with nothing held is allowed and changes no result', () => {
+    const g = liveGame({ a: 7, b: 3 }, { results: { q1: { a: 7, b: 3 } } });
+    const back = run(g, [{ op: 'resume' }]);
+    eq([back.results, back.liveScore, back.liveOverride], [{ q1: { a: 7, b: 3 } }, null, undefined]);
+  });
+  await check('live: resume does not mutate its input', () => {
+    const held = run(liveGame({ a: 7, b: 3 }), [takeover(add('a', 1))]);
+    const before = JSON.stringify(held);
+    run(held, [{ op: 'resume' }]);
+    eq(JSON.stringify(held), before);
+  });
+  await check('live: resume is illegal on Manual and Simulation boards and before lock', () => {
+    eq(G.applyScoreOp(baseGame(), { op: 'resume' }).code, 'illegal');
+    eq(G.applyScoreOp(baseGame({ scoring: 'simulation' }), { op: 'resume' }).code, 'illegal');
+    eq(G.applyScoreOp(liveGame({ a: 0, b: 0 }, { status: 'picking' }), { op: 'resume' }).code, 'illegal');
+  });
+  await check('live: take over again after resume seeds from the new feed score', () => {
+    const back = run(liveGame({ a: 7, b: 3 }), [takeover(add('a', 1)), { op: 'resume' }]);
+    back.liveScore = { a: 21, b: 13, period: 3, clock: '4:00', state: 'in', completed: false, provider: 'espn' };
+    const again = run(back, [takeover(add('b', 3))]);
+    eq([again.liveScore.a, again.liveScore.b, again.liveScore.period, again.liveOverride], [21, 16, 3, true]);
+  });
+  await check('live: after a feed final, a tap is illegal but undo reopens the game', () => {
+    const g = liveGame({ a: 24, b: 17, period: 4, state: 'post', completed: true },
+      { status: 'finished', results: { q1: { a: 7, b: 3 }, q2: { a: 14, b: 10 }, q3: { a: 21, b: 17 }, final: { a: 24, b: 17 } } });
+    eq(G.applyScoreOp(g, takeover(add('a', 3))).code, 'illegal');
+    const reopened = run(g, [takeover({ op: 'undo' })]);
+    eq([reopened.status, reopened.results.final, reopened.liveScore.state, reopened.liveScore.period, reopened.liveOverride],
+      ['started', undefined, 'in', 4, true]);
+  });
+  // A feed reports each overtime as its own period (5, 6, ...); the host panel has one OT.
+  await check('live: seeded from a second overtime, undo returns to Q4 and keeps Q3', () => {
+    const results = { q1: { a: 7, b: 7 }, q2: { a: 14, b: 14 }, q3: { a: 21, b: 21 } };
+    const g = run(liveGame({ a: 30, b: 30, period: 6 }, { results }), [takeover({ op: 'undo' })]);
+    eq([g.results.q3, g.liveScore.period], [{ a: 21, b: 21 }, 4]);
+  });
+  await check('live: seeded from a second overtime, End finishes like the one OT period', () => {
+    const results = { q1: { a: 7, b: 7 }, q2: { a: 14, b: 14 }, q3: { a: 21, b: 21 } };
+    const g = run(liveGame({ a: 36, b: 30, period: 6 }, { results }), [takeover({ op: 'end' })]);
+    eq([g.status, g.results.final, g.liveScore.period], ['finished', { a: 36, b: 30 }, 5]);
+  });
+  await check('manualEntry: Live board shows the panel on an outage or a held score only', () => {
+    eq(G.manualEntry({ scoring: 'live' }), false);
+    eq(G.manualEntry({ scoring: 'live', liveFeed: { available: true } }), false);
+    eq(G.manualEntry({ scoring: 'live', liveFeed: { available: false } }), true);
+    eq(G.manualEntry({ scoring: 'live', liveOverride: true }), true);
+    eq(G.manualEntry({ scoring: 'simulation', liveOverride: true, liveFeed: { available: false } }), false);
+    eq(G.manualEntry({ scoring: 'manual' }), true);
+  });
+
   // ---------- live refresh gating ----------
   await check('refreshLiveScore never touches a manual game', async () => {
     const LiveScore = require('./server-livescore.js');

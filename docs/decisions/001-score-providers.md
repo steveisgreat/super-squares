@@ -162,6 +162,8 @@ Built as designed in §3 to §6, with these differences and additions:
   `liveOverride` (`GameLogic.manualEntry`).
 - **Host wins by position, not a stamp.** The feed fills only quarters with no result, so a
   host entry needs no `source: 'host'` mark.
+- **One overtime period.** A feed numbers each overtime as its own period (5, 6, ...); the host
+  panel has one, so a takeover in a later overtime seeds as period 5 (`manualState`).
 - **Picker.** `/api/todays-games` lists the slate (names from `teams.js`, kickoff from a new
   `startsAt` field on `LiveGame`). It answers 502 only when no fetch has ever succeeded.
 - **Unread slate degrades.** If the table is missing or the read throws, a Live board reads as
