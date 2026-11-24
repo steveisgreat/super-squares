@@ -297,6 +297,20 @@
     // ---- Results panel ----
     const resultsCard = el('div', 'card');
     layout.appendChild(resultsCard);
+    // Manual scoring: the current-score panel sits above the quarter cards
+    // and hides itself in any other mode or before the board is locked.
+    const scorePanel = SBS.scorePanel.create({
+      getGame: () => game,
+      setGame: (g) => {
+        Object.assign(game, g);
+        const c = computeGame(game);
+        SBS.board.renderFullBoard(boardHolder, game, c);
+        fitTeamBadges(boardHolder);
+        refreshQuarterCards(c);
+      }
+    });
+    resultsCard.appendChild(scorePanel.el);
+    scorePanel.update();
     resultsCard.appendChild(el('h3', '', 'Quarterly Results'));
     const qgrid = el('div', 'quarters');
     resultsCard.appendChild(qgrid);
@@ -335,6 +349,11 @@
 
         const inputA = scoreRow.querySelector(`#score-${q}-a`);
         const inputB = scoreRow.querySelector(`#score-${q}-b`);
+        // Manual scoring: results move only through the score panel (End,
+        // Undo, Edit), so typing here can never desync them from the period.
+        if (window.GameLogic.scoringMode(game) === 'manual') {
+          [inputA, inputB].forEach(i => { i.readOnly = true; i.setAttribute('aria-readonly', 'true'); i.title = 'Use the Current score panel to change scores.'; });
+        }
         inputA.addEventListener('input', (e) => onScoreChange(q, 'a', e.target.value));
         inputB.addEventListener('input', (e) => onScoreChange(q, 'b', e.target.value));
         // Re-render with the normalized value once the host moves on.
@@ -465,6 +484,7 @@
         SBS.board.renderFullBoard(boardHolder, game, newComputed);
         fitTeamBadges(boardHolder);
         refreshQuarterCards(newComputed);
+        scorePanel.update();
       } catch (e) {
         if (await SBS.handleConflict(e, game.id)) return;
         console.error('Save failed', e);
@@ -478,7 +498,7 @@
     // in flight so the two never race each other.
     let syncing = false;
     async function pollLive() {
-      if (saveTimer || syncing) return;
+      if (saveTimer || syncing || scorePanel.busy()) return;
       syncing = true;
       try {
         const fresh = await SBS.api.getGame(game.id);
@@ -489,6 +509,7 @@
           SBS.board.renderFullBoard(boardHolder, game, newComputed);
           fitTeamBadges(boardHolder);
           refreshQuarterCards(newComputed);
+          scorePanel.update();
         }
       } catch (e) {
         // Deleted on another device — nothing left here to show.

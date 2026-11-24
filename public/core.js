@@ -95,6 +95,7 @@
     getGame: (id) => request(`/api/game/${id}`),
     createGame: (game) => request('/api/game', json('POST', game)),
     saveGame: (game) => request(`/api/game/${game.id}`, json('PUT', game)),
+    patchScore: (id, op) => request(`/api/game/${id}/score`, json('PATCH', op)),
     deleteGame: (id) => request(`/api/game/${id}`, { method: 'DELETE' }),
     getHosts: () => request('/api/hosts'),
     getTodaysGames: (date, league) => request(`/api/todays-games?${new URLSearchParams({ date: date || '', league: league || '' })}`)

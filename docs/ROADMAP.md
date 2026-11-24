@@ -49,8 +49,8 @@ assigned to Steve's account.
 *Done:* tenant-isolation tests pass in CI (host A cannot list, read-for-write,
 edit or delete host B's games); `/code-review high` clean.
 
-**R3. Manual current score** — `Sonnet` — Depends on: none (R2 later swaps its
-host check for an owner check).
+**R3. Manual current score** — `Sonnet` — ✅ shipped 2026-11-23 ([decision 011](decisions/011-manual-scoring.md)); R2 later swaps its
+host check for an owner check.
 - Scoring mode per game in Setup: **Manual** (default), Live, Simulation.
   Manual never calls ESPN.
 - Current score panel on Phone Score Entry and Game Day: full score per team
@@ -78,8 +78,8 @@ badge.
 grid and setup.
 
 **R4a. Score provider layer and shared cache** — `Sonnet` (design done in
-[decision 001](decisions/001-score-providers.md)) — Depends on: R3 (the
-`scoring` field).
+[decision 001](decisions/001-score-providers.md)) — Depends on: R3 ✅ (the
+`scoring` field, `GameLogic.scoringMode`), probe fixtures.
 Adapters for ESPN and BALLDONTLIE behind one `LiveGame` shape;
 `SCORE_PRIMARY` / `SCORE_SECONDARY` with failover; `live_slates` table and
 fs equivalent; one claimed refresh per league and date every 15 s; boards merge
@@ -169,6 +169,8 @@ office-pool groups.
 
 ## Recently shipped
 
+- R3: manual current score: Manual/Live/Simulation per game, score panel on phone and
+  Game Day, `PATCH /api/game/:id/score`, 43 transition tests (2026-11-23)
 - R0: ported to the RileySoft model: `CLAUDE.md`, `ARCHITECTURE.md`, runbook,
   decisions 002–010, issue templates, version in the Home footer (2026-11-23)
 - Postgres tests for store-pg, skipped without `DATABASE_URL` (d8fa14b)

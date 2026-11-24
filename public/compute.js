@@ -287,6 +287,8 @@
     }
     if (Math.abs(total - 100) > 0.01) return `Quarterly payout percentages must total 100% (got ${total}%).`;
 
+    if (game.scoring !== undefined && SCORING_MODES.indexOf(game.scoring) === -1) return `Scoring must be one of: ${SCORING_MODES.join(', ')}.`;
+
     if (STATUSES.indexOf(game.status) === -1) return `Status must be one of: ${STATUSES.join(', ')}.`;
 
     for (const axis of ['axisX', 'axisY']) {
@@ -407,8 +409,160 @@
     return game;
   }
 
+  // ---------- Scoring mode and manual score entry ----------
+  const SCORING_MODES = ['manual', 'live', 'simulation'];
+  const MAX_SCORE = 999;
+  const OT_PERIOD = 5;
+
+  // The one place the legacy rule lives: a stored game with no `scoring`
+  // reads as 'simulation' when game.simulation is set, else 'live', which is
+  // what every board made before manual mode did.
+  function scoringMode(game) {
+    if (game && SCORING_MODES.indexOf(game.scoring) !== -1) return game.scoring;
+    return game && game.simulation ? 'simulation' : 'live';
+  }
+
+  function isScore(n) {
+    return Number.isInteger(n) && n >= 0 && n <= MAX_SCORE;
+  }
+
+  function hasResult(entry) {
+    return !!entry && entry.a !== null && entry.a !== undefined && entry.a !== ''
+      && entry.b !== null && entry.b !== undefined && entry.b !== '';
+  }
+
+  function failure(code, error) { return { error, code }; }
+
+  // The manual current score; a game nobody has tapped yet reads 0-0, Q1.
+  function manualState(game) {
+    const live = game.liveScore;
+    if (live && live.manual) {
+      return { a: live.a, b: live.b, period: live.period || 1 };
+    }
+    return { a: 0, b: 0, period: 1 };
+  }
+
+  // The label of the first ended quarter whose score the current score has
+  // fallen below (a likely mis-tap), or null. The UI confirms before ending.
+  function belowEndedQuarter(game) {
+    const cur = manualState(game);
+    for (const q of ['q1', 'q2', 'q3']) {
+      const r = game.results && game.results[q];
+      if (hasResult(r) && (cur.a < Number(r.a) || cur.b < Number(r.b))) return QLABEL[q];
+    }
+    return null;
+  }
+
+  function writeLive(g, s, extra) {
+    g.liveScore = Object.assign({
+      a: s.a, b: s.b, period: s.period, clock: '', state: 'in', completed: false,
+      manual: true, updatedAt: new Date().toISOString()
+    }, extra || {});
+  }
+
+  // One manual-score operation, as a pure function: returns { game } (a fresh
+  // copy; the input is never mutated) or { error, code } where code is
+  // 'invalid' (malformed op, HTTP 400) or 'illegal' (not allowed in the
+  // current state, HTTP 409). The server is the authority; the UI calls the
+  // same function for optimistic display.
+  function applyScoreOp(game, op) {
+    if (!op || typeof op !== 'object' || Array.isArray(op)) return failure('invalid', 'Score operation must be an object.');
+    const name = op.op;
+    if (['add', 'set', 'end', 'final', 'undo', 'edit'].indexOf(name) === -1) return failure('invalid', 'Unknown score operation.');
+
+    // Validate the body before looking at game state, so a bad request is 400
+    // whatever state the game is in.
+    if (name === 'add') {
+      if (op.side !== 'a' && op.side !== 'b') return failure('invalid', 'Side must be "a" or "b".');
+      if (!Number.isInteger(op.points) || Math.abs(op.points) > MAX_SCORE) return failure('invalid', 'Points must be a whole number.');
+    }
+    if (name === 'set' && (!isScore(op.a) || !isScore(op.b))) return failure('invalid', `Scores must be whole numbers from 0 to ${MAX_SCORE}.`);
+    if (name === 'edit') {
+      if (QUARTERS.indexOf(op.quarter) === -1) return failure('invalid', 'Quarter must be q1, q2, q3 or final.');
+      if (!isScore(op.a) || !isScore(op.b)) return failure('invalid', `Scores must be whole numbers from 0 to ${MAX_SCORE}.`);
+    }
+
+    if (scoringMode(game) !== 'manual') return failure('illegal', 'This game does not use manual scoring.');
+    if (game.status !== 'started' && game.status !== 'finished') return failure('illegal', 'Scoring opens once the board is locked.');
+
+    const g = JSON.parse(JSON.stringify(game));
+    if (!g.results) g.results = {};
+    const s = manualState(g);
+    const finished = hasResult(g.results.final);
+    const ended = (q) => hasResult(g.results[q]);
+
+    if (name === 'edit') {
+      if (!ended(op.quarter)) return failure('illegal', `${QLABEL[op.quarter]} has not ended yet.`);
+      const entry = g.results[op.quarter];
+      entry.a = op.a;
+      entry.b = op.b;
+      // A stored draw is keyed by grid row-col, and computeGame ignores one
+      // that no longer matches, so there is nothing to clear here.
+      return { game: syncStatus(g) };
+    }
+
+    if (name === 'undo') {
+      if (finished) {
+        // Clear only the score: a stored draw stays, so Undo then Final at the
+        // same score keeps the drawn winner instead of re-rolling it.
+        delete g.results.final.a;
+        delete g.results.final.b;
+        if (!g.results.final.autoResolve) delete g.results.final;
+        syncStatus(g);
+        writeLive(g, s);
+        return { game: g };
+      }
+      if (s.period === OT_PERIOD) {
+        writeLive(g, Object.assign({}, s, { period: 4 }));
+        return { game: g };
+      }
+      for (let n = Math.min(s.period - 1, 3); n >= 1; n--) {
+        const q = 'q' + n;
+        if (ended(q)) {
+          delete g.results[q];
+          writeLive(g, Object.assign({}, s, { period: n }));
+          return { game: g };
+        }
+      }
+      return failure('illegal', 'Nothing has ended yet.');
+    }
+
+    if (finished) return failure('illegal', 'The game is already final.');
+
+    if (name === 'add') {
+      const key = op.side;
+      const next = Math.min(MAX_SCORE, Math.max(0, s[key] + op.points));
+      writeLive(g, Object.assign({}, s, { [key]: next }));
+      return { game: g };
+    }
+    if (name === 'set') {
+      writeLive(g, Object.assign({}, s, { a: op.a, b: op.b }));
+      return { game: g };
+    }
+
+    // end / final
+    const finish = () => {
+      g.results.final = Object.assign({}, g.results.final, { a: s.a, b: s.b });
+      writeLive(g, s, { state: 'post', completed: true });
+      syncStatus(g);
+      return { game: g };
+    };
+    if (name === 'final') return finish();
+    if (s.period <= 3) {
+      g.results['q' + s.period] = Object.assign({}, g.results['q' + s.period], { a: s.a, b: s.b });
+      writeLive(g, Object.assign({}, s, { period: s.period + 1 }));
+      return { game: g };
+    }
+    if (s.period === 4 && s.a === s.b) {
+      writeLive(g, Object.assign({}, s, { period: OT_PERIOD }));
+      return { game: g };
+    }
+    return finish();
+  }
+
   return {
-    QUARTERS, QLABEL, STATUSES, LEAGUES,
+    QUARTERS, QLABEL, STATUSES, LEAGUES, SCORING_MODES,
+    scoringMode, applyScoreOp, belowEndedQuarter, manualState, hasResult,
     shuffle, shuffledDigits, emptyGrid,
     potOf, actualPotOf, findCol, findRow, computeGame, computeLiveHighlight, payoutAmount, drawnDigits,
     validateGame, isDigitPermutation, syncStatus,

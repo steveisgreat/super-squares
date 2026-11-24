@@ -302,9 +302,15 @@ async function refreshLiveScore(game, claimSlot) {
   // final score.
   if (!game || game.status !== 'started') return false;
 
+  // Manual games take their score only from the host's taps (PATCH
+  // /api/game/:id/score). They never call ESPN and a refresh must never
+  // overwrite a manual liveScore.
+  const mode = GameLogic.scoringMode(game);
+  if (mode === 'manual') return false;
+
   // A simulated game is a pure function of wall clock against the plan drawn
   // at lock time — no network call, so there is nothing to throttle or claim.
-  if (game.simulation) return applySimulatedData(game);
+  if (mode === 'simulation') return applySimulatedData(game);
 
   const now = Date.now();
   if (checkedRecently(game, now)) return false;

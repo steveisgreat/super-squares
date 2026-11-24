@@ -145,7 +145,7 @@
           : hasFinal ? computed.results.final.b
           : auto ? '–' : '';
         const statusTxt = game.status === 'finished' ? 'FINAL'
-          : (live && live.state === 'in') ? [live.period ? `Q${live.period}` : '', live.clock].filter(Boolean).join(' &middot; ')
+          : (live && live.state === 'in') ? [live.period ? (live.period > 4 ? (live.period > 5 ? `${live.period - 4}OT` : 'OT') : `Q${live.period}`) : '', live.clock].filter(Boolean).join(' &middot; ')
           : 'In Progress';
         // Same glowing pill treatment the Home screen's game card uses for a
         // "started" game — a quiet visual cue that this one is live right now.

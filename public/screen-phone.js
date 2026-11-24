@@ -33,6 +33,11 @@
     let game = null;
     let activeQ = null;
     let saving = false;
+    const scorePanel = SBS.scorePanel.create({
+      getGame: () => game,
+      setGame: (g) => { game = g; drawAround(); }
+    });
+    const isManual = () => game && window.GameLogic.scoringMode(game) === 'manual';
 
     function firstUnscored(g) {
       const c = computeGame(g);
@@ -67,6 +72,8 @@
       actions.appendChild(manageBtn);
       actions.appendChild(gridBtn);
       header.appendChild(actions);
+
+      if (isManual()) { drawManual(computed); return; }
 
       // --- quarter tabs ---
       tabs.innerHTML = '';
@@ -126,6 +133,47 @@
       }
 
       // --- footer: winners so far, so the host can read them out ---
+      const winners = QUARTERS
+        .filter(q => computed.results[q].resolved && computed.results[q].winnerName)
+        .map(q => `<div class="pw-row"><span>${q === 'final' ? 'FINAL' : QLABEL[q]}</span><strong>${escapeHtml(computed.results[q].winnerName)}</strong><span class="pw-amt">${money(computed.results[q].amount)}</span></div>`);
+      footer.innerHTML = winners.length
+        ? `<div class="phone-winners"><div class="pw-head">Winners so far</div>${winners.join('')}</div>`
+        : '';
+    }
+
+    // Manual scoring: the current-score panel replaces the per-quarter keypad.
+    // The panel redraws itself (keeping keyboard focus); the draw button and
+    // winners footer live outside it and are refreshed around it.
+    const manualExtras = el('div', 'phone-manual-extras');
+
+    function drawManual(computed) {
+      tabs.innerHTML = '';
+      if (panel.firstChild !== scorePanel.el || panel.lastChild !== manualExtras) {
+        panel.innerHTML = '';
+        panel.appendChild(scorePanel.el);
+        panel.appendChild(manualExtras);
+      }
+      scorePanel.update();
+      drawAround(computed);
+    }
+
+    function drawAround(computedNow) {
+      const computed = computedNow || computeGame(game);
+      manualExtras.innerHTML = '';
+      const fin = computed.results.final;
+      if (fin.needsDraw) {
+        manualExtras.appendChild(el('div', 'phone-outcome push', 'That square is empty — a winner has to be drawn.'));
+        const drawBtn = el('button', 'phone-draw', 'Randomly Draw Winner');
+        drawBtn.addEventListener('click', async () => {
+          const filledIdx = game.squares.map((s, i) => s ? i : -1).filter(i => i >= 0);
+          if (!filledIdx.length) { showAlert('No squares are filled in — cannot draw a winner.'); return; }
+          const idx = filledIdx[Math.floor(Math.random() * filledIdx.length)];
+          if (!game.results.final) game.results.final = {};
+          game.results.final.autoResolve = { key: `${fin.row}-${fin.col}`, row: Math.floor(idx / 10), col: idx % 10, drawnAt: Date.now() };
+          await save();
+        });
+        manualExtras.appendChild(drawBtn);
+      }
       const winners = QUARTERS
         .filter(q => computed.results[q].resolved && computed.results[q].winnerName)
         .map(q => `<div class="pw-row"><span>${q === 'final' ? 'FINAL' : QLABEL[q]}</span><strong>${escapeHtml(computed.results[q].winnerName)}</strong><span class="pw-amt">${money(computed.results[q].amount)}</span></div>`);
@@ -229,7 +277,7 @@
             return;
           }
           draw();
-        } else if (!saving && fresh.updatedAt !== game.updatedAt) {
+        } else if (!saving && !scorePanel.busy() && fresh.updatedAt !== game.updatedAt) {
           game = fresh;
           draw();
         }

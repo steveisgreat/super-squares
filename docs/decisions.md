@@ -14,3 +14,4 @@ One line per decision. Detail lives in `docs/decisions/`.
 | [008](decisions/008-atomic-concurrency.md) | 2026-08 | `updateGame` is one atomic check-and-write; a stale `updatedAt` returns a conflict. |
 | [009](decisions/009-host-password-access.md) | 2026-08 | One site-wide host password; a game id is a read capability only (to be replaced by R1/R2). |
 | [010](decisions/010-ported-to-rileysoft-model.md) | 2026-11-23 | Ported to the RileySoft model as a hosted app; code stays at the repo root for now. |
+| [011](decisions/011-manual-scoring.md) | 2026-11-23 | Manual scoring is a per-game mode (default for new games); taps are operations on `PATCH /api/game/:id/score` applied by pure `GameLogic.applyScoreOp`; a drawn winner survives edit and undo. |

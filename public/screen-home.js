@@ -378,6 +378,10 @@
     }
 
     const form = el('div');
+    // Simulation builds its plan when the numbers are generated, so it can't be
+    // switched on for a board that is already locked.
+    const simLocked = !!editGame && (editGame.status === 'started' || editGame.status === 'finished') && window.GameLogic.scoringMode(editGame) !== 'simulation';
+    const scoringStart = editGame ? window.GameLogic.scoringMode(editGame) : 'manual';
     card.appendChild(form);
 
     form.innerHTML = `
@@ -453,12 +457,13 @@
         <p style="color:var(--muted); font-size:0.9rem;">At this time, the app will automatically lock square picking and generate the grid numbers.</p>
       </div>
 
-      <label>Simulation Mode?</label>
-      <div class="toggle-group" id="simulation-toggle">
-        <div class="pill${editGame && editGame.simulation ? ' active' : ''}" data-val="yes">Yes</div>
-        <div class="pill${!editGame || !editGame.simulation ? ' active' : ''}" data-val="no">No</div>
+      <label>Scoring</label>
+      <div class="radio-group" id="scoring-group" role="radiogroup" aria-label="Scoring">
+        <div class="pill${scoringStart === 'manual' ? ' active' : ''}" data-val="manual" role="radio" tabindex="0" aria-checked="${scoringStart === 'manual'}">Manual</div>
+        <div class="pill${scoringStart === 'live' ? ' active' : ''}" data-val="live" role="radio" tabindex="0" aria-checked="${scoringStart === 'live'}">Live (ESPN)</div>
+        <div class="pill${scoringStart === 'simulation' ? ' active' : ''}${simLocked ? ' disabled' : ''}" data-val="simulation" role="radio" tabindex="${simLocked ? -1 : 0}" aria-checked="${scoringStart === 'simulation'}"${simLocked ? ' aria-disabled="true" title="Simulation has to be chosen before the grid numbers are generated."' : ''}>Simulation</div>
       </div>
-      <p style="color:var(--muted); font-size:0.9rem;">For testing or demos — instead of pulling a real score, the app invents a random game and plays it out on its own (2-minute quarters) starting the moment you generate the grid numbers.</p>
+      <p style="color:var(--muted); font-size:0.9rem;">Manual: you enter the score yourself on the phone or Game Day screen, and the app never contacts ESPN. Live: the score is pulled from ESPN while the game is on. Simulation: for testing or demos, the app invents a random game and plays it out (2-minute quarters) starting the moment you generate the grid numbers.</p>
     `;
 
     let league = editGame ? (editGame.league || 'nfl') : 'nfl';
@@ -599,13 +604,19 @@
 
     let pickMode = editGame ? editGame.pickMode : 'both';
     let cutoffEnabled = editGame ? !!editGame.autoCutoffEnabled : false;
-    let simulationEnabled = editGame ? !!editGame.simulation : false;
+    let scoring = scoringStart;
 
-    form.querySelectorAll('#simulation-toggle .pill').forEach(p => {
-      p.addEventListener('click', () => {
-        form.querySelectorAll('#simulation-toggle .pill').forEach(x => x.classList.remove('active'));
+    form.querySelectorAll('#scoring-group .pill').forEach(p => {
+      const choose = () => {
+        if (p.getAttribute('aria-disabled') === 'true') return;
+        form.querySelectorAll('#scoring-group .pill').forEach(x => { x.classList.remove('active'); x.setAttribute('aria-checked', 'false'); });
         p.classList.add('active');
-        simulationEnabled = p.dataset.val === 'yes';
+        p.setAttribute('aria-checked', 'true');
+        scoring = p.dataset.val;
+      };
+      p.addEventListener('click', choose);
+      p.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); }
       });
     });
 
@@ -674,7 +685,8 @@
         pickMode,
         autoCutoffEnabled: cutoffEnabled,
         autoCutoffTime: cutoffEnabled ? form.querySelector('#f-cutoff').value : null,
-        simulation: simulationEnabled,
+        scoring,
+        simulation: scoring === 'simulation',
         kickoffTime: selectedKickoff
       });
       if (league === 'other') {
@@ -684,6 +696,9 @@
         game.teamAColor = null;
         game.teamBColor = null;
       }
+      // Switching mode on an existing board drops the old running score so a
+      // stale feed value never poses as the manual one (or the reverse).
+      if (editGame && scoring !== window.GameLogic.scoringMode(editGame)) game.liveScore = null;
       if (!editGame) {
         game.status = 'picking';
         game.squares = emptyGrid();

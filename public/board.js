@@ -16,6 +16,18 @@
     return otNum > 1 ? `${otNum}OT` : 'OT';
   }
 
+  // "updated 3 min ago" for a manual score. The text is refreshed in place
+  // every 20 seconds by the client-side timer below, so it stays honest
+  // between polls without any server work.
+  function updatedAgo(iso) {
+    const mins = Math.floor((Date.now() - Date.parse(iso)) / 60000);
+    if (!(mins >= 1)) return 'updated just now';
+    return mins === 1 ? 'updated 1 min ago' : `updated ${mins} min ago`;
+  }
+  setInterval(() => {
+    document.querySelectorAll('.live-updated[data-updated]').forEach(n => { n.textContent = updatedAgo(n.dataset.updated); });
+  }, 20000);
+
   // Small "LIVE" banner above the grid, fed by the server's ESPN score poll
   // (see server-livescore.js). Only shown once we actually have a score to
   // report, and hidden again once the final score has been entered — at that
@@ -26,18 +38,19 @@
     if (live.state === 'pre') return null;
     if (game.status === 'finished') return null;
 
-    const bar = el('div', 'live-score-bar badge-fit' + (live.simulation ? ' simulation' : ''));
+    const bar = el('div', 'live-score-bar badge-fit' + (live.simulation ? ' simulation' : '') + (live.manual ? ' manual' : ''));
     const clockTxt = live.completed ? 'FINAL' : [periodLabel(live.period), live.clock].filter(Boolean).join(' · ');
     bar.innerHTML = `
       <span class="live-flag">
         <span class="live-dot" aria-hidden="true"></span>
-        <span class="live-label">${live.simulation ? 'SIMULATION' : 'LIVE'}</span>
+        <span class="live-label">${live.simulation ? 'SIMULATION' : live.manual ? 'MANUAL' : 'LIVE'}</span>
       </span>
       <span class="live-center">
         ${teamBadge(game, 'A', { logoSize: 16, cls: 'team-badge-sm' })}
         <span class="live-score-digits">${live.a}–${live.b}</span>
         ${teamBadge(game, 'B', { logoSize: 16, cls: 'team-badge-sm' })}
         <span class="live-period">${escapeHtml(clockTxt)}</span>
+        ${live.manual && live.updatedAt ? `<span class="live-updated" data-updated="${escapeHtml(live.updatedAt)}">${updatedAgo(live.updatedAt)}</span>` : ''}
       </span>
     `;
     return bar;
