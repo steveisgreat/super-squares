@@ -385,6 +385,7 @@
   const PICK_MODES = ['manual', 'auto', 'both'];
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   const DATETIME_RE = /^\d{4}-\d{2}-\d{2}T[\d:.]{4,18}(Z|[+-]\d{2}:?\d{2})?$/;
+  const ZONED_RE = /(Z|[+-]\d{2}:?\d{2})$/;
   const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
   const MAX_NAME = 40; // the form allows 10 plus a subscript
   const MAX_TEXT = 200;
@@ -526,11 +527,14 @@
   }
 
   // True when picking should be locked because the configured cutoff has passed.
-  // autoCutoffTime is a datetime-local string, parsed as local time on both
-  // the hosting PC and the browser.
+  // autoCutoffTime is an instant with a zone (the setup form saves UTC). Boards saved
+  // before that hold a bare local time; only the host's browser knows whose local time
+  // it is, so the server (UTC on Vercel) must never lock from one. The picking screen
+  // still does (issue #4).
   function cutoffPassed(game, now) {
     if (!game || game.status !== 'picking') return false;
     if (!game.autoCutoffEnabled || !game.autoCutoffTime) return false;
+    if (!ZONED_RE.test(game.autoCutoffTime)) return false;
     const t = new Date(game.autoCutoffTime).getTime();
     if (isNaN(t)) return false;
     return (now === undefined ? Date.now() : now) >= t;

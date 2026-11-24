@@ -553,7 +553,7 @@
       </div>
       <div id="cutoff-time-wrap" class="${editGame && editGame.autoCutoffEnabled ? '' : 'hidden'}">
         <label>Cutoff Date &amp; Time</label>
-        <input type="datetime-local" id="f-cutoff" step="60" value="${editGame && editGame.autoCutoffTime ? escapeHtml(String(editGame.autoCutoffTime).slice(0, 16)) : defaultCutoffValue()}">
+        <input type="datetime-local" id="f-cutoff" step="60" value="${editGame && editGame.autoCutoffTime ? escapeHtml(toLocalInput(editGame.autoCutoffTime)) : defaultCutoffValue()}">
         <p style="color:var(--muted); font-size:0.9rem;">At this time, the app will automatically lock square picking and generate the grid numbers.</p>
       </div>
 
@@ -790,7 +790,8 @@
         payouts: { q1: pq1, q2: pq2, q3: pq3, final: pfinal },
         pickMode,
         autoCutoffEnabled: cutoffEnabled,
-        autoCutoffTime: cutoffEnabled ? form.querySelector('#f-cutoff').value : null,
+        // With its zone, so the server's clock agrees with the host's (issue #4).
+        autoCutoffTime: cutoffEnabled ? new Date(form.querySelector('#f-cutoff').value).toISOString() : null,
         scoring,
         simulation: scoring === 'simulation',
         kickoffTime: selectedKickoff

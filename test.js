@@ -437,17 +437,29 @@ check('cutoff fires only after the configured time', () => {
   const g = fullGame();
   g.status = 'picking';
   g.autoCutoffEnabled = true;
+  for (const time of ['2026-02-08T23:30:00.000Z', '2026-02-08T18:30-05:00']) {
+    g.autoCutoffTime = time;
+    const cutoff = Date.UTC(2026, 1, 8, 23, 30);
+    assert(!G.cutoffPassed(g, cutoff - 1000), 'must not fire before the cutoff');
+    assert(G.cutoffPassed(g, cutoff), 'must fire at the cutoff');
+  }
+});
+
+// Issue #4: a bare local time is a different instant on the server (UTC) than on the
+// host's device, and locked boards hours early.
+check('a cutoff with no time zone never locks the board', () => {
+  const g = fullGame();
+  g.status = 'picking';
+  g.autoCutoffEnabled = true;
   g.autoCutoffTime = '2026-02-08T18:30';
-  const cutoff = new Date('2026-02-08T18:30').getTime();
-  assert(!G.cutoffPassed(g, cutoff - 1000), 'must not fire before the cutoff');
-  assert(G.cutoffPassed(g, cutoff), 'must fire at the cutoff');
+  assert(!G.cutoffPassed(g, Date.UTC(2030, 0, 1)), 'no zone, no lock');
 });
 
 check('cutoff never re-fires on an already started game', () => {
   const g = fullGame();
   g.status = 'started';
   g.autoCutoffEnabled = true;
-  g.autoCutoffTime = '2020-01-01T00:00';
+  g.autoCutoffTime = '2020-01-01T00:00:00Z';
   assert(!G.cutoffPassed(g), 'a started game must not be locked again');
 });
 
