@@ -123,6 +123,10 @@ support email, state; R16). Pages carry a draft banner and `noindex`.
 Terms of Service (entertainment and tracking only, no pot handling), privacy
 policy, contact/support email, footer links. Draft only — Steve reviews with a
 lawyer.
+Also: first sign-in asks the host to accept the Terms ("By signing in you agree to the
+Terms and Privacy Policy", with links), and we record which version they accepted and
+when (a column on `hosts`, migration). Wording follows the lawyer review. Auth code:
+Opus review.
 *Done:* pages live on preview; lawyer review booked (Steve).
 
 **R7. Accounts and plans** — `Steve` — Depends on: none.
