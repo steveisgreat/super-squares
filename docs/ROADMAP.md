@@ -93,8 +93,9 @@ grid and setup.
 
 **R4a. Score provider layer and shared cache** (part 1, adapters and failover in
 `lib/scores/`, done 2026-11-23; part 2, the `live_slates` table, slate refresh, merge on read,
-fallback panel and picker, built 2026-11-24, awaiting review; apply `migrations/003_live_slates.sql`
-before the deploy, and the `/code-review medium` and provider keys are still to do) — `Sonnet` (design done in
+fallback panel and picker, built 2026-11-24; `/code-review medium` done 2026-11-24 with its
+fixes: write paths survive an unreadable slate and answer with the feed status. Left: the provider
+keys (Steve), and a date window on the setup picker's refresh, which Steve decides) — `Sonnet` (design done in
 [decision 001](decisions/001-score-providers.md)) — Depends on: R3 ✅ (the
 `scoring` field, `GameLogic.scoringMode`), probe fixtures.
 Adapters for ESPN (primary) and BALLDONTLIE (secondary) behind one `LiveGame` shape;
@@ -296,8 +297,7 @@ screens. A TV browser gets up to six focusable tiles driven by the remote's arro
 screen when there is no host session. The brand keeps its glowing pill (tighter on a phone, where
 the account button drops its chevron). Party View adds one history entry, so a phone's Back or a TV
 remote's Back leaves it like Exit, and that entry remembers where it was opened from, so Exit
-still returns Home after a reload. Not tried: a real TV remote and TV browser. Follow-up: remove the now-unused `TV_ICON`, `PHONE_ICON` and
-`PEOPLE_ICON` from `ui.js`.
+still returns Home after a reload. Not tried: a real TV remote and TV browser.
 
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
 

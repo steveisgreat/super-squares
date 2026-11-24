@@ -423,21 +423,6 @@
     <path d="M6 10v9a1 1 0 0 0 1 1h3.5v-5.5a1.5 1.5 0 0 1 1.5-1.5v0a1.5 1.5 0 0 1 1.5 1.5V20H17a1 1 0 0 0 1-1v-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
 
-  const TV_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <rect x="3" y="5" width="18" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
-    <path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-  </svg>`;
-  const PHONE_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <rect x="7" y="2" width="10" height="20" rx="2" stroke="currentColor" stroke-width="2"/>
-    <path d="M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-  </svg>`;
-  const PEOPLE_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="2"/>
-    <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    <circle cx="17" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/>
-    <path d="M15.5 14.2c2.8.4 5 2.7 5 5.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-  </svg>`;
-
   // Smart TV browsers (Samsung Tizen, LG webOS, generic HbbTV) identify
   // themselves in the UA string even though they otherwise look like a
   // plain desktop Chrome — Tizen's UA has no "Windows"/"Mac OS X"/"Linux"
@@ -938,6 +923,6 @@
     formatKickoffTime, kickoffNotice,
     teamMeta, teamStyle, applyTeamColors, resetTeamColors, teamLogoTag,
     legalLinks, teamColor, readableTextColor, teamBadge, fitTeamBadges, teamAbbr, shadeColor,
-    TV_ICON, PHONE_ICON, PEOPLE_ICON, MAXIMIZE_ICON, COPY_ICON, PRINT_ICON, CHEVRON_ICON, CLOSE_ICON
+    MAXIMIZE_ICON, COPY_ICON, PRINT_ICON, CHEVRON_ICON, CLOSE_ICON
   };
 })();

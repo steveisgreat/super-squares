@@ -444,6 +444,38 @@ async function run() {
       const g = await mk('2099-05-10', { scoring: 'manual' });
       eq((await call('PATCH', `/api/game/${g.id}/score`, { op: 'resume' })).statusCode, 409);
     });
+    // Review of R4a part 2: the write paths guard the slate read the way GET does, and
+    // answer with the feed status so the client keeps the panel and the offline bar.
+    await check('manual fallback: a tap still works when the slate cannot be read', async () => {
+      const g = await mk('2099-05-14');
+      const real = store.getLiveSlate;
+      store.getLiveSlate = async () => { throw new Error('relation "live_slates" does not exist'); };
+      const quiet = console.error;
+      console.error = () => {};
+      try {
+        const tap = await call('PATCH', `/api/game/${g.id}/score`, { op: 'add', side: 'a', points: 7, override: true });
+        eq(tap.statusCode, 200);
+        eq([tap.json.liveScore.a, tap.json.liveFeed.available], [7, false]);
+      } finally { store.getLiveSlate = real; console.error = quiet; }
+    });
+    await check('payout and edit: the response carries the feed status and the row keeps no feed score', async () => {
+      const date = '2099-05-15';
+      await seed(date, [lg({ etDate: date, state: 'break', period: 1, clock: null, hs: 7, as: 3, hq: [7, null, null, null], aq: [3, null, null, null] })], { at: fresh() });
+      const g = await mk(date);
+      const edit = await call('PATCH', `/api/game/${g.id}/score`, { op: 'edit', quarter: 'q1', a: 4, b: 7, override: true });
+      eq(edit.statusCode, 200);
+      eq([edit.json.liveFeed.available, edit.json.liveScore.a], [true, 3], 'feed score in the response');
+      eq((await store.getGame(g.id)).liveScore, null, 'not in the row');
+      // An empty test grid has no winner, so a mark is refused; it must be a 409, not a 500,
+      // when the slate cannot be read.
+      const real = store.getLiveSlate;
+      store.getLiveSlate = async () => { throw new Error('down'); };
+      const quiet = console.error;
+      console.error = () => {};
+      try {
+        eq((await call('PATCH', `/api/game/${g.id}/payout`, { op: 'paid', quarter: 'q1', name: null, amount: 0 })).statusCode, 409);
+      } finally { store.getLiveSlate = real; console.error = quiet; }
+    });
     await check('manualEntry: Manual, a downed feed, or a held score open the panel; a healthy Live board does not', () => {
       eq(G.manualEntry({ scoring: 'manual' }), true);
       eq(G.manualEntry({ scoring: 'live' }), false);
