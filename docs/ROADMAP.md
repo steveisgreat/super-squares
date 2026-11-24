@@ -244,7 +244,8 @@ localhost-only dev server. Removed the certificates, LAN discovery, `/api/hosts`
 *Done:* tests pass; preview runs on 127.0.0.1; pop-ups and the TV corner QR use the page's origin.
 
 **R28. Guests pick their own squares** — `Opus` decision and review (first guest write),
-`Sonnet` build — Depends on: R22 ✅. **Launch must-have** (Steve, 2026-11-24). Build after
+`Sonnet` build — ✅ built 2026-11-24 ([decision 019](decisions/019-guest-picks.md), no
+migration). Not tried on a real phone yet. Depends on: R22 ✅. **Launch must-have** (Steve, 2026-11-24). Build after
 R24, before R25.
 The host shares the `/<code>` link (for example in an Evite) and guests claim squares
 before the party.

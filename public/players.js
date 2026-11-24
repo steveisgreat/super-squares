@@ -6,7 +6,7 @@
   const SBS = window.SBS = window.SBS || {};
   const { el, escapeHtml, money, overlayEl, showChoice, showConfirm, showAlert } = SBS.ui;
 
-  const { isPlayerName, pickPlayerColor } = window.GameLogic;
+  const { isPlayerName, pickPlayerColor, owedSummary, paidAfterAdd, pruneEmptyPlayers } = window.GameLogic;
 
   const MAX_NAME_LEN = 10;
 
@@ -52,6 +52,42 @@
     ensurePlayerColor(game, name);
   }
 
+  // The one way the host puts squares under a name: stamps the time, and charges right.
+  // A name a guest picked under keeps its part-paid count: with Mark as Paid ticked only the
+  // squares added here become paid. Other names behave as they always did.
+  function addSquares(game, name, indexes, ticked) {
+    const players = ensurePlayers(game);
+    const before = owedSummary(game)[name];
+    const beforeCount = before ? before.count : 0;
+    const beforePaid = before ? before.paidCount : 0;
+    // A name with no squares is nobody's: an old phone's tag must not own these.
+    if (!beforeCount && players[name]) { delete players[name].g; delete players[name].paidSquares; }
+    const at = Math.floor(Date.now() / 1000);
+    indexes.forEach(i => { game.squares[i] = { name, at }; });
+    if (players[name] && players[name].g) {
+      const r = paidAfterAdd(beforePaid, beforeCount, indexes.length, !!ticked);
+      const next = Object.assign({}, players[name], { paid: r.paid });
+      if (r.paidSquares === undefined) delete next.paidSquares; else next.paidSquares = r.paidSquares;
+      players[name] = next;
+      ensurePlayerColor(game, name);
+    } else {
+      markPlayerPaid(game, name, ticked);
+    }
+  }
+
+  // Replaces what `game` holds with a newer copy, in place, so every screen that holds the
+  // same object sees it.
+  function replaceGame(game, next) {
+    Object.keys(game).forEach(k => { delete game[k]; });
+    Object.assign(game, next);
+    return game;
+  }
+
+  // "Nov 24, 3:05 PM" in the viewer's own time zone.
+  function formatAt(at) {
+    return new Date(at * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+
   function renameSquares(game, oldName, newName) {
     game.squares.forEach(sq => { if (sq && sq.name === oldName) sq.name = newName; });
     // A paid-out record follows the person, or the quarter would read Needs settling (R21).
@@ -81,7 +117,7 @@
   // it collides with an existing player so they can combine or keep separate
   // (in which case a subscript number is appended, e.g. Steve₁ / Steve₂).
   // Returns null if the host cancels the pick entirely.
-  async function resolveNameForPick(game, typedName) {
+  async function resolveNameForPick(game, typedName, out) {
     const trimmed = typedName.trim();
     const groups = collectNameGroups(game);
     const key = trimmed.toLowerCase();
@@ -118,7 +154,10 @@
     });
     const bareName = variantNames.find(v => stripSubscript(v) === v);
     if (bareName && !variantNames.includes(group.base + toSubscript(1))) {
-      renameSquares(game, bareName, group.base + toSubscript(1));
+      // With `out` the rename is only reported, so a save that is retried on a newer board
+      // can make the same rename there. Without it the board is changed here, as before.
+      if (out) out.rename = { from: bareName, to: group.base + toSubscript(1) };
+      else renameSquares(game, bareName, group.base + toSubscript(1));
       maxIdx = Math.max(maxIdx, 1);
     }
     return group.base + toSubscript(maxIdx + 1);
@@ -126,19 +165,35 @@
 
   function playerSummaries(game) {
     ensurePlayers(game);
-    const counts = Object.create(null);
-    game.squares.forEach(sq => { if (sq) counts[sq.name] = (counts[sq.name] || 0) + 1; });
-    return Object.keys(counts).sort((a, b) => a.localeCompare(b)).map(name => {
-      const count = counts[name];
-      const paid = !!(game.players[name] && game.players[name].paid);
-      const owed = count * (parseFloat(game.squarePrice) || 0);
+    const sums = owedSummary(game);
+    return Object.keys(sums).sort((a, b) => a.localeCompare(b)).map(name => {
+      const s = sums[name];
       const color = ensurePlayerColor(game, name);
-      return { name, count, paid, owed, color };
+      // `owed` is what is still owed: only the unpaid squares are charged. With no part-paid
+      // name it is count x price while unpaid and 0 once paid, so every total is as it was.
+      return { name, count: s.count, paid: s.paid, owed: s.owed, total: s.count * (parseFloat(game.squarePrice) || 0), paidCount: s.paidCount, unpaidCount: s.unpaidCount, color };
     });
   }
 
   function unpaidTotal(game) {
-    return playerSummaries(game).reduce((sum, p) => sum + (p.paid ? 0 : p.owed), 0);
+    return playerSummaries(game).reduce((sum, p) => sum + p.owed, 0);
+  }
+
+  // The line under a name: "3 squares · $30 owed", or "3 paid, 2 owed ($20)" when part is paid.
+  function ownedLine(p) {
+    if (p.paidCount > 0 && p.unpaidCount > 0) return `${p.paidCount} paid, ${p.unpaidCount} owed (${money(p.owed)})`;
+    return `${p.count} square${p.count === 1 ? '' : 's'} &middot; ${money(p.total)} ${p.paid ? 'paid' : 'owed'}`;
+  }
+
+  // For a name a guest picked: when, in the host's own time zone.
+  function guestLine(game, name) {
+    const times = [];
+    game.squares.forEach(sq => { if (sq && sq.name === name && typeof sq.at === 'number' && times.indexOf(sq.at) === -1) times.push(sq.at); });
+    times.sort((a, b) => a - b);
+    const all = times.map(formatAt).filter((t, i, list) => list.indexOf(t) === i); // to the minute
+    const shown = all.slice(0, 4);
+    const more = all.length > 4 ? ` and ${all.length - 4} more` : '';
+    return `Picked on their own phone${shown.length ? ' &middot; ' + escapeHtml(shown.join(', ')) + more : ''}`;
   }
 
   // Modal for marking players paid/unpaid and removing a player's picks entirely.
@@ -150,25 +205,34 @@
     overlay.appendChild(box);
     document.body.appendChild(overlay);
 
-    async function persistAndRefresh() {
+    // Every change goes through saveWith, so a guest picking at the same moment does not
+    // make it fail: the change is re-applied to the newer board and only a real clash
+    // (`change` returns a message) is reported.
+    async function apply(change) {
+      let result;
       try {
-        const saved = await SBS.api.saveGame(game);
-        Object.assign(game, saved);
+        result = await SBS.saveWith(game, change);
       } catch (e) {
         overlay.remove();
         if (await SBS.handleConflict(e, game.id)) return;
         const denied = await SBS.handleForbidden(e, game.id);
         if (denied) {
-          if (denied.fresh) Object.assign(game, denied.fresh);
+          if (denied.fresh) replaceGame(game, denied.fresh);
           if (onUpdate) onUpdate();
           return;
         }
         showAlert('Failed to save: ' + e.message);
         return;
       }
+      // Assigned over, not replaced: a Live board's feed state is not in a save's answer.
+      Object.assign(game, result.game);
+      if (result.refused) await showAlert(result.refused);
       renderList();
       if (onUpdate) onUpdate();
     }
+
+    const changedMsg = "That player's squares just changed. Check the list and try again.";
+    const countOf = (doc, name) => doc.squares.filter(sq => sq && sq.name === name).length;
 
     function renderList() {
       const summaries = playerSummaries(game);
@@ -186,13 +250,15 @@
         const list = el('div', 'player-list');
         summaries.forEach(p => {
           const row = el('div', 'player-row');
+          const isGuest = !!(game.players[p.name] && game.players[p.name].g);
           row.innerHTML = `
             <div class="player-info">
               <div class="player-name-row">
                 <span class="player-name">${escapeHtml(p.name)}</span>
                 <button class="icon-btn player-rename" type="button" aria-label="Rename player" title="Rename">${EDIT_ICON}</button>
               </div>
-              <div class="player-sub">${p.count} square${p.count === 1 ? '' : 's'} &middot; ${money(p.owed)} ${p.paid ? 'paid' : 'owed'}</div>
+              <div class="player-sub">${ownedLine(p)}</div>
+              ${isGuest ? `<div class="player-sub player-guest-line">${guestLine(game, p.name)}</div>` : ''}
             </div>
             <label class="paid-toggle ${p.paid ? 'is-paid' : ''}">
               <input type="checkbox" ${p.paid ? 'checked' : ''}>
@@ -201,10 +267,15 @@
             <button class="ghost small btn-delete">Remove</button>
           `;
           row.querySelector('input[type=checkbox]').addEventListener('change', async (e) => {
-            const players = ensurePlayers(game);
-            players[p.name] = Object.assign({}, players[p.name], { paid: e.target.checked });
-            delete players[p.name].paidSquares; // paid or unpaid in full, the host's word
-            await persistAndRefresh();
+            const checked = e.target.checked;
+            await apply(doc => {
+              // The host looked at this many squares. If a guest changed them since, the
+              // mark could settle squares nobody has paid for.
+              if (countOf(doc, p.name) !== p.count) return changedMsg;
+              const players = ensurePlayers(doc);
+              players[p.name] = Object.assign({}, players[p.name], { paid: checked });
+              delete players[p.name].paidSquares; // paid or unpaid in full, the host's word
+            });
           });
           row.querySelector('.player-rename').addEventListener('click', () => {
             const nameRow = row.querySelector('.player-name-row');
@@ -222,11 +293,16 @@
               if (!newName) return showAlert('Name cannot be empty.');
               if (!isPlayerName(newName)) return showAlert('That name is not allowed. Choose a different name.');
               if (newName === p.name) return renderList();
-              const collision = Object.keys(ensurePlayers(game))
+              const taken = (doc) => Object.keys(ensurePlayers(doc)).concat(doc.squares.filter(Boolean).map(sq => sq.name))
                 .find(n => n.toLowerCase() === newName.toLowerCase() && n !== p.name);
+              const collision = taken(game);
               if (collision) return showAlert(`"${collision}" is already a player in this game. Choose a different name.`);
-              renameSquares(game, p.name, newName);
-              await persistAndRefresh();
+              await apply(doc => {
+                if (!countOf(doc, p.name)) return changedMsg;
+                const clash = taken(doc);
+                if (clash) return `"${clash}" is already a player in this game. Choose a different name.`;
+                renameSquares(doc, p.name, newName);
+              });
             }
             nameRow.querySelector('.player-rename-save').addEventListener('click', commit);
             nameRow.querySelector('.player-rename-cancel').addEventListener('click', () => renderList());
@@ -239,9 +315,11 @@
             const startedWarning = (game.status === 'started' || game.status === 'finished') ? ' The game has already started — this may change quarter results tied to their square(s).' : '';
             const ok = await showConfirm(`Remove all ${p.count} square${p.count === 1 ? '' : 's'} picked by "${p.name}"?${startedWarning} This cannot be undone.`);
             if (!ok) return;
-            game.squares.forEach((sq, i) => { if (sq && sq.name === p.name) game.squares[i] = null; });
-            delete ensurePlayers(game)[p.name];
-            await persistAndRefresh();
+            await apply(doc => {
+              if (countOf(doc, p.name) !== p.count) return changedMsg;
+              doc.squares.forEach((sq, i) => { if (sq && sq.name === p.name) doc.squares[i] = null; });
+              delete ensurePlayers(doc)[p.name];
+            });
           });
           list.appendChild(row);
         });
@@ -255,7 +333,7 @@
   }
 
   SBS.players = {
-    ensurePlayers, ensurePlayerColor, markPlayerPaid, renameSquares,
+    ensurePlayers, ensurePlayerColor, markPlayerPaid, addSquares, replaceGame, formatAt, renameSquares,
     collectNameGroups, resolveNameForPick,
     playerSummaries, unpaidTotal, openManagePlayersModal,
     toSubscript, fromSubscript, stripSubscript

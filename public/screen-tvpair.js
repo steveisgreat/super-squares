@@ -168,7 +168,7 @@
       share.addEventListener('click', () => SBS.playerView.shareBoard(game));
       const qr = el('button', 'secondary', 'Show QR code');
       qr.type = 'button';
-      qr.addEventListener('click', () => SBS.playerView.showPlayerLink(game.id, game.joinCode));
+      qr.addEventListener('click', () => SBS.playerView.showPlayerLink(game.id, game.joinCode, game));
       inviteRow.appendChild(share);
       inviteRow.appendChild(qr);
     }

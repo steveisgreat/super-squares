@@ -19,15 +19,15 @@
 </div></header>
 <main>
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated: 2026-11-23</p>
+<p class="updated">Last updated: 2026-11-24</p>
 <p class="draft-banner" role="note">Draft — pending legal review. Not final legal text.</p>
 
 <p>This policy explains what [PRODUCT NAME], operated by [COMPANY], collects and does today, and what is planned. It describes how the software actually works. The sections marked for review cover features that are not live yet.</p>
 
 <h2>1. What we store</h2>
 <ul>
-<li><strong>Game data.</strong> When a host creates a game, we store its settings (team names, scoring mode, dates), the grid, and the names the host types onto squares and into the player list. We also store a "paid / unpaid" flag per player that the host sets for their own tracking, plus scores and winners.</li>
-<li><strong>Nothing else about players.</strong> Players do not create accounts, and we do not ask players for or store their email addresses, phone numbers or payment details. Names are whatever the host chooses to type, so hosts should use first names or nicknames.</li>
+<li><strong>Game data.</strong> When a host creates a game, we store its settings (team names, scoring mode, dates), the grid, and the names on squares and in the player list. A host types them, or, when the host allows it, a guest types their own name. We also store the time each square was claimed. We also store a "paid / unpaid" flag per player that the host sets for their own tracking, plus scores and winners.</li>
+<li><strong>Nothing else about players.</strong> Players do not create accounts, and we do not ask players for or store their email addresses, phone numbers or payment details. Names are whatever the host or a guest types, so use first names or nicknames. A guest's device also holds a private key (see the guest pick cookie in section 3); the board stores only a short, one-way tag made from it, never the key itself.</li>
 <li><strong>Server logs.</strong> Our hosting provider processes ordinary request information (such as IP address and browser type) to deliver and secure the site.</li>
 </ul>
 
@@ -37,8 +37,9 @@
 <h2>3. Cookies and device storage</h2>
 <ul>
 <li><strong>Host session cookie (<code>sbs_host</code>).</strong> When a host signs in, we set this cookie so they stay signed in for up to 30 days. It is HttpOnly, so page scripts cannot read it, and it holds a signed expiry value, not personal data. People who only view boards do not get it. Email sign-in, once live, replaces it with the cookie described in section 9.</li>
-<li><strong>Player view memory (browser localStorage).</strong> On a board's player page, your browser remembers which name you picked from the list so it is preselected next time. It stays on your device, is not sent to us, and you can clear it in your browser settings.</li>
+<li><strong>Player view memory (browser localStorage).</strong> On a board's player page, your browser remembers which name you picked from the list so it is preselected next time, and whether you have picked squares there. It stays on your device, is not sent to us, and you can clear it in your browser settings.</li>
 <li><strong>Scorer phone cookie (<code>sbs_scorer</code>).</strong> When a host hands score entry to a phone, that phone gets a cookie for that one board. It lasts up to 24 hours, is HttpOnly, and holds a random value, not personal data. The host can end it at any time. The browser also keeps a note (localStorage) that this phone was a scorer for that board.</li>
+<li><strong>Guest pick cookie (<code>sbs_guest</code>).</strong> Only when a host has allowed guests to pick their own squares, and only after a guest taps Pick squares, their browser gets this cookie for that one board. It lasts up to 180 days, is HttpOnly, and holds a random value, not personal data. It lets the same browser claim and release its own squares and no one else's. Clearing it means the guest can no longer change those squares; the host can.</li>
 <li>We do not use advertising or tracking cookies.</li>
 </ul>
 
@@ -52,7 +53,7 @@
 </ul>
 
 <h2>5. Who can see a board</h2>
-<p>Anyone who has a board's link (for example from its QR code) can view it, including every name and the paid / unpaid flags on it. The link is not a password. Hosts should share it only with people they are happy to have see those names, and should not type sensitive information onto a board. Managing games requires the host to sign in.</p>
+<p>Anyone who has a board's link (for example from its QR code) can view it, including every name and the paid / unpaid flags on it. When a host turns on guest picks, anyone with the link can also claim squares under a name they type, up to the limit the host sets, until the host turns it off, locks the board, or removes the picks. The link is not a password. Hosts should share it only with people they are happy to have see those names, and nobody should type sensitive information onto a board. Managing games requires the host to sign in.</p>
 
 <h2>6. How long we keep data, and deleting it</h2>
 <p>A host can delete a game at any time from the app, which removes its stored data. [RETENTION PERIOD for abandoned or finished games and for backups — to be decided; today games are kept until deleted.] To ask us to delete a game or a name, use the <a href="contact.html">Contact page</a>.</p>

@@ -486,6 +486,10 @@
     const simLocked = !!editGame && (editGame.status === 'started' || editGame.status === 'finished') && window.GameLogic.scoringMode(editGame) !== 'simulation';
     const scoringStart = editGame ? window.GameLogic.scoringMode(editGame) : 'manual';
     card.appendChild(form);
+    // Guest picks (R28): off unless the host turns it on. A board that never had it has no
+    // guestPick at all; turning it off later keeps the limit with on: false.
+    const priorGuest = editGame && editGame.guestPick ? editGame.guestPick : null;
+    const guestStart = { on: !!(priorGuest && priorGuest.on), max: priorGuest ? priorGuest.max : 5, liftAt: priorGuest ? priorGuest.liftAt : null };
 
     form.innerHTML = `
       <label>League</label>
@@ -555,6 +559,15 @@
         <label>Cutoff Date &amp; Time</label>
         <input type="datetime-local" id="f-cutoff" step="60" value="${editGame && editGame.autoCutoffTime ? escapeHtml(toLocalInput(editGame.autoCutoffTime)) : defaultCutoffValue()}">
         <p style="color:var(--muted); font-size:0.9rem;">At this time, the app will automatically lock square picking and generate the grid numbers.</p>
+      </div>
+
+      <label class="checkbox-label"><input type="checkbox" id="f-guest-on"${guestStart.on ? ' checked' : ''}> <span>Let guests pick their own squares</span></label>
+      <div id="guest-wrap" class="${guestStart.on ? '' : 'hidden'}">
+        <label for="f-guest-max">Most squares per person</label>
+        <input type="number" id="f-guest-max" min="1" max="100" step="1" value="${escapeHtml(guestStart.max)}">
+        <label for="f-guest-lift">Limit ends at (optional)</label>
+        <input type="datetime-local" id="f-guest-lift" step="60" value="${guestStart.liftAt ? escapeHtml(toLocalInput(guestStart.liftAt)) : ''}">
+        <p style="color:var(--muted); font-size:0.9rem;">Anyone with the board link can claim squares, up to this number each, until the time you set (leave it empty for no end time). You mark players paid yourself; we never hold or move the money.</p>
       </div>
 
       <label>Scoring</label>
@@ -738,6 +751,10 @@
       });
     });
 
+    form.querySelector('#f-guest-on').addEventListener('change', (e) => {
+      form.querySelector('#guest-wrap').classList.toggle('hidden', !e.target.checked);
+    });
+
     form.querySelectorAll('#cutoff-toggle .pill').forEach(p => {
       p.addEventListener('click', () => setCutoffEnabled(p.dataset.val === 'yes'));
     });
@@ -782,6 +799,19 @@
         return showErr('Please choose a cutoff date & time, or turn off the auto-cutoff option.');
       }
 
+      const guestOn = form.querySelector('#f-guest-on').checked;
+      const guestMax = Number(form.querySelector('#f-guest-max').value);
+      const guestLiftValue = form.querySelector('#f-guest-lift').value;
+      if ((guestOn || priorGuest) && (!Number.isInteger(guestMax) || guestMax < 1 || guestMax > 100)) {
+        return showErr('Most squares per person must be a whole number from 1 to 100.');
+      }
+      if (guestOn && guestLiftValue && isNaN(new Date(guestLiftValue).getTime())) {
+        return showErr('Choose a valid date and time for the guest limit, or clear it.');
+      }
+      // UTC with its zone, like the cutoff, so the server's clock agrees with the host's.
+      const guestLiftAt = guestLiftValue && !isNaN(new Date(guestLiftValue).getTime()) ? new Date(guestLiftValue).toISOString() : null;
+      const wantsGuestPick = guestOn || !!priorGuest;
+
       // Editing only ever touches setup fields (teams, price, payouts, pick
       // mode, cutoff, simulation) — everything else about the game (squares,
       // axis numbers, results, players, status) carries over untouched.
@@ -815,12 +845,27 @@
         game.players = {};
       }
 
+      if (wantsGuestPick) {
+        game.guestPick = { on: guestOn, max: guestMax, liftAt: guestLiftAt, lifted: !!(priorGuest && priorGuest.lifted) };
+      }
+
       submitBtn.disabled = true;
       submitBtn.textContent = 'Saving…';
       try {
         if (editGame) {
-          const saved = await SBS.api.saveGame(game);
-          SBS.go({ screen: 'picking', game: saved });
+          // A guest's pick may land while the host edits: re-apply only this form's fields to
+          // the newer board (the squares and players there are theirs, not ours).
+          const formFields = {};
+          ['teamA', 'teamB', 'description', 'gameDate', 'squarePrice', 'league', 'payouts', 'pickMode', 'autoCutoffEnabled', 'autoCutoffTime',
+            'scoring', 'simulation', 'kickoffTime', 'teamAColor', 'teamBColor'].forEach(k => { formFields[k] = game[k]; });
+          const modeChanged = scoring !== window.GameLogic.scoringMode(editGame);
+          const result = await SBS.saveWith(editGame, doc => {
+            Object.assign(doc, JSON.parse(JSON.stringify(formFields)));
+            if (modeChanged) { doc.liveScore = null; delete doc.liveOverride; }
+            // lifted is the picking screen's switch: keep the newer board's.
+            if (wantsGuestPick) doc.guestPick = { on: guestOn, max: guestMax, liftAt: guestLiftAt, lifted: !!(doc.guestPick && doc.guestPick.lifted) };
+          });
+          SBS.go({ screen: 'picking', game: result.game });
         } else {
           const saved = await SBS.api.createGame(game);
           SBS.go({ screen: 'picking', game: saved });

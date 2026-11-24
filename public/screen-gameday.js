@@ -229,7 +229,7 @@
     // quarter winners, live status) — separate from the host's own score-entry
     // link above, and safe to hand out to anyone in the room.
     const playerBtn = actionBtn(QR_ICON, 'QR code', 'Player View QR', 'Show player view QR code');
-    playerBtn.addEventListener('click', () => SBS.playerView.showPlayerLink(game.id, game.joinCode));
+    playerBtn.addEventListener('click', () => SBS.playerView.showPlayerLink(game.id, game.joinCode, game));
     const headerMeta = [SBS.ui.leagueBadge(game.league), escapeHtml(game.description || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
     const actionBtns = [manageBtn, tvBtn, phoneBtn, playerBtn];
     // Once the board is locked: pair a TV, score from another phone, invite players (R23).
@@ -1001,13 +1001,16 @@
       const on = joiningNow(game);
       joinPanel.hidden = !on;
       if (!on) { joinPanelKey = null; return; }
-      if (joinPanelKey === game.joinCode) return;
+      // The title says what the scan does: with guest picks on, it lets them claim squares.
+      const title = game.guestPick && game.guestPick.on ? 'Scan to pick your squares' : 'Scan to join';
+      const key = game.joinCode + '|' + title;
+      if (joinPanelKey === key) return;
       try {
         const url = `${location.origin}/${game.joinCode}`;
-        joinPanel.innerHTML = `<div class="tv-join-title">Scan to join</div>${window.QRCode.toSvg(url, 300)}`
+        joinPanel.innerHTML = `<div class="tv-join-title">${title}</div>${window.QRCode.toSvg(url, 300)}`
           + `<div class="tv-join-or">or go to</div><div class="tv-join-url">${escapeHtml(location.host)}</div>`
           + `<div class="tv-join-or">and enter</div><div class="tv-join-code-big">${escapeHtml(game.joinCode)}</div>`;
-        joinPanelKey = game.joinCode;
+        joinPanelKey = key;
       } catch (e) {
         joinPanel.hidden = true; // best-effort, like the corner QR
       }

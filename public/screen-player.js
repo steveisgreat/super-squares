@@ -11,6 +11,10 @@
   const { QUARTERS, QLABEL, computeGame, computeLiveHighlight, payoutAmount, drawnDigits } = window.GameLogic;
 
   function storageKey(id) { return `sbs-player-view-${id}`; }
+  // Set once this phone has tapped Pick squares on the board, so a reload opens picking again.
+  // Choosing a name just to look never does: looking must not set the pick cookie.
+  function pickerKey(id) { return `sbs-guest-picker-${id}`; }
+  function isPicker(id) { try { return window.localStorage.getItem(pickerKey(id)) === '1'; } catch (e) { return false; } }
 
   function squareInfo(game, computed, liveHighlight, idx) {
     const row = Math.floor(idx / 10), col = idx % 10;
@@ -258,6 +262,329 @@
     });
   }
 
+  // ---------- Guest picks (R28, decision 019) ----------
+  // A guest claims and releases their own squares from this phone. The browser keeps a private
+  // key in a cookie (set when they tap Pick squares); the server holds only a tag of it. Every
+  // call here is raw: a 401 means "no cookie kept" and must never open the host sign-in.
+
+  const COOKIE_MSG = 'Your browser is blocking cookies for this site. Open the link in Safari or Chrome.';
+
+  function guestPickingOn(game) {
+    return !!(game && game.status === 'picking' && game.guestPick && game.guestPick.on === true);
+  }
+
+  const coordOf = (i) => `R${Math.floor(i / 10) + 1}C${i % 10 + 1}`;
+  const localTime = (ms) => new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+  // ctx: { id, game() -> the board, setGame(g) stores and redraws, remember(name) saves the
+  // name the page already keeps, reload() fetches the board again }.
+  function createGuestPanel(ctx) {
+    const root = el('div', 'guest-panel');
+    const miniHolder = el('div');
+    const startRow = el('div', 'gp-start');
+    const startBtn = el('button', 'gp-start-btn', 'Pick squares');
+    startBtn.type = 'button';
+    startRow.appendChild(el('p', 'player-muted', 'Claim your squares right here. The host marks you paid.'));
+    startRow.appendChild(startBtn);
+
+    const live = el('div', 'gp-live');
+    const nameWrap = el('div', 'gp-name');
+    nameWrap.innerHTML = '<label for="gp-name-input">Your name</label>';
+    const nameInput = el('input', '');
+    nameInput.type = 'text';
+    nameInput.id = 'gp-name-input';
+    nameInput.maxLength = 10;
+    nameInput.autocomplete = 'off';
+    nameInput.setAttribute('autocapitalize', 'words');
+    nameInput.placeholder = 'Name (up to 10)';
+    nameWrap.appendChild(nameInput);
+    const asLine = el('p', 'gp-as');
+    const capLine = el('p', 'gp-cap');
+    const boardWrap = el('div', 'gp-board');
+    boardWrap.setAttribute('role', 'group');
+    const actionBtn = el('button', 'gp-action', '');
+    actionBtn.type = 'button';
+    const clearBtn = el('button', 'secondary gp-clear', 'Clear selection');
+    clearBtn.type = 'button';
+    const actionRow = el('div', 'gp-actions');
+    actionRow.appendChild(actionBtn);
+    actionRow.appendChild(clearBtn);
+    const autoWrap = el('div', 'gp-auto');
+    autoWrap.innerHTML = '<label for="gp-auto-count">Or let us pick for you: how many?</label>';
+    const countInput = el('input', '');
+    countInput.type = 'number';
+    countInput.id = 'gp-auto-count';
+    countInput.min = '1';
+    countInput.max = '100';
+    countInput.step = '1';
+    countInput.value = '1';
+    countInput.inputMode = 'numeric';
+    const autoBtn = el('button', 'secondary gp-auto-btn', 'Pick for me');
+    autoBtn.type = 'button';
+    const autoRow = el('div', 'gp-auto-row');
+    autoRow.appendChild(countInput);
+    autoRow.appendChild(autoBtn);
+    autoWrap.appendChild(autoRow);
+    const status = el('p', 'gp-status');
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    const owed = el('p', 'gp-owed');
+    live.append(asLine, nameWrap, capLine, boardWrap, actionRow, autoWrap);
+    root.append(startRow, miniHolder, live, status, owed);
+
+    let started = false;
+    let name = null;       // the name this phone holds on the board, from the server
+    let sel = [];          // open squares chosen to claim
+    let rel = [];          // own squares chosen to release
+    let busy = false;
+    let tapped = null;     // the cell to give focus back to after a redraw
+
+    const game = () => ctx.game();
+    const mode = () => game().pickMode || 'both';
+    const myIdx = () => (name ? game().squares.map((s, i) => (s && s.name === name ? i : -1)).filter(i => i >= 0) : []);
+    const cap = () => window.GameLogic.guestCap(game(), Date.now());
+    function say(msg) { status.textContent = msg || ''; }
+
+    function room(have) {
+      const c = cap();
+      if (c === Infinity) return Infinity;
+      return Math.max(0, c - have);
+    }
+    function overCapMessage(have) {
+      const c = cap();
+      const left = room(have);
+      return left ? `You can pick up to ${c} squares. You have ${have}, so ${left} more.` : `You have all ${c} of your squares. Release one to pick another.`;
+    }
+
+    // The cell with focus is rebuilt on every redraw; remember which one to give it back to.
+    function rememberFocus() {
+      const a = document.activeElement;
+      if (a && a.classList && a.classList.contains('gp-cell') && root.contains(a)) tapped = Number(a.dataset.i);
+    }
+
+    function render() {
+      if (tapped === null) rememberFocus();
+      const g = game();
+      const own = myIdx();
+      // A square taken while it was selected leaves the selection, with a note.
+      const gone = sel.filter(i => g.squares[i]);
+      if (gone.length) {
+        sel = sel.filter(i => !g.squares[i]);
+        say(`${gone.length === 1 ? 'A square' : 'Some squares'} you picked ${gone.length === 1 ? 'was' : 'were'} just taken: ${gone.map(coordOf).join(', ')}.`);
+      }
+      rel = rel.filter(i => g.squares[i] && g.squares[i].name === name);
+
+      miniHolder.innerHTML = '';
+      startRow.hidden = started;
+      startBtn.disabled = busy;
+      live.hidden = !started;
+      if (!started) {
+        owed.hidden = true;
+        miniHolder.appendChild(miniGrid(g, ctx.viewing()));
+        return;
+      }
+
+      asLine.hidden = !name;
+      asLine.textContent = name ? `Picking as ${name}` : '';
+      nameWrap.hidden = !!name;
+
+      const c = cap();
+      const gp = g.guestPick || {};
+      let capText = c === Infinity ? `You have ${own.length}. No limit.` : `You have ${own.length} of ${c}.`;
+      if (!gp.lifted && gp.liftAt && Date.parse(gp.liftAt) > Date.now()) capText += ` The limit ends at ${localTime(Date.parse(gp.liftAt))}.`;
+      capLine.textContent = capText;
+
+      const m = mode();
+      boardWrap.innerHTML = '';
+      boardWrap.setAttribute('aria-label', 'Squares. Tap an open square to select it' + (own.length ? ', or one of yours to release it.' : '.'));
+      for (let i = 0; i < 100; i++) {
+        const sq = g.squares[i];
+        const where = `Row ${Math.floor(i / 10) + 1} column ${i % 10 + 1}`;
+        const b = el('button', 'gp-cell');
+        b.type = 'button';
+        b.dataset.i = String(i);
+        if (!sq) {
+          const picked = sel.indexOf(i) !== -1;
+          b.classList.add('is-open');
+          if (picked) b.classList.add('is-sel');
+          b.setAttribute('aria-label', `${where}, open${picked ? ', selected' : ''}`);
+          if (m === 'auto') { b.disabled = true; } else { b.setAttribute('aria-pressed', String(picked)); }
+        } else if (name && sq.name === name) {
+          const dropping = rel.indexOf(i) !== -1;
+          b.classList.add('is-mine');
+          if (dropping) b.classList.add('is-rel');
+          b.textContent = sq.name;
+          b.setAttribute('aria-label', `${where}, ${sq.name}, yours${dropping ? ', to release' : ''}`);
+          b.setAttribute('aria-pressed', String(dropping));
+        } else {
+          b.classList.add('is-other');
+          b.textContent = sq.name;
+          b.setAttribute('aria-label', `${where}, ${sq.name}`);
+          b.disabled = true;
+        }
+        b.disabled = b.disabled || busy;
+        b.addEventListener('click', () => toggle(i));
+        boardWrap.appendChild(b);
+      }
+      if (tapped !== null) {
+        const t = boardWrap.querySelector(`[data-i="${tapped}"]`);
+        if (t && !t.disabled) t.focus();
+        tapped = null;
+      }
+
+      const verb = sel.length ? `Claim ${sel.length} square${sel.length === 1 ? '' : 's'}` : rel.length ? `Release ${rel.length} square${rel.length === 1 ? '' : 's'}` : '';
+      actionRow.hidden = !verb;
+      actionBtn.textContent = verb;
+      actionBtn.disabled = busy;
+      clearBtn.disabled = busy;
+      autoWrap.hidden = m === 'manual';
+      autoBtn.disabled = busy;
+
+      const o = window.GameLogic.owedSummary(g)[name];
+      if (name && o) {
+        owed.hidden = false;
+        owed.textContent = (o.owed > 0 ? `${money(o.owed)} owed to the host for ${o.unpaidCount} square${o.unpaidCount === 1 ? '' : 's'}. ` : 'Nothing owed right now. ')
+          + 'Pay the host directly. The money goes to the host, not to us.';
+      } else {
+        owed.hidden = true;
+      }
+    }
+
+    function toggle(i) {
+      if (busy) return;
+      const g = game();
+      const sq = g.squares[i];
+      const have = myIdx().length;
+      tapped = i;
+      if (!sq) {
+        if (mode() === 'auto') return;
+        if (rel.length) { say('You are releasing squares. Clear the selection to claim instead.'); return render(); }
+        const pos = sel.indexOf(i);
+        if (pos >= 0) sel.splice(pos, 1);
+        else {
+          if (have + sel.length + 1 > cap()) { say(overCapMessage(have)); return render(); }
+          sel.push(i);
+        }
+      } else if (name && sq.name === name) {
+        if (sel.length) { say('You are claiming squares. Clear the selection to release instead.'); return render(); }
+        const pos = rel.indexOf(i);
+        if (pos >= 0) rel.splice(pos, 1); else rel.push(i);
+      } else {
+        return;
+      }
+      say('');
+      render();
+    }
+
+    // The name to claim under: the server's if this phone has one, else the typed one.
+    function claimName() {
+      if (name) return name;
+      const clean = window.GameLogic.cleanGuestName(nameInput.value);
+      if (clean.error) { say(clean.error); nameInput.focus(); return null; }
+      return clean.name;
+    }
+
+    function summary() {
+      const own = myIdx();
+      return own.length ? `You have ${own.length} square${own.length === 1 ? '' : 's'}: ${own.map(coordOf).join(', ')}.` : 'You have no squares now.';
+    }
+
+    async function send(op) {
+      busy = true;
+      render();
+      try {
+        const res = await SBS.api.guestOp(ctx.id, op);
+        busy = false;
+        name = res.name || null;
+        ctx.remember(name);
+        sel = [];
+        rel = [];
+        ctx.setGame(res.game);
+        say(summary());
+      } catch (e) {
+        busy = false;
+        if (e && e.status === 401) {
+          started = false;
+          ctx.setGame(game());
+          say(COOKIE_MSG);
+          return;
+        }
+        if (e && e.game && e.game.squares) {
+          if (e.taken) sel = sel.filter(i => e.taken.indexOf(i) === -1);
+          ctx.setGame(e.game);
+        } else {
+          render();
+        }
+        say((e && e.message) || 'That did not work. Try again.');
+        // The board moved on (closed or switched off): the page has changed under the message.
+        if (!guestPickingOn(game())) showAlert((e && e.message) || 'Picking is closed.');
+      }
+    }
+
+    actionBtn.addEventListener('click', () => {
+      if (busy) return;
+      if (rel.length) return send({ op: 'release', squares: rel.slice() });
+      const nm = claimName();
+      if (nm) send({ op: 'claim', name: nm, squares: sel.slice() });
+    });
+    clearBtn.addEventListener('click', () => { sel = []; rel = []; say(''); render(); });
+    autoBtn.addEventListener('click', () => {
+      if (busy) return;
+      const n = Number(countInput.value);
+      if (!Number.isInteger(n) || n < 1 || n > 100) { say('Enter how many squares, from 1 to 100.'); return countInput.focus(); }
+      const have = myIdx().length;
+      if (have + n > cap()) return say(overCapMessage(have));
+      const nm = claimName();
+      if (nm) send({ op: 'claim', name: nm, count: n, have });
+    });
+
+    // Ask the server who this phone is on this board; it also hands out the key cookie.
+    // `quiet`: a reload of a phone that picked before, so nothing is said if it cannot.
+    async function start(quiet) {
+      if (busy) return;
+      busy = true;
+      startBtn.disabled = true;
+      let res;
+      try {
+        res = await SBS.api.guestStart(ctx.id);
+      } catch (e) {
+        busy = false;
+        startBtn.disabled = false;
+        if (!quiet) say((e && e.message) || 'Could not start.');
+        if (e && e.status === 409) ctx.reload();
+        return render();
+      }
+      // The cookie is HttpOnly, so the page cannot look. A name in the answer proves it came
+      // back; a new phone with cookies blocked finds out on its first claim (a 401).
+      busy = false;
+      startBtn.disabled = false;
+      started = true;
+      name = res.name || null;
+      if (!quiet) ctx.markPicker();
+      if (name) ctx.remember(name);
+      say('');
+      render();
+      const focusTarget = name ? boardWrap.querySelector('.gp-cell:not(:disabled)') : nameInput;
+      if (!quiet && focusTarget) focusTarget.focus();
+    }
+    startBtn.addEventListener('click', () => start(false));
+
+    // A host rename moves the name; a host removal ends it. When this phone's name has no
+    // squares any more, ask again.
+    async function followName() {
+      if (!started || !name || busy) return;
+      if (game().squares.some(s => s && s.name === name)) return;
+      try {
+        const res = await SBS.api.guestStart(ctx.id);
+        name = res.name || null;
+        ctx.remember(name);
+      } catch (e) { /* the board closed: the page redraws without the panel */ }
+      render();
+    }
+
+    return { root, render, start, followName };
+  }
+
   function renderPlayer(id) {
     const app = SBS.appEl;
     app.innerHTML = '';
@@ -285,6 +612,17 @@
 
     let game = null;
     let selectedPlayer = null;
+    let panel = null; // the guest-pick panel, kept for the life of the screen
+    let panelCard = null; // the card it sits in, left in place while picking so typing and focus survive
+    const panelCtx = {
+      id,
+      game: () => game,
+      setGame: (g) => { game = g; drawAll(); },
+      remember: (name) => { selectedPlayer = name; saveSelectedPlayer(name); },
+      reload: () => load(false),
+      viewing: () => selectedPlayer,
+      markPicker: () => { try { window.localStorage.setItem(pickerKey(id), '1'); } catch (e) { /* asks again next time */ } }
+    };
 
     function loadSelectedPlayer() {
       try { return window.localStorage.getItem(storageKey(id)); } catch (e) { return null; }
@@ -342,7 +680,7 @@
 
       header.innerHTML = `
         <div class="player-title-row badge-fit">
-          <div class="player-title">Player Grid Watch</div>
+          <div class="player-title">${guestPickingOn(game) ? 'Pick your squares' : 'Player Grid Watch'}</div>
         </div>
         ${tickerHtml}
       `;
@@ -380,11 +718,28 @@
     }
 
     function drawBody() {
+      // While a guest is picking, the panel stays where it is: taking it off the page, even
+      // for a moment, closes a phone's keyboard.
+      if (panelCard && panelCard.isConnected && guestPickingOn(game)) {
+        panelCard.querySelector('.player-card-sub').textContent = `${game.squares.filter(Boolean).length} of 100 claimed`;
+        panel.render();
+        return;
+      }
       body.innerHTML = '';
 
       if (game.status === 'setup' || game.status === 'picking') {
         const claimed = game.squares.filter(Boolean).length;
         const card = el('div', 'card player-card');
+        if (guestPickingOn(game)) {
+          if (!panel) panel = createGuestPanel(panelCtx);
+          card.innerHTML = `<div class="player-card-head"><span class="player-card-title">Board filling up</span><span class="player-card-sub">${claimed} of 100 claimed</span></div>
+            <p class="player-muted">The numbers are drawn when the host locks the board.</p>`;
+          card.appendChild(panel.root);
+          panelCard = card;
+          body.appendChild(card);
+          panel.render();
+          return;
+        }
         card.innerHTML = `<div class="player-card-head"><span class="player-card-title">Board filling up</span><span class="player-card-sub">${claimed} of 100 claimed</span></div>
           <p class="player-muted">The numbers are drawn when the host locks the board. Come back then to see how your squares are doing.</p>`;
         card.appendChild(miniGrid(game, selectedPlayer));
@@ -535,9 +890,13 @@
             selectedPlayer = null;
           }
           drawAll();
+          // A phone that picked before opens straight into picking. Its name may have changed
+          // since (a host rename), so the server is asked, not the remembered name trusted.
+          if (isPicker(id) && panel && guestPickingOn(game)) panel.start(true);
         } else if (fresh.updatedAt !== (game && game.updatedAt)) {
           game = fresh;
           drawAll();
+          if (panel) panel.followName();
         }
       } catch (e) {
         if (e && e.status === 404) {
@@ -565,12 +924,14 @@
   // The host's QR code for the guest view. Guests pass the link on with showInvite.
   // `code` (R22): when the board has a join code, the QR and link use the short
   // /<code> form, the same link the host shares and the TV shows.
-  function showPlayerLink(id, code) {
+  function showPlayerLink(id, code, game) {
     const overlay = SBS.ui.overlayEl('0.65');
     const box = el('div', 'card');
     box.style.cssText = 'max-width:520px; width:100%; box-shadow: var(--shadow-pop);';
     box.innerHTML = `<h3 style="margin-top:0">Scan to view your squares</h3>
-      <p style="color:var(--muted)">Point a phone's camera at this code to open the same read-only player view — your squares, quarter winners, and a live status readout. Nothing here can change the game.</p>
+      <p style="color:var(--muted)">${guestPickingOn(game)
+        ? "Point a phone's camera at this code to open the player view. Guests can claim and release their own squares while picking is open, then follow their squares, quarter winners and a live status readout. They can't change anything else."
+        : "Point a phone's camera at this code to open the same read-only player view — your squares, quarter winners, and a live status readout. Nothing here can change the game."}</p>
       <div class="phone-link-list"></div>`;
     overlay.appendChild(box);
     document.body.appendChild(overlay);

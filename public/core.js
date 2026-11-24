@@ -26,9 +26,11 @@
       // Signed in, but not allowed (someone else's board). Signing in again
       // would not help, so this never opens the prompt.
       if (res.status === 403) err.forbidden = true;
-      if (res.status === 409 && data && data.conflict) {
-        err.conflict = true;
-        err.game = data.game;
+      if (res.status === 409 && data) {
+        if (data.conflict) err.conflict = true;
+        // A guest's refused pick carries the board as it is now and which squares were taken.
+        if (data.game && data.game.squares) err.game = data.game;
+        if (data.taken) err.taken = data.taken;
       }
       throw err;
     }
@@ -133,6 +135,10 @@
     useHandoff: (token) => rawRequest('/api/handoff', json('POST', { token })),
     getRole: (id) => rawRequest(`/api/game/${id}/role`),
     patchPayout: (id, op) => request(`/api/game/${id}/payout`, json('PATCH', op)),
+    // Guest picks (R28). Raw on purpose: a 401 here means "no cookie kept" and must never
+    // open the host sign-in prompt, in any auth mode.
+    guestStart: (id) => rawRequest(`/api/game/${id}/guest`, { method: 'POST' }),
+    guestOp: (id, op) => rawRequest(`/api/game/${id}/guest`, json('PATCH', op)),
     deleteGame: (id) => request(`/api/game/${id}`, { method: 'DELETE' }),
     getTodaysGames: (date, league) => request(`/api/todays-games?${new URLSearchParams({ date: date || '', league: league || '' })}`)
   };
@@ -155,6 +161,37 @@
       SBS.go({ screen: 'home' });
     }
     return true;
+  };
+
+  // Save one host change onto a board that guests may be changing (decision 019 section 6).
+  // `change(doc)` edits a copy of the board and returns a string to refuse (a rule it checks
+  // again on every document, such as "a square was just taken"). On a 409 the same change is
+  // applied to the newer board from the error and saved again, up to 3 more times. Resolves
+  // { game } on success or { refused, game } (game = the board the refusal was judged on).
+  // Anything else rethrows, and so does a lost race when the board was picking and no longer
+  // is, so the caller's handleConflict runs as it always did.
+  SBS.saveWith = async function (game, change) {
+    const clone = (d) => JSON.parse(JSON.stringify(d));
+    let base = clone(game);
+    for (let attempt = 0; ; attempt++) {
+      const work = clone(base);
+      const refused = change(work);
+      if (typeof refused === 'string' && refused) return { refused, game: base };
+      try {
+        return { game: await SBS.api.saveGame(work) };
+      } catch (e) {
+        if (!e || !e.conflict || attempt >= 3) throw e;
+        let fresh = e.game && e.game.squares ? e.game : null;
+        if (!fresh) {
+          try { fresh = await SBS.api.getGame(game.id); } catch (err) { throw e; }
+        }
+        if (game.status === 'picking' && fresh.status !== 'picking') {
+          e.game = fresh;
+          throw e;
+        }
+        base = clone(fresh);
+      }
+    }
   };
 
   // 403: signed in, but the board is someone else's. Tell the host once, say

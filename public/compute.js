@@ -957,6 +957,55 @@
     return out;
   }
 
+  // What each name holds and what is still owed for it: only the unpaid squares are charged
+  // (decision 019 section 5). With no paidSquares anywhere this is count * price, as before.
+  // { [name]: { count, paidCount, unpaidCount, owed, paid } }; `paid` means nothing is owed.
+  function owedSummary(game) {
+    const price = parseFloat(game.squarePrice) || 0;
+    const out = Object.create(null);
+    (game.squares || []).forEach(s => { if (s) out[s.name] = out[s.name] || { count: 0 }; if (s) out[s.name].count++; });
+    Object.keys(out).forEach(name => {
+      const o = out[name];
+      o.paidCount = paidSquareCount(game, name);
+      o.unpaidCount = o.count - o.paidCount;
+      o.owed = o.unpaidCount * price;
+      o.paid = o.unpaidCount === 0;
+    });
+    return out;
+  }
+
+  // The paid fields of a guest's name after the host adds squares with Mark as Paid ticked or
+  // not: only the added squares become paid. { paid, paidSquares } where paidSquares is
+  // undefined for none. `beforePaid` and `beforeCount` are read before the squares are added.
+  function paidAfterAdd(beforePaid, beforeCount, added, ticked) {
+    const total = beforeCount + added;
+    const paid = Math.min(beforePaid + (ticked ? added : 0), total);
+    if (paid >= total) return { paid: true, paidSquares: undefined };
+    return { paid: false, paidSquares: paid > 0 ? paid : undefined };
+  }
+
+  // A name left with no squares must not keep its players entry: its tag would give an old
+  // phone the squares someone types under that name later.
+  function pruneEmptyPlayers(game) {
+    if (!isRecord(game.players)) return game;
+    const holding = new Set((game.squares || []).filter(Boolean).map(s => s.name));
+    Object.keys(game.players).forEach(n => { if (!holding.has(n)) delete game.players[n]; });
+    return game;
+  }
+
+  // Squares a guest picked and has not paid for, and how many people hold them. A guest's
+  // name is the one whose players entry carries a tag.
+  function unpaidGuestPicks(game) {
+    const unpaid = unpaidSquares(game);
+    const squares = [];
+    const people = new Set();
+    game.squares.forEach((s, i) => {
+      const p = s && playerOf(game, s.name);
+      if (s && p && typeof p.g === 'string' && unpaid.has(i)) { squares.push(i); people.add(s.name); }
+    });
+    return { squares, people: people.size };
+  }
+
   const validSquareList = (v) => Array.isArray(v) && v.length >= 1 && v.length <= 100
     && v.every(n => Number.isInteger(n) && n >= 0 && n <= 99) && new Set(v).size === v.length;
 
@@ -1070,6 +1119,7 @@
   return {
     PLAYER_COLORS, pickPlayerColor,
     applyGuestOp, guestCap, guestNameOf, paidSquareCount, unpaidSquares, cleanGuestName, nameKey,
+    owedSummary, paidAfterAdd, pruneEmptyPlayers, unpaidGuestPicks,
     QUARTERS, QLABEL, STATUSES, LEAGUES, SCORING_MODES,
     scoringMode, manualEntry, applyScoreOp, setQuarterScore, belowEndedQuarter, manualState, hasResult,
     shuffle, shuffledDigits, emptyGrid,

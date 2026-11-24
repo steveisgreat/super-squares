@@ -95,9 +95,11 @@
 
   // A square is flagged when the person holding it still owes for it, so the
   // host can see at a glance who to chase without opening the payments list.
+  // By square, not by name: a guest who paid for some squares and claimed more owes only for
+  // the newer ones (decision 019). With nothing part-paid this flags exactly what it used to.
   function unpaidChecker(game) {
-    const players = game.players || {};
-    return (name) => !(players[name] && players[name].paid);
+    const unpaid = window.GameLogic.unpaidSquares(game);
+    return (idx) => unpaid.has(idx);
   }
 
   function nameTxt(game, name) {
@@ -127,7 +129,7 @@
         if (sq) {
           cls += ' filled';
           label = nameTxt(game, sq.name);
-          if (isUnpaid(sq.name)) {
+          if (isUnpaid(idx)) {
             cls += ' is-unpaid';
           }
         } else {
@@ -135,6 +137,17 @@
           if (state.selected.includes(idx)) cls += ' selected';
         }
         const cell = el('div', cls, label);
+        if (sq && state.onFilled) {
+          // The host taps a claimed square to see who has it (and remove or reassign it).
+          cell.classList.add('is-tappable');
+          cell.setAttribute('role', 'button');
+          cell.tabIndex = 0;
+          cell.setAttribute('aria-label', `Row ${r + 1} column ${c + 1}, ${sq.name}`);
+          cell.addEventListener('click', () => state.onFilled(idx));
+          cell.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); state.onFilled(idx); }
+          });
+        }
         if (!sq && state.selecting) {
           if (state.pickColor) cell.style.setProperty('--pick-color', state.pickColor);
           cell.addEventListener('click', () => state.onToggle(idx));
@@ -213,7 +226,7 @@
 
         // The TV never shows who hasn't paid (R22 design rule); the host's own
         // board keeps the flag.
-        const owing = sq && !document.body.classList.contains('tv-mode') && isUnpaid(sq.name);
+        const owing = sq && !document.body.classList.contains('tv-mode') && isUnpaid(r * 10 + c);
         if (owing) cls += ' is-unpaid';
 
         const inner = sq ? nameTxt(game, sq.name) : (hasPush ? '<div class="name-txt">PUSH</div>' : '');

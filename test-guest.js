@@ -381,6 +381,52 @@ function pure() {
     const src = fs.readFileSync(require('path').join(__dirname, 'public', 'players.js'), 'utf8');
     assert(!src.includes('#feca57') && src.includes('pickPlayerColor'), 'players.js uses the shared rule');
   });
+
+  // ---- Owed amounts and host oversight helpers (R28 part b) ----
+  t('owedSummary: with no paidSquares it is count x price, paid or not, exactly as before', () => {
+    const g = held({ 0: 'Ann', 1: 'Ann', 2: 'Bo' }, { Ann: { paid: true }, Bo: { paid: false } });
+    const o = G.owedSummary(g);
+    eq([o.Ann.count, o.Ann.owed, o.Ann.paid, o.Bo.owed, o.Bo.paid], [2, 0, true, 10, false], 'summary');
+    eq(Object.keys(o).sort(), ['Ann', 'Bo'], 'names');
+  });
+  t('owedSummary: a part-paid name owes only the unpaid squares', () => {
+    const g = held({ 0: 'Ann', 1: 'Ann', 2: 'Ann', 3: 'Ann', 4: 'Ann' }, { Ann: { paid: false, paidSquares: 3 } });
+    const a = G.owedSummary(g).Ann;
+    eq([a.count, a.paidCount, a.unpaidCount, a.owed, a.paid], [5, 3, 2, 20, false], 'part paid');
+  });
+  t('owedSummary: a paidSquares above the count, or on a paid name, never goes negative', () => {
+    const g = held({ 0: 'Ann', 1: 'Bo' }, { Ann: { paid: false, paidSquares: 9 }, Bo: { paid: true, paidSquares: 1 } });
+    const o = G.owedSummary(g);
+    eq([o.Ann.owed, o.Ann.paid, o.Bo.owed, o.Bo.paid], [0, true, 0, true], 'clamped');
+  });
+  t('owedSummary: a price typed as text or missing is read as today (0 when not a number)', () => {
+    const g = held({ 0: 'Ann' }, {}, { squarePrice: '2.5' });
+    eq(G.owedSummary(g).Ann.owed, 2.5, 'text price');
+    const h = held({ 0: 'Ann' }, {}, { squarePrice: undefined });
+    eq(G.owedSummary(h).Ann.owed, 0, 'no price');
+  });
+  t('paidAfterAdd: only the added squares become paid', () => {
+    eq(G.paidAfterAdd(3, 3, 2, true), { paid: true, paidSquares: undefined }, 'paid in full');
+    eq(G.paidAfterAdd(0, 3, 2, true), { paid: false, paidSquares: 2 }, 'old squares stay owed');
+    eq(G.paidAfterAdd(3, 5, 2, true), { paid: false, paidSquares: 5 }, 'some old still owed');
+    eq(G.paidAfterAdd(2, 5, 2, true), { paid: false, paidSquares: 4 }, 'grows');
+    eq(G.paidAfterAdd(3, 3, 2, false), { paid: false, paidSquares: 3 }, 'unticked: new ones owed');
+    eq(G.paidAfterAdd(0, 0, 2, false), { paid: false, paidSquares: undefined }, 'nothing paid');
+    eq(G.paidAfterAdd(0, 0, 2, true), { paid: true, paidSquares: undefined }, 'new name, ticked');
+  });
+  t('pruneEmptyPlayers: a name with no squares loses its entry (and tag); others stay', () => {
+    const g = held({ 0: 'Ann' }, { Ann: { paid: false, g: T1 }, Bo: { paid: true, g: T2 }, Cy: { paid: false } });
+    G.pruneEmptyPlayers(g);
+    eq(Object.keys(g.players), ['Ann'], 'kept');
+  });
+  t('unpaidGuestPicks: counts only unpaid squares of names with a tag', () => {
+    const g = held({ 0: 'Ann', 1: 'Ann', 2: 'Ann', 3: 'Bo', 4: 'Cy' }, { Ann: { paid: false, g: T1, paidSquares: 1 }, Bo: { paid: false, g: T2 }, Cy: { paid: false } });
+    g.squares[0].at = 100; g.squares[1].at = 200; g.squares[2].at = 300;
+    const r = G.unpaidGuestPicks(g);
+    eq([r.squares, r.people], [[1, 2, 3], 2], 'unpaid guest picks');
+    const paid = held({ 0: 'Ann' }, { Ann: { paid: true, g: T1 } });
+    eq(G.unpaidGuestPicks(paid).squares, [], 'paid guest');
+  });
 }
 
 // ---------- routes ----------
