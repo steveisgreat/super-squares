@@ -58,9 +58,9 @@ checks on the server, mailer, tests; see the decision's build notes). Part 2 don
 2026-11-23 (client sign-in: email and code prompt, `#login-` page, sign out everywhere,
 403 handling). Part 3 done 2026-11-23 (escaping audit, stricter board validation,
 Content-Security-Policy, 28 KB game limit, `scripts/assign-owner.js`, CI workflow, privacy
-draft). Not live: `AUTH_MODE` stays unset. Left: the first CI run after a push, the
-`TEST_DATABASE_URL` secret, then going live (runbook, "Turn on host accounts") once R16
-and R10 are done.
+draft). Not live: `AUTH_MODE` stays unset. `TEST_DATABASE_URL` set 2026-11-24 (Neon
+branch `ci-tests`; the Postgres suites passed there). Left: the first CI run after a push,
+then going live (runbook, "Turn on host accounts") once R16 is done.
 
 **R3. Manual current score** — `Sonnet` — ✅ shipped 2026-11-23 ([decision 011](decisions/011-manual-scoring.md)); R2 later swaps its
 host check for an owner check.
@@ -174,7 +174,7 @@ A dependency-free Node script simulating 25,000 screens across 3,000 boards
 *Done:* p95 under 500 ms and error rate under 0.5% at target; results and cost
 estimate recorded in the runbook.
 
-**R10. Sign-in rate limit** — `Sonnet` — Ships with R2 (decision 012).
+**R10. Sign-in rate limit** — `Sonnet` — ✅ live 2026-11-24 (runbook, "Sign-in rate limit").
 Vercel Firewall rule on `/api/login` and `/api/login/verify`.
 *Done:* rule live; documented in the runbook.
 

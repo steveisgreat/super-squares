@@ -1,6 +1,6 @@
 # Runbook — Super-Squares
 
-How to run, configure, deploy, recover and roll back. Accurate as of 2026-11-23.
+How to run, configure, deploy, recover and roll back. Accurate as of 2026-11-24.
 
 ## Environment variables
 
@@ -41,10 +41,11 @@ it at a Neon branch, since it writes rows.
 
 CI (`.github/workflows/test.yml`) runs the offline suites on every push to `master` and
 every pull request. The Postgres suites run there too once the repository secret
-`TEST_DATABASE_URL` exists: make a Neon branch for tests, copy its **pooled** connection
-string, and run `gh secret set TEST_DATABASE_URL` (it asks for the value, so the string
-stays out of the shell history). Never the production string. Delete the secret to turn
-them off.
+`TEST_DATABASE_URL` exists. It is set (2026-11-24) to the **pooled** string of the Neon
+branch `ci-tests` (project Super-Squares), made from production with its `games` rows
+deleted. Use the same branch for local runs. To replace it, copy a branch's pooled string
+and run `gh secret set TEST_DATABASE_URL` (it asks for the value, so the string stays out
+of the shell history). Never the production string. Delete the secret to turn them off.
 
 ## Database
 
@@ -57,7 +58,7 @@ start. Do not add a keepalive or scheduled ping.
 
 ## Turn on host accounts
 
-Once, after R16 (sending domain) and R10 (sign-in firewall rule):
+Once, after R16 (sending domain). R10's firewall rule is already live (below).
 
 1. Deploy with `AUTH_MODE` unset. Password mode keeps working.
 2. Apply `migrations/002_host_accounts.sql`.
@@ -68,6 +69,23 @@ Once, after R16 (sending domain) and R10 (sign-in firewall rule):
 5. Run step 3 again, for boards made in between. Sign in and check the list.
 
 To go back, unset `AUTH_MODE` and redeploy. Boards keep their owner.
+
+## Sign-in rate limit (R10)
+
+A Vercel Firewall custom rule, live since 2026-11-24. It is project config, not in
+`vercel.json`, so it applies at once with no deploy, to production and previews:
+
+- Name `Sign-in rate limit` (id `rule_sign_in_rate_limit_2w2DWH`).
+- Matches `POST /api/login` or `POST /api/login/verify`. That covers `HOST_PASSWORD`
+  sign-in today and the email and code steps in accounts mode.
+- Fixed window, 10 requests per 60 s per client IP. Over that, Vercel answers 429 before
+  the function runs.
+
+It sits on top of the app's own limits (the code's try count, `LOGIN_EMAILS_PER_HOUR`).
+Hobby allows one rate-limit rule and fixed window only, and counters are per region.
+See or change it in the dashboard (Project, Firewall) or with
+`vercel firewall rules inspect "Sign-in rate limit"`. To turn it off, set it inactive
+there. Never delete it while `HOST_PASSWORD` is the only defense.
 
 ## Security headers
 
