@@ -97,7 +97,7 @@ cutoff rules, shared with the server and unit-tested), `teams.js` (NFL/NBA names
 colors and ESPN logo URLs), `qrcode.js`, `core.js` (API client, routing, sign-in prompt by mode and 401 replay, 403 handling), `ui.js`,
 `players.js`, `board.js`, `score-panel.js` (manual score; keyboard scoring on a laptop), `present.js` (Present on an HDMI TV:
 Party View in its own window, on the second screen when the browser can), then screens: `screen-home` (Home: top bar with New game and the account menu, Today / Coming up / Past games sections of cards with a primary button, Party View and a ⋯ menu, tiles for a TV browser; also setup and the version
-footer), `screen-picking` (two columns from 1024 px, else one; `players.js` has the Players card and payment box it shares with Game Day), `screen-gameday`, `screen-phone` (score entry),
+footer), `screen-picking` (two columns from 1024 px, one below, three tabs on a phone; `players.js` has the Players card and payment box it shares with Game Day), `screen-gameday`, `screen-phone` (score entry),
 `screen-player` (Player View: pick while picking is open, then My Squares), `screen-tvpair` (TV pairing and the Connect box),
 `screen-mirror` (Mirror mode for one phone, `#mirror-<id>`: TV-style board, score strip on tap),
 `screen-handoff` (scorer-phone code and the `#handoff-<token>` page), and `app.js` (hash router: `#tv-<id>`,

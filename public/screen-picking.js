@@ -163,8 +163,9 @@
       });
     }
 
-    // From 1024 px: the board, then one panel. Below that, or on a phone, one column: the tabs, the
-    // board, then player picks and the lock.
+    // From 1024 px: the board, then one panel with Add squares and Players tabs. Below that one
+    // column: that panel, the board, then player picks and the lock. A phone (or a window as narrow)
+    // shows one thing at a time, like Game Day: what is sold, then Squares, Grid and Players tabs.
     const layout = el('div', 'pick-fill' + (phone ? ' is-phone' : ''));
     main.appendChild(layout);
     const boardCard = el('div', 'card board-card');
@@ -177,35 +178,56 @@
     tabBar.setAttribute('aria-label', 'Squares');
     const addSec = el('section', 'pick-sec add-sec');
     const playersSec = el('section', 'pick-sec players-sec');
-    const tabs = { add: { panel: addSec, label: 'Add squares' }, players: { panel: playersSec, label: 'Players' } };
-    Object.keys(tabs).forEach((k, i, keys) => {
-      const t = tabs[k].btn = el('button', 'gd-tab', tabs[k].label);
+    const tabs = { add: { panel: addSec }, grid: { panel: boardCard }, players: { panel: playersSec } };
+    let tabbed = false; // the phone layout: the grid is a tab too
+    const tabKeys = () => Object.keys(tabs).filter(k => tabbed || k !== 'grid');
+    Object.keys(tabs).forEach((k) => {
+      const t = tabs[k].btn = el('button', 'gd-tab', '');
       t.type = 'button';
       t.id = `pick-tab-${k}`;
       t.setAttribute('role', 'tab');
       t.setAttribute('aria-controls', `pick-panel-${k}`);
       tabs[k].panel.id = `pick-panel-${k}`;
-      tabs[k].panel.setAttribute('role', 'tabpanel');
-      tabs[k].panel.setAttribute('aria-labelledby', t.id);
       t.addEventListener('click', () => selectTab(k));
       t.addEventListener('keydown', (e) => {
-        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        const keys = tabKeys();
+        const i = keys.indexOf(k);
+        const to = e.key === 'ArrowRight' ? keys[(i + 1) % keys.length]
+          : e.key === 'ArrowLeft' ? keys[(i + keys.length - 1) % keys.length]
+            : e.key === 'Home' ? keys[0] : e.key === 'End' ? keys[keys.length - 1] : null;
+        if (!to) return;
         e.preventDefault();
-        const to = keys[1 - i];
         selectTab(to);
         tabs[to].btn.focus();
       });
       tabBar.appendChild(t);
     });
+    function labelTabs() {
+      const n = new Set(game.squares.filter(Boolean).map(sq => sq.name)).size;
+      tabs.add.btn.textContent = tabbed ? 'Squares' : 'Add squares';
+      tabs.grid.btn.textContent = 'Grid';
+      tabs.players.btn.textContent = n ? `Players (${n})` : 'Players';
+    }
     function selectTab(k) {
       view.tab = k;
+      const keys = tabKeys();
+      const shown = keys.indexOf(k) < 0 ? 'add' : k; // the grid is only a tab on a phone
       Object.keys(tabs).forEach(o => {
-        const on = o === k;
-        tabs[o].btn.setAttribute('aria-selected', String(on));
-        tabs[o].btn.tabIndex = on ? 0 : -1;
-        tabs[o].panel.hidden = !on;
+        const isTab = keys.indexOf(o) >= 0;
+        const on = o === shown;
+        const { btn, panel } = tabs[o];
+        btn.hidden = !isTab;
+        btn.setAttribute('aria-selected', String(on));
+        btn.tabIndex = on ? 0 : -1;
+        panel.hidden = isTab && !on;
+        if (isTab) { panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-labelledby', btn.id); }
+        else { panel.removeAttribute('role'); panel.removeAttribute('aria-labelledby'); }
       });
+      side.hidden = tabbed && shown === 'grid';
+      if (tabbed && shown === 'grid') drawPreview(); // it was hidden: fit the names again
     }
+    // Where a half-made pick is finished: beside the board, or on the phone's Grid tab.
+    const claimTab = () => (tabbed ? 'grid' : 'add');
     side.append(tabBar, addSec, playersSec);
 
     // ---- Add squares: one player, or a pasted list ----
@@ -237,7 +259,7 @@
     errBox.setAttribute('role', 'alert');
     addSec.append(errBox, onePane);
     // Whatever tab is open, the message is where the host can see it.
-    function showErr(msg) { errBox.textContent = msg; errBox.classList.remove('hidden'); selectTab('add'); }
+    function showErr(msg) { errBox.textContent = msg; errBox.classList.remove('hidden'); selectTab(manualSelecting ? claimTab() : 'add'); }
     function clearErr() { errBox.classList.add('hidden'); }
 
     // "Claiming for" panel: shown in place of the form from the first selected square until Done or
@@ -263,7 +285,15 @@
       actionBtn.type = 'button';
       onePane.appendChild(actionBtn);
     }
+    if (tapToClaim) {
+      // On a phone the board is another tab, so a button goes there with the typed name.
+      const gridBtn = el('button', 'full-width grid-btn' + (actionBtn ? ' secondary' : ''), 'Pick on the grid');
+      gridBtn.type = 'button';
+      gridBtn.addEventListener('click', () => startManual(null));
+      onePane.appendChild(gridBtn);
+    }
     if (tapToClaim) onePane.appendChild(el('p', 'tap-hint', actionBtn ? 'or tap open squares on the board' : 'Type a name, then tap open squares on the board.'));
+    addSec.appendChild(el('p', 'claim-note', 'Finish the pick on the Grid tab, or cancel it there.'));
     const fullNote = el('p', 'tap-hint full-note hidden', 'Every square is taken. Tap a square on the board to remove it or give it to someone else.');
     addSec.insertBefore(fullNote, canPaste ? seg : errBox);
 
@@ -281,6 +311,18 @@
     const playerPrice = () => parseFloat(game.squarePrice) || 0;
     const openSquares = () => game.squares.map((s, i) => s ? -1 : i).filter(i => i >= 0);
 
+    // Claiming for, Already paid, Done and any message sit in the panel, or above the phone's grid.
+    const claimSlot = el('div', 'claim-slot');
+    function placeClaim() {
+      const onGrid = tabbed && manualSelecting;
+      addSec.classList.toggle('is-claiming', manualSelecting);
+      claimSlot.classList.toggle('is-claiming', onGrid);
+      if (onGrid === (manualBanner.parentNode === claimSlot)) return;
+      const act = document.activeElement;
+      if (onGrid) claimSlot.append(manualBanner, errBox, formWrap, manualBtns);
+      else { addSec.insertBefore(errBox, onePane); onePane.prepend(manualBanner, formWrap, manualBtns); }
+      if (act && act !== document.activeElement && formWrap.contains(act)) act.focus();
+    }
     function updateManualBanner() {
       // The banner is redrawn on every tap and poll: keep the keyboard on the same button.
       const had = document.activeElement && manualBtns.contains(document.activeElement) ? document.activeElement.dataset.act : null;
@@ -288,7 +330,7 @@
       manualBtns.innerHTML = '';
       manualBanner.classList.toggle('hidden', !manualSelecting);
       manualBtns.classList.toggle('hidden', !manualSelecting);
-      addSec.classList.toggle('is-claiming', manualSelecting);
+      placeClaim();
       if (!manualSelecting) return;
       const n = manualSelected.length;
       const count = manualTarget ? `${n} of ${manualTarget} picked` : `${n} picked`;
@@ -430,13 +472,19 @@
           manualSelected.push(idx);
         }
         clearErr();
-        selectTab('add');
+        selectTab(claimTab());
         return refreshPreview();
       }
+      return startManual(idx);
+    }
+
+    // Starts a pick for the typed name, with `idx` as its first square (null: none yet).
+    async function startManual(idx) {
+      if (saving || starting || manualSelecting) return;
       clearErr();
       const nameInput = formWrap.querySelector('#p-name');
       const rawName = nameInput.value.trim();
-      if (!rawName) { setMode('one'); showErr('Type a name first, then tap squares.'); nameInput.focus(); return; }
+      if (!rawName) { setMode('one'); showErr(tabbed ? 'Type a name first, then pick on the grid.' : 'Type a name first, then tap squares.'); nameInput.focus(); return; }
       if (!isPlayerName(rawName)) return showErr('That name is not allowed. Choose a different name.');
       // The # of squares is optional here: blank means no target.
       const countRaw = formWrap.querySelector('#p-count').value.trim();
@@ -453,16 +501,16 @@
       let name;
       try { name = await resolveNameForPick(game, rawName, out); } finally { starting = false; }
       if (!name) return; // host cancelled at the duplicate-name prompt
-      if (game.squares[idx]) return showErr('That square was just taken.');
+      if (idx !== null && game.squares[idx]) return showErr('That square was just taken.');
       manualSelecting = true;
       manualTarget = target;
-      manualSelected = [idx];
+      manualSelected = idx === null ? [] : [idx];
       manualName = name;
       manualPaid = formWrap.querySelector('#p-paid').checked;
       manualRename = out.rename || null;
       manualHadName = hadName;
-      selectTab('add');
       setMode('one');
+      selectTab(claimTab());
       refreshPreview();
     }
 
@@ -585,7 +633,7 @@
         <div class="sold-bar" aria-hidden="true"><div></div></div></div>
       <div class="board-stat"><span class="lbl">Pot</span><span class="val is-pot" data-v="pot"></span></div>
       <div class="board-stat"><span class="lbl">Per square</span><span class="val" data-v="price"></span></div>`;
-    boardCard.appendChild(boardHead);
+    boardCard.append(boardHead, claimSlot);
     const boardHolder = el('div');
     boardHolder.id = 'board-holder';
     boardCard.appendChild(boardHolder);
@@ -641,8 +689,7 @@
     playersSec.appendChild(players.el);
     function drawPlayers() {
       players.draw();
-      const n = new Set(game.squares.filter(Boolean).map(sq => sq.name)).size;
-      tabs.players.btn.textContent = n ? `Players (${n})` : 'Players';
+      labelTabs();
     }
 
     // ---- Paste a list of players (auto and both modes) ----
@@ -749,21 +796,31 @@
 
     // The page order is the visual order, so the keyboard follows it.
     const wideQuery = window.matchMedia('(min-width: 1024px)');
+    const narrowQuery = window.matchMedia('(max-width: 699px)');
     function placeCards() {
       const wide = wideQuery.matches && !phone;
+      tabbed = phone || narrowQuery.matches;
       const focused = document.activeElement;
       layout.classList.toggle('is-wide', wide);
-      foot.classList.toggle('card', !wide);
-      if (wide) side.appendChild(foot);
-      const order = wide ? [boardCard, side] : [side, boardCard, foot];
-      order.forEach(n => layout.appendChild(n));
+      layout.classList.toggle('is-tabbed', tabbed);
+      foot.classList.toggle('card', !wide && !tabbed);
+      if (wide || tabbed) side.appendChild(foot);
+      if (tabbed) {
+        [boardHead, tabBar, boardCard, side].forEach(n => layout.appendChild(n));
+      } else {
+        boardCard.prepend(boardHead);
+        side.prepend(tabBar);
+        (wide ? [boardCard, side] : [side, boardCard, foot]).forEach(n => layout.appendChild(n));
+      }
+      labelTabs();
+      placeClaim();
       selectTab(view.tab);
       if (focused && focused !== document.activeElement && layout.contains(focused)) focused.focus();
     }
     // (addListener: iPads before Safari 14 have no addEventListener on a media query)
-    if (wideQuery.addEventListener) wideQuery.addEventListener('change', placeCards); else wideQuery.addListener(placeCards);
+    [wideQuery, narrowQuery].forEach(q => { if (q.addEventListener) q.addEventListener('change', placeCards); else q.addListener(placeCards); });
     SBS.onLeaveScreen(() => {
-      if (wideQuery.removeEventListener) wideQuery.removeEventListener('change', placeCards); else wideQuery.removeListener(placeCards);
+      [wideQuery, narrowQuery].forEach(q => { if (q.removeEventListener) q.removeEventListener('change', placeCards); else q.removeListener(placeCards); });
     });
     setMode(view.mode);
     drawPlayers();

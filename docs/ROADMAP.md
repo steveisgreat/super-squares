@@ -303,7 +303,8 @@ still returns Home after a reload. Not tried: a real TV remote and TV browser.
 the mock, then dropped its three-column layout for two). Depends on: R25, R28, R29. Centered matchup with the
 join chip and Connect; the board in a team-colored frame with "?" until the lock; two columns
 from 1024 px (the board; one panel with Add squares and Players tabs, Player picks and the lock),
-one below that and on a phone. Manual pick is a tap on the board, and paste a
+one below that; a phone has Squares, Grid and Players tabs with the grid fitted to the width, like
+phone Game Day. Manual pick is a tap on the board, and paste a
 list works on every size. Player picks settings open in a dialog, and the screen's join card and
 Connect's Scoring section (before the lock) are gone. "Guest picks" is now "Player picks: Allow
 picks in Player View"; the guest page is Player View. Part payments:

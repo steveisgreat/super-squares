@@ -2608,19 +2608,22 @@ button.gd-onair {
 
 /* ---- Picking screen (redesign of R25) ----
    Two columns from 1024 px (the board, then one panel with Add squares and Players tabs), one
-   below that and on a phone (tabs, board, then player picks and the lock). In the wide layout the
-   board sets the height: its cell comes from both the width and the height, so the grid shows
+   below that (that panel, the board, then player picks and the lock). A phone, or a window under
+   700 px, has three tabs under what is sold: Squares, Grid (it fits the width) and Players. In
+   the wide layout the board sets the height: its cell comes from both the width and the height, so the grid shows
    whole, and the panel beside it is as tall as it is and scrolls inside. */
 .main.pick-main { max-width: 1800px; padding: 16px 24px calc(16px + var(--sab)); }
 .pick-fill { display: flex; flex-direction: column; gap: 16px; max-width: 760px; margin: 0 auto; }
 .pick-fill > .card { margin: 0; border-radius: 10px; }
-.pick-sec[hidden], .pick-tabs[hidden], .one-pane[hidden], .paste-card[hidden], .room-opt[hidden] { display: none; }
+.pick-fill .gd-tab[hidden], .pick-fill > [hidden], .pick-sec[hidden], .one-pane[hidden], .paste-card[hidden], .room-opt[hidden] { display: none; }
 .pick-sec h3 { margin: 0 0 4px; }
 .pick-sec > p { margin: 0 0 12px; color: var(--muted); font-size: 0.9rem; line-height: 1.45; }
 .pick-side, .pick-foot.card { padding: 0; }
 .pick-side .pick-sec, .pick-foot .pick-sec { padding: 16px 18px 18px; }
 .pick-tabs { margin: 0; padding: 4px 12px 0; }
 .players-sec .players-head { display: none; } /* the tab says it */
+.players-sec .money-box { flex-direction: row; align-items: baseline; justify-content: space-between; padding: 6px 12px; }
+.players-sec .money-box .val { font-size: 1.1rem; }
 .pick-seg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; margin-bottom: 14px; border-radius: 10px; background: var(--bg); }
 .pick-seg button { min-height: 44px; padding: 0 8px; border: 0; border-radius: 7px; box-shadow: none; background: transparent; color: var(--muted); font-size: 0.9rem; font-weight: 700; }
 .pick-seg button:hover { color: var(--text); background: var(--panel2); }
@@ -2687,15 +2690,44 @@ button.lock-btn:hover { background: var(--accent-soft); color: var(--accent-hi);
 .pick-fill .cell.selected::after { content: "\2713"; font-size: 1.2rem; font-weight: 800; color: var(--on-accent); }
 .pick-fill .cell.is-unpaid { box-shadow: inset 0 0 0 2px var(--danger); }
 .pick-fill .cell.is-tappable:hover { box-shadow: inset 0 0 0 2px var(--accent); }
-/* Under 700 px the grid scrolls sideways (squares stay at least 44 px), so the team bars, which
-   would not scroll with it, give way to the matchup in the top bar. */
+/* Players has its panel to itself: no player picks, no lock. */
+.pick-side > .players-sec:not([hidden]) + .pick-foot { display: none; }
+button.grid-btn { display: none; min-height: 48px; margin-top: 8px; font-size: 1rem; font-weight: 700; }
+
+/* ---- The phone's three tabs ---- */
+.pick-fill.is-tabbed { gap: 10px; max-width: 560px; }
+.is-tabbed .board-head { gap: 14px; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.is-tabbed > .pick-tabs { margin: 0; padding: 0; }
+.is-tabbed > .pick-tabs .gd-tab { min-height: 48px; padding: 0 4px; white-space: nowrap; }
+.is-tabbed > .board-card { padding: 10px 8px; }
+.is-tabbed .pick-side > .pick-foot { border-top: 1px solid var(--border); }
+.is-tabbed .add-sec:not(.is-claiming) .grid-btn { display: block; }
+.is-tabbed .add-sec .tap-hint:not(.full-note) { display: none; }
+.claim-note { display: none; margin: 0; color: var(--muted); }
+.is-tabbed .add-sec.is-claiming .claim-note { display: block; }
+.is-tabbed .claim-slot.is-claiming { margin-bottom: 10px; }
+.is-tabbed .claim-slot .manual-banner:not(.hidden) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; align-items: baseline; margin: 0; padding: 8px 12px; }
+.is-tabbed .claim-slot .manual-for { display: none; }
+.is-tabbed .claim-slot .manual-name { font-size: 1.15rem; }
+.is-tabbed .claim-slot .manual-count, .is-tabbed .claim-slot .manual-paid { font-size: 0.9rem; }
+.is-tabbed .claim-slot .manual-paid { grid-column: 1 / -1; }
+.is-tabbed .claim-slot .pick-fields { display: none; }
+.is-tabbed .claim-slot .checkbox-label { margin: 0; }
+.is-tabbed .claim-slot .error-msg { margin: 8px 0 0; }
+/* The whole grid fits the width, as on Game Day; a wrong tap is undone by tapping again. */
+.is-tabbed .board-scroll { overflow: visible; padding-bottom: 0; }
+.is-tabbed .board-grid-outer { gap: 2px; }
+.is-tabbed .board-table { grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 2px; }
+.is-tabbed .cell, .is-tabbed .cell.empty-pick[role=button] { min-width: 0; min-height: 0; aspect-ratio: 1; padding: 0 1px; border-radius: 4px; }
+.is-tabbed .cell.head { font-size: 0.8rem; }
+.is-tabbed .cell .name-txt { padding-top: 0; font-size: 0.6rem; }
+.is-tabbed .cell.selected::after { font-size: 0.9rem; }
+.is-tabbed .teamB-label { padding: 1px 8px; font-size: 0.9rem; }
+.is-tabbed .teamA-label { padding: 6px 1px; }
+.is-tabbed .teamA-label-text { font-size: 0.9rem; }
+.is-tabbed .teamA-label .team-logo, .is-tabbed .teamB-label .team-logo { --logo-size: 22px !important; padding: 2px; }
 @media (max-width: 699px) {
-  .main.pick-main { padding: 12px 10px calc(16px + var(--sab)); }
-  .pick-fill .board-grid-outer { display: block; }
-  .pick-fill .teamA-label, .pick-fill .teamB-label { display: none; }
-  .pick-fill .board-card { padding: 12px; }
-  .board-head { gap: 14px; }
-  .pick-fill .board-legend { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .main.pick-main { padding: 10px 10px calc(16px + var(--sab)); }
 }
 
 @media (min-width: 1024px) {
@@ -2721,12 +2753,11 @@ button.lock-btn:hover { background: var(--accent-soft); color: var(--accent-hi);
   /* The lock closes the panel at the same line as the board. */
   .pick-fill.is-wide .pick-foot { flex: 1 0 auto; display: flex; flex-direction: column; border-top: 1px solid var(--border); }
   .pick-fill.is-wide .lock-sec { margin-top: auto; }
-  /* Players: the list scrolls, between what is owed and Manage Players. */
-  .pick-fill.is-wide .pick-side > .players-sec { flex: 1 1 0; min-height: 260px; display: flex; flex-direction: column; }
+  /* Players has the whole panel: what is owed, the list (it scrolls) and Manage Players. */
+  .pick-fill.is-wide .pick-side > .players-sec { flex: 1 1 0; min-height: 0; padding: 12px 18px; display: flex; flex-direction: column; }
   .pick-fill.is-wide .pick-side > .players-sec[hidden] { display: none; }
   .pick-fill.is-wide .players-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .pick-fill.is-wide .fill-players { flex: 1 1 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; padding-right: 4px; border-top: 1px solid var(--border); }
-  .pick-fill.is-wide .players-sec:not([hidden]) + .pick-foot { flex: 0 0 auto; }
   .pick-fill.is-wide .board-card { justify-self: center; }
   .pick-fill.is-wide .board-scroll { padding-bottom: 0; overflow: visible; }
   .pick-fill.is-wide .board-table { grid-template-columns: repeat(11, var(--cell)); grid-auto-rows: var(--cell); width: max-content; }
@@ -2756,6 +2787,12 @@ button.lock-btn:hover { background: var(--accent-soft); color: var(--accent-hi);
 /* A mouse needs less than a finger, so a short laptop window still shows the whole grid. */
 @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
   .pick-fill.is-wide { --cell-min: 34px; }
+  /* One short line per player, so 20 or more fit. */
+  .pick-fill.is-wide .fill-player { padding: 1px 0; }
+  .pick-fill.is-wide button.fill-player-info { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+  .pick-fill.is-wide .fill-player-info .player-name { flex: none; font-size: 0.95rem; }
+  .pick-fill.is-wide .fill-player-info .player-sub { flex: 1; min-width: 0; margin: 0; font-size: clamp(0.72rem, 1.1vw, 0.82rem); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pick-fill.is-wide button.paid-pill { min-height: 28px; min-width: 74px; padding: 2px 6px; font-size: 0.8rem; }
 }
 
 /* The picking screen's top bar: the same Home, matchup and Connect as Game Day, with the matchup
