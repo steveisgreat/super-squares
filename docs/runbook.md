@@ -2,6 +2,10 @@
 
 How to run, configure, deploy, recover and roll back. Accurate as of 2026-11-24.
 
+**Production:** <https://play-super-squares.vercel.app> (Vercel project
+`super-squares`). `super-squares.vercel.app` is an unrelated third-party site; never
+link to it.
+
 ## Environment variables
 
 Template: `.env.example`. Real values live in `.env.local` (git-ignored) and in the
