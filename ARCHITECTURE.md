@@ -29,7 +29,8 @@ LAN-only.
 | `lib/store.js` | Storage contract and backend switch (decision 008) |
 | `lib/store-fs.js`, `lib/store-pg.js` | The two backends; both apply auto-cutoff on read |
 | `lib/version.js` | App version from `package.json`; adds `+<short hash>` on Vercel non-production |
-| `server-livescore.js` | ESPN scoreboard lookup, `refreshLiveScore` (refresh on read, decision 007), `getTodaysGames` |
+| `lib/scores/` | Score providers (decision 001): `espn.js` and `balldontlie.js` adapters, `index.js` (config, failover, no-backward merge, quarter completion), `slate.js` (the shared slate: one claimed refresh per league and date every 15 s, merge into a board, `listGames` for the picker) |
+| `server-livescore.js` | Simulation scoring (`applySimulatedData`) via `refreshLiveScore`. Its ESPN lookup (`findEvent`, `getTodaysGames`) is no longer called by the API and remains only for `test-livescore.js` |
 | `server.js` | LAN only: static files, certificate, single-port HTTP/HTTPS, host info; sends the security headers it reads from `vercel.json` |
 | `scripts/assign-owner.js` | One-off: gives boards with no owner to an account (runbook) |
 | `scripts/poll-scores.js` | Probe for the score providers (decision 001); not part of the app |
@@ -43,10 +44,10 @@ LAN-only.
 | `DELETE /api/session` | sign out |
 | `POST /api/login`, `POST /api/login/verify` | accounts mode: send the link and code; use either one |
 | `POST /api/session/revoke-all` | accounts mode: sign out everywhere |
-| `GET /api/game/:id` | public (the id is the read capability); refreshes live score |
+| `GET /api/game/:id` | public (the id is the read capability); a Live board merges the shared slate into `liveScore` and adds a response-only `liveFeed: { available, fetchedAt }`; writes the game only when a quarter newly completes |
 | `GET /api/hosts` | public; LAN addresses, empty on Vercel |
 | `GET /api/games` | host only; list summaries |
-| `GET /api/todays-games` | host only; ESPN schedule for the setup screen |
+| `GET /api/todays-games` | host only; the setup screen's schedule, read from the shared slate (no provider call of its own) |
 | `POST /api/game`, `PUT /api/game/:id`, `DELETE /api/game/:id` | host only |
 | `PATCH /api/game/:id/score` | host only; one manual-score operation (decision 011) |
 
@@ -66,6 +67,15 @@ index on `updated_at desc` (`migrations/001_games.sql`, applied by hand, see run
 Accounts (`migrations/002_host_accounts.sql`): `hosts`, `login_requests`, and
 `games.owner_id`, a nullable column that is never copied into `doc`. The store stamps `createdAt` and `updatedAt`.
 
+Live scores (`migrations/003_live_slates.sql`): `live_slates (league, et_date, payload jsonb, checked_at, fetched_at)`,
+one row per league and ET date, shared by every Live board. `checked_at` is the throttle: a
+request that finds it more than 15 s old claims the refresh with a conditional write
+(`claimLiveSlate`, one winner in both stores), calls the providers, and saves the slate. The fs
+backend keeps the same rows in memory. Nothing refreshes unless a request asks, so there is no
+timer. A Live board merges its game from the slate on every read (`lib/scores/slate.js`) and is
+written only when a quarter newly completes; a host-entered score (`liveOverride`) or result
+always wins.
+
 ## Client (`public/`, vanilla JS, no build step)
 
 `index.html` loads plain scripts in order: `compute.js` (payout math, validation,
@@ -83,7 +93,7 @@ Content-Security-Policy in `vercel.json` allows no inline script.
 
 ## External dependencies
 
-- ESPN's unofficial scoreboard API (scores and schedule).
+- Score providers: ESPN's unofficial scoreboard API (primary) and BALLDONTLIE (secondary), reached only through `lib/scores/`.
 - Neon Postgres (cloud only). Resend for sign-in email (accounts mode only). Runtime packages: `@neondatabase/serverless`, `selfsigned`.
 - Node 24.x (`engines`).
 

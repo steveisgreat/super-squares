@@ -143,6 +143,34 @@ and "updated N s ago".
 - Before launch: ask BALLDONTLIE for its commercial terms, and set
   `BALLDONTLIE_API_KEY`, `SCORE_PRIMARY` and `SCORE_SECONDARY` in Vercel (R4a).
 
+## Build notes (R4a part 2, 2026-11-24)
+
+Built as designed in §3 to §6, with these differences and additions:
+- **Board match is derived on read, not stored.** There is no `liveMatch` on the game: team
+  names resolve to abbreviations through `teams.js`, and the ET date comes from `kickoffTime`
+  (else `gameDate`). A board that cannot be matched reads as "feed unavailable".
+- **`payload.error`.** A failed refresh keeps the last good games and records `error` in the
+  payload; "feed unavailable" means no good fetch for 60 s *and* a recorded failure, or no match.
+  A row that is merely old (nobody has read it) is not an outage.
+- **Response-only `liveFeed`.** `GET /api/game/:id` adds `liveFeed: { available, fetchedAt }` to a
+  Live board. It is never stored (PUT drops it, and also drops a feed-merged `liveScore`). The ETag
+  now includes the merged score, because `updatedAt` does not move when nothing is written.
+- **Host fallback.** The score operations accept a Live board once the op carries
+  `override: true` (the client adds it) or the board already has `liveOverride`. The first tap seeds
+  from the feed's score and sets `liveOverride: true`; the op `resume` clears it and the
+  stored `liveScore`. The panel shows for a Live board when `liveFeed.available === false` or
+  `liveOverride` (`GameLogic.manualEntry`).
+- **Host wins by position, not a stamp.** The feed fills only quarters with no result, so a
+  host entry needs no `source: 'host'` mark.
+- **Picker.** `/api/todays-games` lists the slate (names from `teams.js`, kickoff from a new
+  `startsAt` field on `LiveGame`). It answers 502 only when no fetch has ever succeeded.
+- **Unread slate degrades.** If the table is missing or the read throws, a Live board reads as
+  "feed unavailable" and the error is logged.
+- No `expect` list is passed to failover, so the secondary is called only on an error, not for a
+  game the primary lacks (open question 2 stays open).
+- `server-livescore.js` keeps its ESPN code for now: `test-livescore.js` still tests it. Removing it
+  means retiring those tests, which was not done here.
+
 ## Open questions
 1. ~~Which providers?~~ Answered 2026-11-23 (§2).
 2. Should stale data trigger failover, for example when the primary's score

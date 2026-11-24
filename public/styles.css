@@ -2260,6 +2260,9 @@ body.player-mode #app { padding: 0; }
 .sp-edit input { width: 4.5rem; }
 .live-score-bar.manual .live-dot { background: var(--accent); }
 .live-score-bar.manual .live-label { color: var(--accent); }
+.live-score-bar.offline .live-dot { background: var(--warn); animation: none; }
+.live-score-bar.offline .live-label { color: var(--warn); }
+.sp-note { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px; color: var(--muted); font-size: 0.9rem; }
 .live-updated { color: var(--muted); font-size: 0.8rem; font-weight: 600; }
 .tv-header .live-updated { font-size: 0.6em; }
 .pill.disabled { opacity: 0.4; cursor: not-allowed; }

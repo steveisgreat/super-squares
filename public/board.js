@@ -34,6 +34,23 @@
   // point the grid's own FINAL badge tells the story.
   function renderLiveScoreBar(game) {
     const live = game.liveScore;
+    // A Live board whose feed is down says so, with the last score if there is one.
+    // A host-entered score (manual) has its own bar and needs no warning.
+    if (game.liveFeed && game.liveFeed.available === false && game.status === 'started' && !(live && live.manual)) {
+      const off = el('div', 'live-score-bar badge-fit offline');
+      const hasScore = live && live.a !== null && live.a !== undefined && live.b !== null && live.b !== undefined && live.state !== 'pre';
+      off.innerHTML = `
+        <span class="live-flag">
+          <span class="live-dot" aria-hidden="true"></span>
+          <span class="live-label">FEED OFFLINE</span>
+        </span>
+        <span class="live-center">
+          ${hasScore ? `${teamBadge(game, 'A', { cls: 'team-badge-sm' })}<span class="live-score-digits">${escapeHtml(live.a)}–${escapeHtml(live.b)}</span>${teamBadge(game, 'B', { cls: 'team-badge-sm' })}` : ''}
+          <span class="live-updated">Live feed unavailable. The host can enter the score.</span>
+        </span>
+      `;
+      return off;
+    }
     if (!live || live.a === null || live.a === undefined || live.b === null || live.b === undefined) return null;
     if (live.state === 'pre') return null;
     if (game.status === 'finished') return null;

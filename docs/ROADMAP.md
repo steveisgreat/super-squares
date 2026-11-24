@@ -91,7 +91,9 @@ badge.
 grid and setup.
 
 **R4a. Score provider layer and shared cache** (part 1, adapters and failover in
-`lib/scores/`, done 2026-11-23; part 2, the table, API and screens, waits for R2) — `Sonnet` (design done in
+`lib/scores/`, done 2026-11-23; part 2, the `live_slates` table, slate refresh, merge on read,
+fallback panel and picker, built 2026-11-24, awaiting review; apply `migrations/003_live_slates.sql`
+before the deploy, and the `/code-review medium` and provider keys are still to do) — `Sonnet` (design done in
 [decision 001](decisions/001-score-providers.md)) — Depends on: R3 ✅ (the
 `scoring` field, `GameLogic.scoringMode`), probe fixtures.
 Adapters for ESPN (primary) and BALLDONTLIE (secondary) behind one `LiveGame` shape;

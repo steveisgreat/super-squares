@@ -37,7 +37,7 @@
       getGame: () => game,
       setGame: (g) => { game = g; drawAround(); }
     });
-    const isManual = () => game && window.GameLogic.scoringMode(game) === 'manual';
+    const isManual = () => game && window.GameLogic.manualEntry(game);
 
     function firstUnscored(g) {
       const c = computeGame(g);

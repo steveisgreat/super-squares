@@ -512,6 +512,15 @@
     return game && game.simulation ? 'simulation' : 'live';
   }
 
+  // True when the host can enter the score by hand: a Manual board, or a Live board whose
+  // feed is down (the server marks the response with liveFeed.available === false) or
+  // whose score the host already holds (liveOverride). The score panel shows on these.
+  function manualEntry(game) {
+    const mode = scoringMode(game);
+    if (mode === 'manual') return true;
+    return mode === 'live' && (game.liveOverride === true || !!(game.liveFeed && game.liveFeed.available === false));
+  }
+
   function isScore(n) {
     return Number.isInteger(n) && n >= 0 && n <= MAX_SCORE;
   }
@@ -526,8 +535,9 @@
   // The manual current score; a game nobody has tapped yet reads 0-0, Q1.
   function manualState(game) {
     const live = game.liveScore;
-    if (live && live.manual) {
-      return { a: live.a, b: live.b, period: live.period || 1 };
+    // A Live board seeds the host's entry from the feed's last score.
+    if (live && (live.manual || scoringMode(game) === 'live')) {
+      return { a: Number.isFinite(live.a) ? live.a : 0, b: Number.isFinite(live.b) ? live.b : 0, period: live.period || 1 };
     }
     return { a: 0, b: 0, period: 1 };
   }
@@ -558,7 +568,7 @@
   function applyScoreOp(game, op) {
     if (!op || typeof op !== 'object' || Array.isArray(op)) return failure('invalid', 'Score operation must be an object.');
     const name = op.op;
-    if (['add', 'set', 'end', 'final', 'undo', 'edit'].indexOf(name) === -1) return failure('invalid', 'Unknown score operation.');
+    if (['add', 'set', 'end', 'final', 'undo', 'edit', 'resume'].indexOf(name) === -1) return failure('invalid', 'Unknown score operation.');
 
     // Validate the body before looking at game state, so a bad request is 400
     // whatever state the game is in.
@@ -572,10 +582,24 @@
       if (!isScore(op.a) || !isScore(op.b)) return failure('invalid', `Scores must be whole numbers from 0 to ${MAX_SCORE}.`);
     }
 
-    if (scoringMode(game) !== 'manual') return failure('illegal', 'This game does not use manual scoring.');
+    // A Live board takes the host's taps only once the host has chosen to enter the score
+    // (decision 001 section 6): the op says so (override: true) or the board already
+    // holds a host score (liveOverride). Resume hands the score back to the feed.
+    const mode = scoringMode(game);
+    const takeover = mode === 'live' && (op.override === true || game.liveOverride === true);
+    if (name === 'resume') {
+      if (mode !== 'live') return failure('illegal', 'This game does not use a live feed.');
+    } else if (mode !== 'manual' && !takeover) {
+      return failure('illegal', 'This game does not use manual scoring.');
+    }
     if (game.status !== 'started' && game.status !== 'finished') return failure('illegal', 'Scoring opens once the board is locked.');
 
     const g = JSON.parse(JSON.stringify(game));
+    if (name === 'resume') {
+      delete g.liveOverride;
+      g.liveScore = null;
+      return { game: g };
+    }
     if (!g.results) g.results = {};
     const s = manualState(g);
     const finished = hasResult(g.results.final);
@@ -590,6 +614,9 @@
       // that no longer matches, so there is nothing to clear here.
       return { game: syncStatus(g) };
     }
+
+    // From here the host holds the score of a Live board: the feed no longer overwrites it.
+    if (mode === 'live') g.liveOverride = true;
 
     if (name === 'undo') {
       if (finished) {
@@ -661,7 +688,7 @@
 
   return {
     QUARTERS, QLABEL, STATUSES, LEAGUES, SCORING_MODES,
-    scoringMode, applyScoreOp, setQuarterScore, belowEndedQuarter, manualState, hasResult,
+    scoringMode, manualEntry, applyScoreOp, setQuarterScore, belowEndedQuarter, manualState, hasResult,
     shuffle, shuffledDigits, emptyGrid,
     potOf, actualPotOf, findCol, findRow, computeGame, computeLiveHighlight, payoutAmount, drawnDigits,
     validateGame, isPlayerName, isColor, isDigitPermutation, syncStatus,

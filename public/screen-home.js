@@ -584,10 +584,10 @@
       <label>Scoring</label>
       <div class="radio-group" id="scoring-group" role="radiogroup" aria-label="Scoring">
         <div class="pill${scoringStart === 'manual' ? ' active' : ''}" data-val="manual" role="radio" tabindex="0" aria-checked="${scoringStart === 'manual'}">Manual</div>
-        <div class="pill${scoringStart === 'live' ? ' active' : ''}" data-val="live" role="radio" tabindex="0" aria-checked="${scoringStart === 'live'}">Live (ESPN)</div>
+        <div class="pill${scoringStart === 'live' ? ' active' : ''}" data-val="live" role="radio" tabindex="0" aria-checked="${scoringStart === 'live'}">Live</div>
         <div class="pill${scoringStart === 'simulation' ? ' active' : ''}${simLocked ? ' disabled' : ''}" data-val="simulation" role="radio" tabindex="${simLocked ? -1 : 0}" aria-checked="${scoringStart === 'simulation'}"${simLocked ? ' aria-disabled="true" title="Simulation has to be chosen before the grid numbers are generated."' : ''}>Simulation</div>
       </div>
-      <p style="color:var(--muted); font-size:0.9rem;">Manual: you enter the score yourself on the phone or Game Day screen, and the app never contacts ESPN. Live: the score is pulled from ESPN while the game is on. Simulation: for testing or demos, the app invents a random game and plays it out (2-minute quarters) starting the moment you generate the grid numbers.</p>
+      <p style="color:var(--muted); font-size:0.9rem;">Manual: you enter the score yourself on the phone or Game Day screen, and the app never contacts a score feed. Live: the score comes from a live score feed while the game is on, and you can enter it yourself if the feed drops. Simulation: for testing or demos, the app invents a random game and plays it out (2-minute quarters) starting the moment you generate the grid numbers.</p>
     `;
 
     let league = editGame && window.GameLogic.LEAGUES.includes(editGame.league) ? editGame.league : 'nfl';
@@ -662,7 +662,7 @@
         const data = await SBS.api.getTodaysGames(dateVal, league);
         games = data.games || [];
       } catch (e) {
-        gamesCard.innerHTML = `<p class="games-picker-msg">ESPN API is not available so Auto Fetch Score will not be available.</p>`;
+        gamesCard.innerHTML = `<p class="games-picker-msg">The score feed is not available, so Auto Fetch Score will not be available.</p>`;
         appendDetailsButton(null, []);
         gamesCard.classList.remove('hidden');
         return;
@@ -820,7 +820,7 @@
       }
       // Switching mode on an existing board drops the old running score so a
       // stale feed value never poses as the manual one (or the reverse).
-      if (editGame && scoring !== window.GameLogic.scoringMode(editGame)) game.liveScore = null;
+      if (editGame && scoring !== window.GameLogic.scoringMode(editGame)) { game.liveScore = null; delete game.liveOverride; }
       if (!editGame) {
         game.status = 'picking';
         game.squares = emptyGrid();

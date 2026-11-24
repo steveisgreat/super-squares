@@ -429,6 +429,36 @@ async function main() {
     await sql`delete from login_requests where email like ${mine}`;
   }
 
+  // ---------- shared live slates (decision 001 section 3) ----------
+
+  const slateLeague = 't' + crypto.randomBytes(6).toString('hex');
+  try {
+    await check('live slate: 50 concurrent claims on an empty row, exactly one wins', async () => {
+      const wins = await Promise.all(Array.from({ length: 50 }, () =>
+        store.claimLiveSlate(slateLeague, '2099-12-31', null, '2099-12-31T00:00:00.000Z')));
+      eq(wins.filter(Boolean).length, 1, 'winners');
+      eq((await store.getLiveSlate(slateLeague, '2099-12-31')).checkedAt, '2099-12-31T00:00:00.000Z', 'checkedAt');
+    });
+
+    await check('live slate: 50 concurrent claims holding the same seen value, exactly one wins', async () => {
+      const seen = '2099-12-31T00:00:00.000Z';
+      const wins = await Promise.all(Array.from({ length: 50 }, (_, i) =>
+        store.claimLiveSlate(slateLeague, '2099-12-31', seen, new Date(Date.UTC(2099, 11, 31, 0, 0, 15 + i)).toISOString())));
+      eq(wins.filter(Boolean).length, 1, 'winners');
+    });
+
+    await check('live slate: a stale seen value loses; save round-trips the payload and keeps fetchedAt on a failure', async () => {
+      eq(await store.claimLiveSlate(slateLeague, '2099-12-31', '2000-01-01T00:00:00.000Z', '2100-01-01T00:00:00.000Z'), false, 'stale');
+      await store.saveLiveSlate(slateLeague, '2099-12-31', { provider: 'espn', games: [{ a: 1 }] }, '2099-12-31T00:00:09.000Z');
+      await store.saveLiveSlate(slateLeague, '2099-12-31', { provider: 'espn', games: [{ a: 1 }], error: 'down' }, null);
+      const row = await store.getLiveSlate(slateLeague, '2099-12-31');
+      eq([row.fetchedAt, row.payload.games, row.payload.error], ['2099-12-31T00:00:09.000Z', [{ a: 1 }], 'down'], 'row');
+      eq(await store.getLiveSlate(slateLeague, '2099-12-30'), null, 'a missing row');
+    });
+  } finally {
+    await sql`delete from live_slates where league = ${slateLeague}`;
+  }
+
   // ---------- report ----------
 
   for (const id of cleanupIds) {

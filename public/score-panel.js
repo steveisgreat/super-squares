@@ -39,6 +39,8 @@
     // Serialized: taps queue behind one another so the server sees them in
     // order and a fast double-tap never races itself into a conflict.
     function send(op) {
+      // On a Live board the host's tap takes the score over from the feed (section 6).
+      if (GL.scoringMode(game()) === 'live' && op.op !== 'resume') op = Object.assign({ override: true }, op);
       const local = GL.applyScoreOp(game(), op);
       if (local.error) { showAlert(local.error); return Promise.resolve(); }
       opts.setGame(local.game);
@@ -151,7 +153,7 @@
     function drawInner() {
       const g = game();
       root.innerHTML = '';
-      if (!g || GL.scoringMode(g) !== 'manual' || (g.status !== 'started' && g.status !== 'finished')) {
+      if (!g || !GL.manualEntry(g) || (g.status !== 'started' && g.status !== 'finished')) {
         root.hidden = true;
         return;
       }
@@ -162,6 +164,24 @@
       const head = el('div', 'sp-title');
       head.innerHTML = `<h3>Current score</h3><span class="sp-period">${finished ? 'FINAL' : escapeHtml(periodLabel(cur.period))}</span>`;
       root.appendChild(head);
+
+      // A Live board: say why the panel is here, and offer the way back to the feed.
+      if (GL.scoringMode(g) === 'live') {
+        const note = el('div', 'sp-note');
+        if (g.liveOverride) {
+          note.textContent = 'You are entering the score. The live feed is paused.';
+          if (!finished) {
+            const resume = el('button', 'sp-btn', 'Resume live feed');
+            resume.type = 'button';
+            resume.setAttribute('data-spkey', 'resume');
+            resume.addEventListener('click', () => send({ op: 'resume' }));
+            note.appendChild(resume);
+          }
+        } else {
+          note.textContent = 'Live feed unavailable. Enter the score here until it comes back.';
+        }
+        root.appendChild(note);
+      }
 
       root.appendChild(scoreRow(g, 'a', cur, finished));
       root.appendChild(scoreRow(g, 'b', cur, finished));

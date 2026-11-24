@@ -106,7 +106,7 @@ function game(o) {
       provider: 'espn', providerGameId: '401873078', league: 'nfl', etDate: ET,
       home: { abbr: 'wsh', score: 0, quarters: [0, 0, null, null], ot: null },
       away: { abbr: 'cin', score: 10, quarters: [0, 10, null, null], ot: null },
-      state: 'in', period: 2, clock: '0:54', providerUpdatedAt: null, fetchedAt: 'T'
+      state: 'in', period: 2, clock: '0:54', startsAt: '2026-11-24T01:15Z', providerUpdatedAt: null, fetchedAt: 'T'
     });
   });
   await check('espn: pre -> scores and quarters null, period and clock null', () => {
