@@ -967,7 +967,8 @@
       syncFsLabel();
     });
 
-    exitBtn.addEventListener('click', async () => {
+    // Exit, or Back on a phone or TV remote (see partyHistory below).
+    async function leaveTV() {
       if (SBS.ui.fullscreen.active()) await SBS.ui.fullscreen.exit();
       // A window the host console opened to present on a TV (R25 part b): Exit closes it.
       // (The opener may be gone: the console tab was closed. Closing still works for a window a
@@ -984,7 +985,9 @@
       }
       window.location.hash = '';
       SBS.go({ screen: 'home' });
-    });
+    }
+    let partyHist = null;
+    exitBtn.addEventListener('click', () => { if (!partyHist || !partyHist.exit()) leaveTV(); });
 
     controls.appendChild(fsBtn);
     // A paired TV has no host to go back to: no Exit.
@@ -1011,9 +1014,12 @@
     wake();
 
     // Opened from Game Day in this tab: the hash makes a reload land here again, and Exit goes back.
-    if (from === 'board') {
-      try { window.history.replaceState(null, '', `${location.pathname}${location.search}#tv-${id}`); } catch (e) { /* the hash is only for reloads */ }
+    // Opened from Home, the same (Exit goes Home).
+    if (from === 'board' || from === 'home') {
+      try { window.history.replaceState(window.history.state, '', `${location.pathname}${location.search}#tv-${id}`); } catch (e) { /* the hash is only for reloads */ }
     }
+    // Back on a phone or TV remote leaves Party View like Exit. A paired TV has no Exit, so no entry.
+    if (!paired) partyHist = SBS.ui.partyHistory(id, from, leaveTV);
     // Held while Party View is up; a touch device that cannot hold it gets a one-time Auto-Lock tip.
     const releaseWakeLock = SBS.ui.keepPartyAwake(screenEl, !!paired);
 

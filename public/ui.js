@@ -888,6 +888,41 @@
     });
   }
 
+  // Party View adds one history entry, so a phone's Back gesture or a TV remote's Back key leaves
+  // Party View (onBack) instead of leaving the site. The entry also carries where Party View was
+  // opened from, which the hash alone does not say, so a reload still knows. Returns:
+  // from: the remembered origin (or the one given); exit(): leave through history (onBack runs
+  // on popstate), false when there is no entry to use and the caller should leave itself.
+  function partyHistory(id, from, onBack) {
+    let armed = false;
+    const st = window.history.state;
+    if (!from && st && st.sbsParty && st.id === id) from = st.from;
+    try {
+      if (!(st && st.sbsParty && st.id === id)) window.history.pushState({ sbsParty: 1, id: id, from: from || '' }, '', location.href);
+      armed = true;
+    } catch (e) { /* Back leaves the site, as before */ }
+    function onPop() {
+      if (!armed) return;
+      release();
+      onBack();
+    }
+    function release() {
+      armed = false;
+      window.removeEventListener('popstate', onPop);
+    }
+    window.addEventListener('popstate', onPop);
+    SBS.onLeaveScreen(release);
+    return {
+      from: from,
+      exit: function () {
+        const s = window.history.state;
+        if (!armed || !(s && s.sbsParty)) return false;
+        window.history.back();
+        return true;
+      }
+    };
+  }
+
   // Tabler outline icons (MIT, 24 px): arrows-maximize, copy, printer, chevron-right, x.
   const ic = d => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   const MAXIMIZE_ICON = ic('<path d="M16 4l4 0l0 4"/><path d="M14 10l6 -6"/><path d="M8 20l-4 0l0 -4"/><path d="M4 20l6 -6"/><path d="M16 20l4 0l0 -4"/><path d="M14 14l6 6"/><path d="M8 4l-4 0l0 4"/><path d="M4 4l6 6"/>');
@@ -897,7 +932,7 @@
   const CLOSE_ICON = ic('<path d="M18 6l-12 12"/><path d="M6 6l12 12"/>');
 
   SBS.ui = {
-    el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake, keepPartyAwake,
+    el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake, keepPartyAwake, partyHistory,
     showModal, showConfirm, showAlert, disturbMessage, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin,
     topbar, statusLabel, leagueLabel, leagueBadge, isTvBrowser, isPhone,
     formatKickoffTime, kickoffNotice,

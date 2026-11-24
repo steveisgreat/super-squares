@@ -293,9 +293,10 @@ status chip (Live, Kickoff, Picking squares, Final), one-line matchup, a primary
 squares, Open Game Day, See results), Party View in the same tab with Exit back to Home, and a ⋯
 menu (Edit, Players, Score from another phone, Delete) as a sheet on a phone or a popover on wide
 screens. A TV browser gets up to six focusable tiles driven by the remote's arrows, or the pairing
-screen when there is no host session. The Home brand drops its glowing pill so the top bar fits a
-phone. Not tried: a real TV remote and TV browser; a remote's Back key does not leave Party View
-(only the on-screen Exit). Follow-up: remove the now-unused `TV_ICON`, `PHONE_ICON` and
+screen when there is no host session. The brand keeps its glowing pill (tighter on a phone, where
+the account button drops its chevron). Party View adds one history entry, so a phone's Back or a TV
+remote's Back leaves it like Exit, and that entry remembers where it was opened from, so Exit
+still returns Home after a reload. Not tried: a real TV remote and TV browser. Follow-up: remove the now-unused `TV_ICON`, `PHONE_ICON` and
 `PEOPLE_ICON` from `ui.js`.
 
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)

@@ -36,7 +36,11 @@
   function renderMirror(id, from) {
     const app = SBS.appEl;
     app.innerHTML = '';
-    try { window.history.replaceState(null, '', `${location.pathname}${location.search}#mirror-${id}`); } catch (e) { /* the hash is only for reloads */ }
+    try { window.history.replaceState(window.history.state, '', `${location.pathname}${location.search}#mirror-${id}`); } catch (e) { /* the hash is only for reloads */ }
+    // Back (the phone's gesture or button) leaves Party View like Exit. The history entry also
+    // remembers where Party View was opened from, so Exit still goes Home after a reload.
+    const partyHist = SBS.ui.partyHistory(id, from, () => leave());
+    from = partyHist.from;
 
     // tv-mode is what keeps unpaid marks off the board (board.js): this screen is the room's view.
     document.body.classList.add('tv-mode');
@@ -58,7 +62,7 @@
     exitBtn.setAttribute('aria-label', 'Exit Party View');
     exitBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      leave();
+      if (!partyHist.exit()) leave();
     });
     function leave() {
       closed = true;

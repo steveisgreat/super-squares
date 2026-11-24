@@ -2732,7 +2732,10 @@ button.home-acct:hover { background: var(--panel2); border-color: var(--border);
 @media (max-width: 400px) {
   .home-topbar h1 .header-icon { display: none; }
   .home-topbar h1 { font-size: 1.05rem; }
+  /* Room for the whole brand pill beside New game and the account button on a phone. */
+  .home-topbar h1.brand-pill { padding: 6px 10px; }
   button.home-new { padding: 0 12px; }
+  button.home-acct > svg:last-child { display: none; }
 }
 @media (min-width: 720px) {
   .home-topbar { padding: 12px 28px; }

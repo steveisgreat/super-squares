@@ -556,7 +556,7 @@
       newBtn.addEventListener('click', () => SBS.go({ screen: 'setup' }));
       extra.push(newBtn);
     }
-    const bar = topbar('<span><span class="brand-dollar">B</span>ig <span class="brand-dollar">G</span>ame <span class="brand-dollar">G</span>rids</span>', extra, { hideHome: true });
+    const bar = topbar('<span><span class="brand-dollar">B</span>ig <span class="brand-dollar">G</span>ame <span class="brand-dollar">G</span>rids</span>', extra, { hideHome: true, pill: true });
     bar.classList.add('home-topbar');
     if (tv) bar.classList.add('tv-topbar');
     app.appendChild(bar);
