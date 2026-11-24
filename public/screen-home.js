@@ -137,7 +137,7 @@
       ${isTv ? '' : `
       <div class="game-card-actions">
         <button class="icon-btn game-card-edit" type="button" aria-label="Edit Game" title="Edit Game"${numbersPicked ? ' disabled' : ''}>${EDIT_ICON}</button>
-        <button class="icon-btn game-card-tv" type="button" aria-label="Open TV Grid View" title="TV Grid View">${TV_ICON}</button>
+        <button class="icon-btn game-card-tv" type="button" aria-label="Open Party View" title="Party View">${TV_ICON}</button>
         <button class="icon-btn game-card-phone" type="button" aria-label="Open Phone Score Entry" title="Phone Score Entry">${PHONE_ICON}</button>
         <button class="icon-btn game-card-people" type="button" aria-label="Manage Players" title="Manage Players">${PEOPLE_ICON}</button>
       </div>`}

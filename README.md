@@ -1,7 +1,7 @@
 # Super-Squares
 
 A squares-pool web app for any sport: hosts create boards, players claim squares, scores
-pay out per quarter, and a TV view shows the grid. The product is the hosted app
+pay out per quarter, and Party View shows the grid. The product is the hosted app
 (Vercel + Neon); its address is in `docs/runbook.md`.
 
 This README covers running it locally for development only.

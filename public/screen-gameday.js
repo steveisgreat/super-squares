@@ -4,10 +4,10 @@
   'use strict';
 
   const SBS = window.SBS = window.SBS || {};
-  const { el, escapeHtml, money, topbar, showAlert, showConfirm, applyTeamColors, teamBadge, teamStyle, fitTeamBadges, readableTextColor, isPhone, TV_ICON, PHONE_ICON, PEOPLE_ICON } = SBS.ui;
+  const { el, escapeHtml, money, topbar, showAlert, showConfirm, applyTeamColors, teamBadge, teamStyle, fitTeamBadges, readableTextColor, isPhone } = SBS.ui;
   const { unpaidTotal, openManagePlayersModal } = SBS.players;
   const { disturbMessage } = SBS.ui;
-  // Tabler "devices" (MIT, 24 px outline), for the In the room button.
+  // Tabler "devices" (MIT, 24 px outline), for the Connect button.
   const DEVICES_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 9a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1v-10z"/><path d="M18 8v-3a1 1 0 0 0 -1 -1h-13a1 1 0 0 0 -1 1v12a1 1 0 0 0 1 1h9"/><path d="M16 9h2"/></svg>';
   const { QUARTERS, QLABEL, computeGame, payoutAmount, drawnDigits, payoutStatus, whoToPay, paidQuartersDisturbed } = window.GameLogic;
 
@@ -208,51 +208,58 @@
     app.innerHTML = '';
     const reopen = () => SBS.go({ screen: 'board', game });
     const phone = isPhone();
-    // Phone: labeled actions (icon + short text) instead of bare icons.
-    function actionBtn(icon, phoneLabel, fullLabel, aria) {
-      const b = phone
-        ? el('button', 'gd-action', `${icon}<span>${phoneLabel}</span>`)
-        : el('button', 'secondary', fullLabel);
-      b.type = 'button';
-      if (phone) { b.setAttribute('aria-label', aria || fullLabel); b.title = aria || fullLabel; }
-      return b;
-    }
-    const manageBtn = actionBtn(PEOPLE_ICON, 'Players', 'Manage Players');
-    manageBtn.addEventListener('click', () => openManagePlayersModal(game, reopen));
-    const tvBtn = actionBtn(TV_ICON, 'TV view', 'Open TV Grid View');
-    tvBtn.addEventListener('click', () => {
-      window.open(`${location.origin}${location.pathname}#tv-${game.id}`, '_blank');
-    });
-    const phoneBtn = actionBtn(PHONE_ICON, 'Score on phone', 'Phone Score Entry');
-    phoneBtn.addEventListener('click', () => SBS.handoff.open(game, phoneBtn));
-    // Players scan this to open the read-only companion view (their squares,
-    // quarter winners, live status) — separate from the host's own score-entry
-    // link above, and safe to hand out to anyone in the room.
-    const playerBtn = actionBtn(QR_ICON, 'QR code', 'Player View QR', 'Show player view QR code');
-    playerBtn.addEventListener('click', () => SBS.playerView.showPlayerLink(game.id, game.joinCode, game));
     const headerMeta = [SBS.ui.leagueBadge(game.league), escapeHtml(game.description || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
-    const actionBtns = [manageBtn, tvBtn, phoneBtn, playerBtn];
-    // Once the board is locked: pair a TV, score from another phone, invite players (R23).
-    const locked = game.status === 'started' || game.status === 'finished';
-    if (locked) {
-      const roomBtn = actionBtn(DEVICES_ICON, 'In the room', "What's in the room?");
-      roomBtn.classList.add('room-btn');
-      roomBtn.addEventListener('click', () => SBS.deviceChooser.open(game, roomBtn));
-      actionBtns.push(roomBtn);
+    // The top bar (R29): Home, the matchup on one line (full names when they fit, else short ones),
+    // then on a wide screen the join chip and the "On the TV" pill, then Party View and Connect.
+    const bar = topbar('', [], { hideIcon: true, homeLeft: true });
+    bar.classList.add('gd-topbar');
+    if (phone) bar.classList.add('gd-topbar-phone');
+    const head = el('div', 'gd-head');
+    const match = el('h1', 'gd-match badge-fit',
+      `${teamBadge(game, 'A', { logoSize: 20, cls: 'team-badge-sm' })}<span class="vs-sep">vs</span>${teamBadge(game, 'B', { logoSize: 20, cls: 'team-badge-sm' })}`);
+    head.append(match, el('div', 'gd-meta', headerMeta));
+    bar.replaceChild(head, bar.querySelector('h1'));
+    const nav = bar.querySelector('.nav');
+
+    if (!phone && game.joinCode) {
+      const wrap = el('div', 'gd-chip-wrap');
+      const chip = el('button', 'gd-chip',
+        `<span class="gd-chip-label">Join</span><span class="gd-chip-code">${escapeHtml(game.joinCode)}</span>${SBS.ui.COPY_ICON}`);
+      chip.type = 'button';
+      chip.setAttribute('aria-label', `Join code ${game.joinCode.split('').join(' ')}. Copy the join link`);
+      const note = el('div', 'gd-chip-note');
+      note.setAttribute('role', 'status');
+      note.setAttribute('aria-live', 'polite');
+      chip.addEventListener('click', () => SBS.playerView.copyJoinLink(game, note));
+      wrap.append(chip, note);
+      nav.appendChild(wrap);
     }
-    // The topbar keeps the four desktop buttons; on a phone they sit in a labeled row below it.
-    app.appendChild(topbar('', phone ? [] : actionBtns, { hideIcon: true, homeLeft: true }));
+    if (!phone) {
+      const pill = el('button', 'gd-onair', '<span class="gd-onair-dot" aria-hidden="true"></span>On the TV &middot; Stop');
+      pill.type = 'button';
+      pill.addEventListener('click', () => { SBS.present.stop(game.id); });
+      const syncPill = () => { pill.hidden = !SBS.present.isOpen(game.id); };
+      syncPill();
+      SBS.onLeaveScreen(SBS.present.subscribe(syncPill));
+      nav.appendChild(pill);
+    }
+    const partyBtn = el('button', 'gd-bar-btn gd-party' + (phone ? ' gd-icon-only' : ''),
+      SBS.ui.MAXIMIZE_ICON + (phone ? '' : '<span>Party View</span>'));
+    partyBtn.type = 'button';
+    partyBtn.title = 'Party View';
+    partyBtn.setAttribute('aria-label', 'Party View');
+    // Party View opens in this tab: the mirror screen on a phone, the TV board elsewhere. Its Exit comes back here.
+    partyBtn.addEventListener('click', () => {
+      SBS.go(phone ? { screen: 'mirror', id: game.id, from: 'board' } : { screen: 'tv', id: game.id, from: 'board' });
+    });
+    const connectBtn = el('button', 'gd-bar-btn gd-connect room-btn', `${DEVICES_ICON}<span>Connect</span>`);
+    connectBtn.type = 'button';
+    connectBtn.setAttribute('aria-haspopup', 'dialog');
+    connectBtn.addEventListener('click', () => SBS.deviceChooser.open(game, connectBtn));
+    nav.append(partyBtn, connectBtn);
+    app.appendChild(bar);
     const main = el('div', 'main' + (phone ? ' gd-phone' : ''));
     app.appendChild(main);
-    if (phone) {
-      const row = el('div', 'gd-actions');
-      actionBtns.forEach(b => row.appendChild(b));
-      main.appendChild(row);
-    }
-
-    main.appendChild(el('h2', 'gameday-heading', headerMeta));
-    const joinCard = SBS.playerView.joinCard(game);
-    if (joinCard) main.appendChild(joinCard);
 
     const computed = computeGame(game);
 
@@ -718,7 +725,6 @@
       }
     }
 
-    let presentCard = null;
     if (!phone) {
       players = SBS.players.playersCard({
         getGame: () => game,
@@ -728,8 +734,6 @@
         onSaved: (r) => { Object.assign(game, r.game); redrawAll(); }
       });
       players.draw();
-      presentCard = SBS.present.card(game.id);
-      SBS.onLeaveScreen(presentCard.destroy);
 
       const wideQuery = window.matchMedia('(min-width: 1024px)');
       const fineQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
@@ -739,15 +743,12 @@
         layout.classList.toggle('gd-wide', wide);
         boardCard.classList.toggle('gd-board', wide);
         if (wide) {
-          const order = [boardCard, scorePanel.el, SBS.present.eligible() ? presentCard.el : null, resultsCard, players.el, joinCard, strip];
+          const order = [boardCard, scorePanel.el, resultsCard, players.el, strip];
           order.forEach(n => { if (n) layout.appendChild(n); });
-          if (!SBS.present.eligible()) presentCard.el.remove();
         } else {
           resultsCard.insertBefore(scorePanel.el, resultsCard.firstChild);
           layout.append(boardCard, resultsCard);
           players.el.remove();
-          presentCard.el.remove();
-          if (joinCard) main.insertBefore(joinCard, layout);
           main.insertBefore(strip, layout);
         }
         if (focused && focused !== document.activeElement && document.body.contains(focused) && focused !== document.body) focused.focus();
@@ -886,14 +887,22 @@
       }
     }
     SBS.setManagedInterval(pollLive, 8000);
-    SBS.deviceChooser.onGameDay(game, app.querySelector('.room-btn') || null);
+    SBS.deviceChooser.onGameDay(game, connectBtn);
     SBS.onLeaveScreen(() => {
       if (activeDrawReveal) { activeDrawReveal.cancel(); activeDrawReveal = null; }
     });
   }
 
   // ---------- TV / grid-only view (1080p, no controls, self-refreshing) ----------
-  function renderTV(id, paired) {
+  function renderTV(id, paired, from) {
+    // Opened from Game Day: remember it for this tab, so Exit still goes back there after a reload
+    // (the #tv-<id> hash alone does not say where it came from).
+    const FROM_KEY = 'sbs.tvfrom';
+    try {
+      if (from === 'board') window.sessionStorage.setItem(FROM_KEY, id);
+      else if (!paired && window.sessionStorage.getItem(FROM_KEY) === id) from = 'board';
+      else window.sessionStorage.removeItem(FROM_KEY);
+    } catch (e) { /* Exit goes Home after a reload */ }
     const app = SBS.appEl;
     app.innerHTML = '';
     document.body.classList.add('tv-mode');
@@ -967,6 +976,12 @@
         window.close();
         if (window.closed) return;
       }
+      if (from === 'board') {
+        // Back to this board's Game Day (Home if it cannot be loaded).
+        try { window.history.replaceState(null, '', `${location.pathname}${location.search}`); } catch (e) { /* nothing to undo */ }
+        try { SBS.openGame(await SBS.api.getGame(id)); } catch (e) { SBS.go({ screen: 'home' }); }
+        return;
+      }
       window.location.hash = '';
       SBS.go({ screen: 'home' });
     });
@@ -995,7 +1010,12 @@
     ['mousemove', 'touchstart', 'keydown'].forEach(ev => screenEl.addEventListener(ev, wake));
     wake();
 
-    const releaseWakeLock = SBS.ui.keepScreenAwake();
+    // Opened from Game Day in this tab: the hash makes a reload land here again, and Exit goes back.
+    if (from === 'board') {
+      try { window.history.replaceState(null, '', `${location.pathname}${location.search}#tv-${id}`); } catch (e) { /* the hash is only for reloads */ }
+    }
+    // Held while Party View is up; a touch device that cannot hold it gets a one-time Auto-Lock tip.
+    const releaseWakeLock = SBS.ui.keepPartyAwake(screenEl, !!paired);
 
     // ---- Quarter-end celebration ----
     // Fires whenever a quarter transitions from unresolved to "has a winner",

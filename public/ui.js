@@ -825,8 +825,19 @@
   // from auto-locks, AirPlay stops and the television goes dark — so hold a wake
   // lock while the TV view is up, and re-acquire it after the tab is
   // backgrounded (the browser drops the lock on visibility change).
-  function keepScreenAwake() {
-    if (!('wakeLock' in navigator)) return () => {};
+  // `onUnavailable` (optional) is called once when the lock cannot be held: no API, or the request
+  // was refused (Low Power Mode, an older iOS home-screen app). The return value is unchanged.
+  function keepScreenAwake(onUnavailable) {
+    let told = false;
+    function unavailable() {
+      if (told || !onUnavailable) return;
+      told = true;
+      try { onUnavailable(); } catch (e) { /* the caller's tip is best effort */ }
+    }
+    if (!('wakeLock' in navigator) || !navigator.wakeLock || typeof navigator.wakeLock.request !== 'function') {
+      unavailable();
+      return () => {};
+    }
     let lock = null;
     let released = false;
 
@@ -836,7 +847,8 @@
         lock = await navigator.wakeLock.request('screen');
         lock.addEventListener('release', () => { lock = null; });
       } catch (e) {
-        // Denied (often on battery saver) — nothing to do but carry on.
+        // Denied (often on battery saver): carry on, and let the caller know.
+        unavailable();
       }
     }
 
@@ -851,13 +863,46 @@
     };
   }
 
+  // Party View keeps the screen awake. On a touch device that cannot (no wake lock, or it was
+  // refused) a note says so once per browser: "Your screen may sleep ...". Never on a TV-paired
+  // screen and never with a mouse. Returns the release function of keepScreenAwake.
+  const SLEEP_TIP_KEY = 'sbs.sleeptip';
+  function keepPartyAwake(host, paired) {
+    return keepScreenAwake(() => {
+      if (paired || !host || !host.isConnected) return;
+      if (!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)) return;
+      try { if (window.localStorage.getItem(SLEEP_TIP_KEY) === '1') return; } catch (e) { /* ask again next time */ }
+      if (host.querySelector('.sleep-tip')) return;
+      const tip = el('div', 'sleep-tip');
+      tip.setAttribute('role', 'note');
+      const text = el('span', '', "Your screen may sleep. Turn off Auto-Lock in Settings while the party's on.");
+      const ok = el('button', 'sleep-tip-ok', 'Got it');
+      ok.type = 'button';
+      ok.addEventListener('click', (e) => {
+        e.stopPropagation();
+        try { window.localStorage.setItem(SLEEP_TIP_KEY, '1'); } catch (err) { /* hidden for this visit only */ }
+        tip.remove();
+      });
+      tip.append(text, ok);
+      host.appendChild(tip);
+    });
+  }
+
+  // Tabler outline icons (MIT, 24 px): arrows-maximize, copy, printer, chevron-right, x.
+  const ic = d => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const MAXIMIZE_ICON = ic('<path d="M16 4l4 0l0 4"/><path d="M14 10l6 -6"/><path d="M8 20l-4 0l0 -4"/><path d="M4 20l6 -6"/><path d="M16 20l4 0l0 -4"/><path d="M14 14l6 6"/><path d="M8 4l-4 0l0 4"/><path d="M4 4l6 6"/>');
+  const COPY_ICON = ic('<path d="M7 9.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"/><path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"/>');
+  const PRINT_ICON = ic('<path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2"/><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4"/><path d="M7 13m0 2a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z"/>');
+  const CHEVRON_ICON = ic('<path d="M9 6l6 6l-6 6"/>');
+  const CLOSE_ICON = ic('<path d="M18 6l-12 12"/><path d="M6 6l12 12"/>');
+
   SBS.ui = {
-    el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake,
+    el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake, keepPartyAwake,
     showModal, showConfirm, showAlert, disturbMessage, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin,
     topbar, statusLabel, leagueLabel, leagueBadge, isTvBrowser, isPhone,
     formatKickoffTime, kickoffNotice,
     teamMeta, teamStyle, applyTeamColors, resetTeamColors, teamLogoTag,
     legalLinks, teamColor, readableTextColor, teamBadge, fitTeamBadges, teamAbbr, shadeColor,
-    TV_ICON, PHONE_ICON, PEOPLE_ICON
+    TV_ICON, PHONE_ICON, PEOPLE_ICON, MAXIMIZE_ICON, COPY_ICON, PRINT_ICON, CHEVRON_ICON, CLOSE_ICON
   };
 })();

@@ -2,7 +2,7 @@
 //   * the /tv screen a television shows: a big code, polled until a host pairs it, then
 //     the read-only TV view. It holds a random token in its own storage and nothing else:
 //     no session, no cookie, nothing a write route accepts.
-//   * the host's "What's in the room?" chooser on Game Day, where the code is typed.
+//   * the host's Connect box on Game Day (was "What's in the room?"), where the code is typed.
 (function () {
   'use strict';
 
@@ -39,7 +39,7 @@
     const screenEl = el('main', 'tvp-screen');
     screenEl.innerHTML = `
       <h1 class="tvp-title">Pair this TV</h1>
-      <p class="tvp-steps">On your phone, open your locked board, tap <strong>In the room</strong>, choose <strong>Show on a TV</strong> and enter</p>
+      <p class="tvp-steps">On your phone, open your locked board, tap <strong>Connect</strong>, find <strong>Show on a smart TV</strong> and enter</p>
       <div class="tvp-code" id="tvp-code" aria-live="polite">······</div>
       <p class="tvp-status" id="tvp-status" role="status">Getting a code…</p>
       <button type="button" class="tvp-unpair" id="tvp-unpair">Unpair</button>`;
@@ -106,7 +106,11 @@
     SBS.setManagedInterval(step, POLL_MS);
   }
 
-  // ---------- Host: "What's in the room?" ----------
+  // ---------- Host: Connect (was "What's in the room?") ----------
+  // One box with three sections: Players (code, link, QR, print), TV (smart TV pairing, Present on
+  // an HDMI TV, Mirror this phone) and Scoring (hand score entry to another phone). A bottom sheet on
+  // a phone, a popover under the Connect button on a wide screen. Party View is its own top-bar
+  // button, so there is no "open it here" row.
   let openChooser = null;
   // The board this host's TVs were last moved to from this tab, so returning to an
   // earlier board moves them back (a Set would skip it).
@@ -116,17 +120,35 @@
 
   function open(game, opener, opts) {
     if (openChooser) return;
-    const overlay = SBS.ui.overlayEl();
-    const box = el('div', 'card room-card');
+    const phone = SBS.ui.isPhone();
+    const { CLOSE_ICON, PRINT_ICON } = SBS.ui;
+    const overlay = el('div', 'connect-layer ' + (phone ? 'connect-layer-sheet' : 'connect-layer-pop'));
+    const box = el('div', 'card room-card connect-card ' + (phone ? 'connect-sheet' : 'connect-pop'));
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'true');
     box.setAttribute('aria-labelledby', 'room-title');
     const tvUrl = `${location.origin}/tv`;
+    const code = game.joinCode || '';
+    const shortUrl = game.joinCode ? `${location.host}/${game.joinCode}` : '';
     box.innerHTML = `
-      <h3 id="room-title" class="room-title">What's in the room?</h3>
+      ${phone ? '<div class="connect-grab" aria-hidden="true"></div>' : ''}
+      <div class="connect-head">
+        <h3 id="room-title" class="room-title">Connect</h3>
+        <button type="button" class="icon-btn connect-x" id="room-close" aria-label="Close">${CLOSE_ICON}</button>
+      </div>
+      <section class="room-opt connect-players" aria-labelledby="room-players-h">
+        <h4 id="room-players-h">Players</h4>
+        ${code ? `<div class="connect-code-row">
+          <div><div class="connect-label">Join code</div>
+          <div class="connect-code" aria-label="Join code ${escapeHtml(code.split('').join(' '))}">${escapeHtml(code)}</div></div>
+          <div class="connect-url">${escapeHtml(shortUrl)}</div></div>` : ''}
+        <div class="room-row connect-players-row"></div>
+        <p class="room-status connect-note" id="room-link-note" role="status" aria-live="polite"></p>
+        <p>Players open the link or scan the code to see their squares.</p>
+      </section>
       <section class="room-opt" aria-labelledby="room-tv-h">
-        <h4 id="room-tv-h">Show on a TV</h4>
-        <p>On the TV, open <strong class="room-url">${escapeHtml(tvUrl)}</strong> and type the code it shows.</p>
+        <h4 id="room-tv-h">TV</h4>
+        <p><strong>Show on a smart TV.</strong> On the TV, open <strong class="room-url">${escapeHtml(tvUrl)}</strong> and type the code it shows.</p>
         <form class="room-pair" id="room-form" novalidate>
           <label for="room-code" class="room-label">TV code</label>
           <div class="room-row">
@@ -136,48 +158,75 @@
           </div>
         </form>
         <p class="room-status" id="room-status" role="status" aria-live="polite"></p>
-      </section>
-      <section class="room-opt room-present" aria-labelledby="room-present-h" hidden>
-        <h4 id="room-present-h">Present on an HDMI TV</h4>
-      </section>
-      <section class="room-opt room-mirror" aria-labelledby="room-mirror-h" hidden>
-        <h4 id="room-mirror-h">Mirror this phone to the TV</h4>
-        <p>Start Screen Mirroring (iPhone) or Cast / Smart View (Android) first, then turn your phone sideways.</p>
-        <p class="room-mirror-note" id="room-mirror-note" hidden>It opens once the numbers are drawn.</p>
-        <div class="room-row"><button type="button" id="room-mirror">Mirror this phone</button></div>
+        <div class="room-present" aria-label="Present on an HDMI TV" hidden></div>
+        <div class="room-mirror" aria-labelledby="room-mirror-h" hidden>
+          <h5 id="room-mirror-h">Mirror this phone</h5>
+          <p>AirPlay or Cast, then opens Party View.</p>
+          <p class="room-mirror-note" id="room-mirror-note" hidden>It opens once the numbers are drawn.</p>
+          <div class="room-row"><button type="button" id="room-mirror">Mirror this phone</button></div>
+        </div>
       </section>
       <section class="room-opt" aria-labelledby="room-score-h">
-        <h4 id="room-score-h">Score from another phone</h4>
-        <p>Hand score entry for this board to one phone. It scans a code; no sign-in.</p>
+        <h4 id="room-score-h">Scoring</h4>
+        <p><strong>Score from another phone.</strong> Hand score entry for this board to one phone. It scans a code; no sign-in.</p>
         <div class="room-row"><button type="button" id="room-score">Show the scoring code</button></div>
-      </section>
-      <section class="room-opt" aria-labelledby="room-invite-h">
-        <h4 id="room-invite-h">Invite players</h4>
-        <p>Players join with code <strong class="room-url">${escapeHtml(game.joinCode || '')}</strong> at ${escapeHtml(location.origin)}.</p>
-        <div class="room-row"></div>
-      </section>
-      <div class="actions"><button type="button" class="secondary" id="room-close">Close</button></div>`;
+      </section>`;
     overlay.appendChild(box);
     document.body.appendChild(overlay);
+
+    // Where the popover sits: right-aligned under the Connect button.
+    function place() {
+      if (phone) return;
+      const r = opener && opener.getBoundingClientRect ? opener.getBoundingClientRect() : null;
+      const top = r ? Math.round(r.bottom + 8) : 72;
+      box.style.top = top + 'px';
+      box.style.right = (r ? Math.max(8, Math.round(window.innerWidth - r.right)) : 20) + 'px';
+      box.style.maxHeight = `calc(100vh - ${top + 12}px)`;
+    }
+    place();
+    window.addEventListener('resize', place);
+
+    // Players: Share link on a phone (the share sheet), Copy link on a wide screen, Show QR on a phone, Print.
+    const linkNote = box.querySelector('#room-link-note');
+    const playersRow = box.querySelector('.connect-players-row');
+    if (game.joinCode) {
+      const link = el('button', '', phone ? 'Share link' : 'Copy link');
+      link.type = 'button';
+      link.addEventListener('click', () => {
+        if (phone) SBS.playerView.shareBoard(game, linkNote);
+        else SBS.playerView.copyJoinLink(game, linkNote);
+      });
+      playersRow.appendChild(link);
+      if (phone) {
+        const qr = el('button', 'secondary', 'Show QR');
+        qr.type = 'button';
+        qr.addEventListener('click', () => SBS.playerView.showPlayerLink(game.id, game.joinCode, game));
+        playersRow.appendChild(qr);
+      }
+      const print = el('button', 'secondary connect-print', `${PRINT_ICON}<span>Print</span>`);
+      print.type = 'button';
+      print.addEventListener('click', () => SBS.playerView.printSign(game));
+      playersRow.appendChild(print);
+    }
 
     // On a laptop with a mouse: show the board on a TV plugged in by HDMI (R25 part b).
     let presentView = null;
     const presentSection = box.querySelector('.room-present');
     if (SBS.present && SBS.present.eligible()) {
-      presentView = SBS.present.view(game.id, { idle: 'Open the TV view in its own window, on the second screen when this browser can find one. This screen stays your console.' });
+      presentView = SBS.present.view(game.id, { idle: 'Open Party View in its own window, on the second screen when this browser can find one. This screen stays your console.' });
       presentSection.appendChild(presentView.el);
       presentSection.hidden = false;
     }
 
     // On a phone with no second device: the screen mirrored to the TV (R26). Wide screens have Present.
-    if (SBS.ui.isPhone()) {
+    if (phone) {
       const mirrorSection = box.querySelector('.room-mirror');
       const mirrorBtn = box.querySelector('#room-mirror');
       mirrorSection.hidden = false;
       if (game.status === 'started' || game.status === 'finished') {
         mirrorBtn.addEventListener('click', () => {
-          close();
-          SBS.go({ screen: 'mirror', id: game.id });
+          close(true);
+          SBS.go({ screen: 'mirror', id: game.id, from: 'board' });
         });
       } else {
         mirrorBtn.disabled = true;
@@ -195,40 +244,31 @@
       SBS.handoff.open(game, opener);
     });
 
-    const inviteRow = box.querySelector('.room-opt:last-of-type .room-row');
-    if (game.joinCode) {
-      const share = el('button', '', 'Share join link');
-      share.type = 'button';
-      share.addEventListener('click', () => SBS.playerView.shareBoard(game));
-      const qr = el('button', 'secondary', 'Show QR code');
-      qr.type = 'button';
-      qr.addEventListener('click', () => SBS.playerView.showPlayerLink(game.id, game.joinCode, game));
-      inviteRow.appendChild(share);
-      inviteRow.appendChild(qr);
-    }
-
-    function close() {
+    // `leaving` skips returning focus to the opener when the screen is about to change.
+    function close(leaving) {
       document.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('resize', place);
       if (presentView) presentView.destroy();
       overlay.remove();
       openChooser = null;
-      if (opener && opener.focus) opener.focus();
+      if (leaving !== true && opener && opener.focus) opener.focus();
     }
     // Escape closes; Tab stays inside the box.
     function onKey(e) {
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
       if (e.key !== 'Tab') return;
-      const items = Array.from(box.querySelectorAll('button, input')).filter(n => !n.disabled);
+      const items = Array.from(box.querySelectorAll('button, input')).filter(n => !n.disabled && !n.closest('[hidden]'));
       if (!items.length) return;
       const first = items[0];
       const last = items[items.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      if (!box.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
     document.addEventListener('keydown', onKey, true);
     openChooser = close;
     overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
-    box.querySelector('#room-close').addEventListener('click', close);
+    box.querySelector('#room-close').addEventListener('click', () => close());
 
     input.addEventListener('input', () => {
       const pos = input.selectionStart;
@@ -238,9 +278,9 @@
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const code = input.value.trim().toUpperCase();
+      const tvCode = input.value.trim().toUpperCase();
       status.className = 'room-status';
-      if (code.length !== 6) {
+      if (tvCode.length !== 6) {
         status.textContent = 'The code has six letters and numbers. Look at the TV.';
         status.classList.add('room-error');
         input.focus();
@@ -249,7 +289,7 @@
       pairBtn.disabled = true;
       status.textContent = 'Pairing…';
       try {
-        await SBS.api.pairTv(code, game.id);
+        await SBS.api.pairTv(tvCode, game.id);
         // Every TV of this host shows the board that is open, so say how many that is.
         let count = 1;
         try { count = (await SBS.api.followTv(game.id)).count || 1; } catch (err) { /* the pair itself worked */ }
@@ -268,8 +308,10 @@
     });
 
     // Opened by itself on a phone: don't raise the keyboard over the choices.
-    if (opts && opts.auto && SBS.ui.isPhone()) box.querySelector('#room-close').focus();
-    else input.focus();
+    const firstBtn = playersRow.querySelector('button');
+    if (opts && opts.auto && phone) box.querySelector('#room-close').focus();
+    else if (firstBtn) firstBtn.focus();
+    else box.querySelector('#room-close').focus();
   }
 
   // Called by Game Day when it renders. Once a board is live (locked, not finished): the

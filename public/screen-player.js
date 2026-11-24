@@ -111,6 +111,13 @@
         // Anything else: fall through to copying.
       }
     }
+    await copyJoinLink(game, note);
+  }
+
+  // Puts the join link on the clipboard (no share sheet) and says so in `note`, a role=status
+  // element. Resolves true when it copied.
+  async function copyJoinLink(game, note) {
+    const url = joinUrl(game);
     let copied = false;
     try {
       await navigator.clipboard.writeText(url);
@@ -130,6 +137,7 @@
       clearTimeout(note._t);
       note._t = setTimeout(() => { note.textContent = ''; }, 6000);
     }
+    return copied;
   }
 
   // The code in large type (so it can be read aloud) and the Share button.
@@ -961,7 +969,50 @@
     box.appendChild(actions);
   }
 
+  // ---------- Printed sign (R29) ----------
+  // One Letter page to hang up at the party: the join code and a QR of the join link. Built as a
+  // print-only element at the end of <body>; @media print (styles.css) hides the app and shows only
+  // it, then window.print() opens the browser's own print dialog. Nothing private goes on it: no paid
+  // status, no money. Everything that reaches markup is escaped.
+  function signDate(game) {
+    const raw = game && game.gameDate;
+    if (!raw) return '';
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? new Date(raw + 'T12:00:00') : new Date(raw);
+    if (isNaN(d.getTime())) return String(raw);
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  function buildSign(game) {
+    const url = joinUrl(game);
+    let qr = '';
+    try { qr = window.QRCode.toSvg(url, 360); } catch (err) { console.error('QR encode failed', err); }
+    const matchup = `${game.teamA || 'Team A'} vs ${game.teamB || 'Team B'}`;
+    const date = signDate(game);
+    const sign = el('div', 'print-sign');
+    sign.setAttribute('aria-hidden', 'true');
+    sign.innerHTML = `
+      <div class="ps-brand">Super Squares</div>
+      <h1 class="ps-title">Scan to see your squares</h1>
+      <div class="ps-match">${escapeHtml(matchup)}${date ? ' &middot; ' + escapeHtml(date) : ''}</div>
+      <div class="ps-qr">${qr}</div>
+      <p class="ps-how">Point your phone's camera at the code and tap the link. You'll see your squares, the numbers for each row and column, and who is winning each quarter.</p>
+      ${game.joinCode ? `<div class="ps-code-box"><span class="ps-code-help">No camera?<br>Go to <b>${escapeHtml(location.host)}</b><br>and enter the code</span><span class="ps-code">${escapeHtml(game.joinCode)}</span></div>` : ''}
+      <div class="ps-foot">Nothing to install. No sign-in.</div>`;
+    return sign;
+  }
+
+  function printSign(game) {
+    const old = document.querySelector('.print-sign');
+    if (old) old.remove();
+    const sign = buildSign(game);
+    document.body.appendChild(sign);
+    const after = () => { window.removeEventListener('afterprint', after); sign.remove(); };
+    window.addEventListener('afterprint', after);
+    try { window.print(); } catch (e) { after(); }
+    return sign;
+  }
+
   SBS.screens.player = renderPlayer;
   SBS.screens.join = renderJoin;
-  SBS.playerView = { showPlayerLink, joinCard, shareBoard, joinUrl };
+  SBS.playerView = { showPlayerLink, joinCard, shareBoard, copyJoinLink, printSign, buildSign, joinUrl };
 })();

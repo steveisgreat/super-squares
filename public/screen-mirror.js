@@ -1,14 +1,15 @@
 // Mirror mode for one phone (R26). A host with no second device mirrors this phone's screen to
 // the TV (AirPlay, Cast, Smart View), so everything on it is seen by the room. The screen is
-// the TV view's board with no private data (no paid or unpaid marks, no money owed, no
-// Players), a "turn your phone sideways" prompt in portrait, and a score strip that a tap
+// the Party View board with no private data (no paid or unpaid marks, no money owed, no
+// Players), its own portrait layout (R29: score, winning now, the board fitted to the width, the
+// quarters 2 x 2), and a score strip that a tap
 // brings up and that hides again 3 s after the last touch. Host only: a game id alone never
 // opens it (the role check below), and every score tap is still authorized by the server.
 (function () {
   'use strict';
 
   const SBS = window.SBS = window.SBS || {};
-  const { el, escapeHtml, money, teamBadge, fitTeamBadges, applyTeamColors } = SBS.ui;
+  const { el, escapeHtml, money, teamBadge, teamLogoTag, fitTeamBadges, applyTeamColors } = SBS.ui;
   const { QUARTERS, QLABEL, computeGame, payoutAmount, drawnDigits } = window.GameLogic;
 
   const STRIP_MS = 3000;
@@ -16,7 +17,7 @@
   const TIP_KEY = 'sbs.mirror.tip';
   // Tabler "cast" and "device-mobile-share" (MIT, 24 px outline).
   const CAST_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19l.01 0"/><path d="M7 19a4 4 0 0 0 -4 -4"/><path d="M11 19a8 8 0 0 0 -8 -8"/><path d="M15 19h3a3 3 0 0 0 3 -3v-8a3 3 0 0 0 -3 -3h-12a3 3 0 0 0 -2.8 2"/></svg>';
-  const ROTATE_ICON = '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21h-4a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8"/><path d="M11 4h2"/><path d="M16 22l5 -5"/><path d="M21 21.5v-4.5h-4.5"/><path d="M12 17v.01"/></svg>';
+  const ROTATE_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21h-4a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8"/><path d="M11 4h2"/><path d="M16 22l5 -5"/><path d="M21 21.5v-4.5h-4.5"/><path d="M12 17v.01"/></svg>';
 
   // The "Do Not Disturb" tip is remembered per browser once dismissed.
   function tipDismissed() {
@@ -48,12 +49,13 @@
     let scorePanel = null;
     let stripTimer = null;
     let lastBoardSignature = null;
-    const releaseWakeLock = SBS.ui.keepScreenAwake();
+    // Held while Party View is up; a phone that cannot hold it gets a one-time Auto-Lock tip.
+    const releaseWakeLock = SBS.ui.keepPartyAwake(screenEl, false);
 
     // ---- Exit (small, top corner) ----
     const exitBtn = el('button', 'mirror-exit', 'Exit');
     exitBtn.type = 'button';
-    exitBtn.setAttribute('aria-label', 'Exit mirror mode');
+    exitBtn.setAttribute('aria-label', 'Exit Party View');
     exitBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       leave();
@@ -78,10 +80,14 @@
     side.append(exitBtn, header, quarters);
     main.appendChild(side);
 
-    // ---- Portrait prompt: it is what the TV shows too, so plain, branded, nothing private ----
-    const turn = el('div', 'mirror-turn');
-    turn.innerHTML = `${ROTATE_ICON}<div class="mirror-turn-title">Turn your phone sideways</div><div class="mirror-turn-sub">Super Squares</div>`;
-    screenEl.appendChild(turn);
+    // ---- Portrait layout (CSS shows these only upright): score, winning now, a hint ----
+    const pscore = el('div', 'mirror-pscore');
+    const winning = el('div', 'mirror-winning');
+    winning.hidden = true;
+    const hint = el('div', 'mirror-hint', `${ROTATE_ICON}<span>Turn sideways for a bigger board</span>`);
+    header.after(winning);
+    header.before(pscore);
+    screenEl.appendChild(hint);
 
     // ---- Do Not Disturb tip ----
     if (!tipDismissed()) {
@@ -182,8 +188,36 @@
       fitTeamBadges(quarters);
     }
 
+    // Upright header: both logos, the score, the period. Prize and names only, nothing private.
+    function drawPortraitHead() {
+      const live = game.liveScore;
+      const has = live && live.a !== null && live.a !== undefined && live.b !== null && live.b !== undefined && live.state !== 'pre';
+      const period = !has ? '' : live.completed ? 'FINAL' : [live.period ? `Q${live.period}` : '', live.clock].filter(Boolean).join(' ');
+      const abbrA = SBS.ui.teamStyle(game, 'A').abbr;
+      const abbrB = SBS.ui.teamStyle(game, 'B').abbr;
+      pscore.innerHTML = `
+        ${teamLogoTag(game, 'A', 34)}
+        <span class="mirror-pnum">${has ? escapeHtml(live.a) : '–'}</span>
+        <span class="mirror-pmid"><span class="mirror-pperiod">${escapeHtml(period || '')}</span><span class="mirror-pteams">${escapeHtml(abbrA)} &middot; ${escapeHtml(abbrB)}</span></span>
+        <span class="mirror-pnum">${has ? escapeHtml(live.b) : '–'}</span>
+        ${teamLogoTag(game, 'B', 34)}`;
+      const hl = window.GameLogic.computeLiveHighlight(game);
+      winning.hidden = true;
+      if (hl) {
+        const parts = hl.winnerKey.split('-');
+        const row = Number(parts[0]);
+        const col = Number(parts[1]);
+        const sq = game.squares[row * 10 + col];
+        const y = game.axisY ? game.axisY[row] : '';
+        const x = game.axisX ? game.axisX[col] : '';
+        winning.innerHTML = `Winning now: <strong>${sq ? escapeHtml(sq.name) : 'Empty square'}</strong> (${escapeHtml(y)}&ndash;${escapeHtml(x)})`;
+        winning.hidden = false;
+      }
+    }
+
     function drawBoard() {
       applyTeamColors(game);
+      drawPortraitHead();
       const computed = computeGame(game);
       header.innerHTML = '<div class="tv-meta"></div>';
       const liveBar = SBS.board.renderLiveScoreBar(game);
@@ -208,7 +242,7 @@
 
     function notReady(text) {
       main.hidden = true;
-      turn.hidden = true;
+      hint.hidden = true;
       let note = screenEl.querySelector('.mirror-note');
       if (!note) { note = el('div', 'mirror-note'); screenEl.appendChild(note); }
       note.textContent = text;
