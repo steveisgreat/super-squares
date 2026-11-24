@@ -12,7 +12,7 @@ Vercel project settings. Never commit them.
 | `DATABASE_URL` | cloud | Neon **pooled** connection string (host contains `-pooler`). Unset means the fs backend. |
 | `HOST_PASSWORD` | cloud | Host sign-in. Use 20+ random characters; it is the only brute-force defense. Unset disables auth on the LAN; on Vercel, unset with no accounts means 503 on every host route. |
 | `SESSION_SECRET` | accounts (optional for password) | Signs the session cookie. Accounts mode requires 32+ random characters; password mode defaults to `HOST_PASSWORD`. |
-| `AUTH_MODE` | cloud, after R2 | `accounts` turns on host accounts (decision 012). Unset keeps password mode. Any other value fails closed (503). **Leave unset until the rest of R2 ships: the client has no account sign-in yet.** |
+| `AUTH_MODE` | cloud, after R2 | `accounts` turns on host accounts (decision 012). Unset keeps password mode. Any other value fails closed (503). **Leave unset until the rest of R2 ships (escaping audit, CSP, assigning existing boards).** |
 | `APP_ORIGIN` | accounts | The site's own `https://` origin, used in emailed links. |
 | `RESEND_API_KEY`, `EMAIL_FROM` | accounts | Sign-in email. Off Vercel, without the key, the link and code print to the server console. Turn click tracking off for the domain in Resend: it rewrites the link. |
 | `LOGIN_EMAILS_PER_HOUR` | optional | Site-wide cap on sign-in emails. Default 200. |

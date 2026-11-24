@@ -68,7 +68,7 @@ Accounts (`migrations/002_host_accounts.sql`): `hosts`, `login_requests`, and
 
 `index.html` loads plain scripts in order: `compute.js` (payout math, validation,
 cutoff rules, shared with the server and unit-tested), `teams.js` (NFL/NBA names
-and colors, no logos), `qrcode.js`, `core.js` (API client, routing, 401 sign-in replay), `ui.js`,
+and colors, no logos), `qrcode.js`, `core.js` (API client, routing, sign-in prompt by mode and 401 replay, 403 handling), `ui.js`,
 `players.js`, `board.js`, `score-panel.js` (manual score), then screens: `screen-home` (saved games, setup, version
 footer), `screen-picking`, `screen-gameday`, `screen-phone` (score entry),
 `screen-player` (read-only My Squares), and `app.js` (hash router: `#tv-<id>`,

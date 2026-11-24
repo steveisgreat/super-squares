@@ -54,10 +54,11 @@ assigned to Steve's account by script. Large: plan 2–3 sessions.
 *Done:* tenant-isolation tests pass in CI (host A cannot list, read-for-write,
 edit or delete host B's games); `/code-review high` clean.
 *Progress:* part 1 done 2026-11-23 (migration 002, store scoping, sign-in and owner
-checks on the server, mailer, tests; see the decision's build notes). Not live:
-`AUTH_MODE` stays unset. Left: part 2, client sign-in (email form, code entry, `#login-`
-page); part 3, escaping audit and Content-Security-Policy, smaller body limit,
-`scripts/assign-owner.js`, GitHub Actions.
+checks on the server, mailer, tests; see the decision's build notes). Part 2 done
+2026-11-23 (client sign-in: email and code prompt, `#login-` page, sign out everywhere,
+403 handling). Not live: `AUTH_MODE` stays unset. Left: part 3, escaping audit and
+Content-Security-Policy, smaller body limit, `scripts/assign-owner.js`, GitHub Actions,
+privacy page (email, `sbs_session`, pending sign-in in localStorage).
 
 **R3. Manual current score** — `Sonnet` — ✅ shipped 2026-11-23 ([decision 011](decisions/011-manual-scoring.md)); R2 later swaps its
 host check for an owner check.

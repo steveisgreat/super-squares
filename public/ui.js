@@ -102,6 +102,274 @@
     });
   }
 
+  // ---------- Email sign-in (accounts mode) ----------
+  // One dialog, two steps: ask for an email, then take the 8-digit code. The
+  // emailed link does the same job on its own page (#login-<token>). Resolves
+  // true once this device is signed in, false if the host dismissed it.
+  //
+  // What survives a reload is only { requestId, email, expiry }: iOS may kill a
+  // home-screen app while the host is in Mail. Never the code or a token.
+  const PENDING_KEY = 'sbs-login-pending';
+  const PENDING_MS = 15 * 60 * 1000;
+
+  function readPendingLogin() {
+    try {
+      const v = JSON.parse(localStorage.getItem(PENDING_KEY));
+      if (v && typeof v.requestId === 'string' && typeof v.email === 'string' && v.expiry > Date.now()) return v;
+      localStorage.removeItem(PENDING_KEY);
+    } catch (e) { /* storage blocked or not JSON: start at step 1 */ }
+    return null;
+  }
+  function writePendingLogin(v) {
+    try { localStorage.setItem(PENDING_KEY, JSON.stringify(v)); } catch (e) { /* optional */ }
+  }
+  function clearPendingLogin() {
+    try { localStorage.removeItem(PENDING_KEY); } catch (e) { /* optional */ }
+  }
+
+  // Set while the prompt is open. Closing it this way keeps the pending sign-in.
+  let closeOpenPrompt = null;
+  function closeEmailPrompt() {
+    if (closeOpenPrompt) closeOpenPrompt();
+  }
+
+  function showEmailPrompt() {
+    return new Promise(resolve => {
+      const opener = document.activeElement;
+      const overlay = overlayEl();
+      const box = el('div', 'card');
+      box.style.cssText = 'max-width:440px; width:100%; box-shadow: var(--shadow-pop);';
+      box.setAttribute('role', 'dialog');
+      box.setAttribute('aria-modal', 'true');
+      box.setAttribute('aria-labelledby', 'signin-title');
+      const title = el('h3', '', 'Host sign-in');
+      title.id = 'signin-title';
+      title.style.marginTop = '0';
+      const body = el('div', '');
+      const err = el('div', 'error-msg hidden');
+      err.setAttribute('role', 'alert');
+      err.style.marginTop = '14px';
+      err.style.marginBottom = '0';
+      const note = el('p', '');
+      note.setAttribute('aria-live', 'polite');
+      note.style.cssText = 'color:var(--muted); margin:12px 0 0; font-size:0.9rem;';
+      box.append(title, body, err, note);
+      overlay.appendChild(box);
+
+      let step = 1;
+      let email = '';
+      let requestId = '';
+      let busy = false;
+      let closed = false;
+      let checking = false;
+      let hintTimer = null;
+
+      const showErr = (text) => { err.textContent = text; err.classList.remove('hidden'); note.textContent = ''; };
+      const clearMsgs = () => { err.textContent = ''; err.classList.add('hidden'); note.textContent = ''; };
+      const setBusy = (on) => {
+        box.querySelectorAll('button[data-lock]').forEach(b => { b.disabled = on; });
+      };
+
+      function finish(value) {
+        if (closed) return;
+        closed = true;
+        closeOpenPrompt = null;
+        clearTimeout(hintTimer);
+        document.removeEventListener('keydown', onKey, true);
+        document.removeEventListener('visibilitychange', onVisible);
+        overlay.remove();
+        if (opener && opener !== document.body && document.contains(opener) && opener.focus) opener.focus();
+        resolve(value);
+      }
+      function dismiss() { clearPendingLogin(); finish(false); }
+
+      // Runs one request: buttons locked, and a hint if the database is waking.
+      async function run(task) {
+        busy = true;
+        clearMsgs();
+        setBusy(true);
+        hintTimer = setTimeout(() => { if (!closed) note.textContent = 'Still working, waking the database…'; }, 2000);
+        try {
+          return await task();
+        } finally {
+          busy = false;
+          clearTimeout(hintTimer);
+          if (!closed) {
+            setBusy(false);
+            if (note.textContent.startsWith('Still working')) note.textContent = '';
+          }
+        }
+      }
+
+      function onKey(e) {
+        if (e.key === 'Escape') { e.preventDefault(); dismiss(); return; }
+        if (e.key !== 'Tab') return;
+        const items = Array.from(box.querySelectorAll('button:not([disabled]), input:not([disabled])'));
+        if (!items.length) { e.preventDefault(); return; }
+        const first = items[0];
+        const last = items[items.length - 1];
+        const active = document.activeElement;
+        if (!box.contains(active)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+        else if (e.shiftKey && active === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
+      }
+
+      // Back from Mail after tapping the link in another tab: one check, no timer.
+      function onVisible() {
+        if (document.visibilityState !== 'visible' || step !== 2 || busy || checking || closed) return;
+        checking = true;
+        SBS.api.getSession().then(s => {
+          if (!closed && s && s.host) { clearPendingLogin(); finish(true); }
+        }).catch(() => {}).finally(() => { checking = false; });
+      }
+
+      function button(label, cls, type, lock) {
+        const b = el('button', cls || '', label);
+        b.type = type || 'button';
+        if (lock !== false) b.setAttribute('data-lock', '');
+        return b;
+      }
+
+      function showStep1(prefill) {
+        step = 1;
+        clearMsgs();
+        body.innerHTML = '';
+        const form = el('form', '');
+        form.noValidate = true;
+        form.appendChild(el('p', '', 'We will email you a sign-in link and an 8-digit code. No password needed.'));
+        const label = el('label', '', 'Email address');
+        label.htmlFor = 'signin-email';
+        label.style.marginTop = '0';
+        const input = el('input', '');
+        input.type = 'email';
+        input.id = 'signin-email';
+        input.name = 'email';
+        input.autocomplete = 'email';
+        input.setAttribute('inputmode', 'email');
+        input.setAttribute('autocapitalize', 'none');
+        input.spellcheck = false;
+        input.value = prefill || '';
+        const actions = el('div', 'actions');
+        const go = button('Email me a code', '', 'submit');
+        const no = button('Not now', 'secondary', 'button', false);
+        no.addEventListener('click', dismiss);
+        actions.append(go, no);
+        form.append(label, input, actions);
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          if (busy) return;
+          const typed = input.value.trim();
+          if (!typed) { showErr('Enter your email address.'); input.focus(); return; }
+          try {
+            const r = await run(() => SBS.api.requestLoginCode(typed));
+            if (closed) return;
+            email = typed;
+            requestId = r.requestId;
+            writePendingLogin({ requestId, email, expiry: Date.now() + PENDING_MS });
+            showStep2();
+          } catch (e2) {
+            if (closed) return;
+            showErr(e2.message);
+            input.focus();
+          }
+        });
+        body.appendChild(form);
+        input.focus();
+        if (prefill) input.select();
+      }
+
+      function showStep2() {
+        step = 2;
+        clearMsgs();
+        body.innerHTML = '';
+        const form = el('form', '');
+        form.noValidate = true;
+        form.appendChild(el('p', '', `We sent a link and an 8-digit code to <strong style="overflow-wrap:anywhere">${escapeHtml(email)}</strong>. Open the link, or type the code here.`));
+        const label = el('label', '', '8-digit code');
+        label.htmlFor = 'signin-code';
+        label.style.marginTop = '0';
+        // No maxlength: the email shows "1234 5678" and a paste keeps the space.
+        const input = el('input', 'code-input');
+        input.type = 'text';
+        input.id = 'signin-code';
+        input.name = 'code';
+        input.setAttribute('inputmode', 'numeric');
+        input.autocomplete = 'one-time-code';
+        input.setAttribute('autocapitalize', 'none');
+        input.spellcheck = false;
+        const actions = el('div', 'actions');
+        const go = button('Sign in', '', 'submit');
+        const no = button('Not now', 'secondary', 'button', false);
+        no.addEventListener('click', dismiss);
+        actions.append(go, no);
+        const more = el('div', 'actions');
+        more.style.marginTop = '12px';
+        const again = button('Send a new code', 'ghost small');
+        const other = button('Use a different email', 'ghost small');
+        more.append(again, other);
+        form.append(label, input, actions, more);
+
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          if (busy) return;
+          const digits = input.value.replace(/\D/g, '');
+          if (digits.length !== 8) { showErr('Enter the 8-digit code from the email.'); input.focus(); return; }
+          try {
+            await run(() => SBS.api.verifyLogin({ requestId, code: digits }));
+          } catch (e2) {
+            if (closed) return;
+            showErr(e2.status === 401 ? 'That code is wrong or has expired. Check it, or send a new code.' : e2.message);
+            input.focus();
+            input.select();
+            return;
+          }
+          clearPendingLogin();
+          if (closed) {
+            // Dismissed while this was in flight, and it worked: the cookie is
+            // set, so redraw Home rather than leave it showing signed out.
+            if (SBS.currentScreen && SBS.currentScreen() === 'home') SBS.go({ screen: 'home' });
+            return;
+          }
+          finish(true);
+        });
+        again.addEventListener('click', async () => {
+          if (busy) return;
+          try {
+            const r = await run(() => SBS.api.requestLoginCode(email));
+            if (closed) return;
+            requestId = r.requestId;
+            writePendingLogin({ requestId, email, expiry: Date.now() + PENDING_MS });
+            input.value = '';
+            note.textContent = 'We sent a new code. Use the newest email.';
+          } catch (e2) {
+            if (!closed) showErr(e2.message);
+          }
+          if (!closed) input.focus();
+        });
+        other.addEventListener('click', () => {
+          if (busy) return;
+          clearPendingLogin();
+          showStep1(email);
+        });
+        body.appendChild(form);
+        input.focus();
+      }
+
+      document.body.appendChild(overlay);
+      document.addEventListener('keydown', onKey, true);
+      document.addEventListener('visibilitychange', onVisible);
+      closeOpenPrompt = () => finish(false);
+      const pending = readPendingLogin();
+      if (pending) {
+        email = pending.email;
+        requestId = pending.requestId;
+        showStep2();
+      } else {
+        showStep1('');
+      }
+    });
+  }
+
   // Generic multi-button choice modal (used for duplicate-name resolution etc.)
   function showChoice({ message, buttons }) {
     return new Promise(resolve => {
@@ -500,7 +768,7 @@
 
   SBS.ui = {
     el, escapeHtml, money, overlayEl, fullscreen, keepScreenAwake,
-    showModal, showConfirm, showAlert, showChoice, showPasswordPrompt,
+    showModal, showConfirm, showAlert, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin,
     topbar, statusLabel, leagueLabel, leagueBadge, isTvBrowser, isPhone,
     formatKickoffTime, kickoffNotice,
     teamMeta, teamStyle, applyTeamColors, resetTeamColors,

@@ -162,6 +162,12 @@
       } catch (e) {
         overlay.remove();
         if (await SBS.handleConflict(e, game.id)) return;
+        const denied = await SBS.handleForbidden(e, game.id);
+        if (denied) {
+          if (denied.fresh) Object.assign(game, denied.fresh);
+          if (onUpdate) onUpdate();
+          return;
+        }
         showAlert('Failed to save: ' + e.message);
         return;
       }

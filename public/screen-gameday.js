@@ -277,6 +277,11 @@
         renderBoard(saved);
       } catch (err) {
         if (await SBS.handleConflict(err, game.id)) return;
+        const denied = await SBS.handleForbidden(err, game.id);
+        if (denied) {
+          if (SBS.currentScreen() === 'board') SBS.openGame(denied.fresh || game);
+          return;
+        }
         showAlert('Could not save the total pot: ' + err.message);
         renderBoard(game);
       }
@@ -490,6 +495,13 @@
         scorePanel.update();
       } catch (e) {
         if (await SBS.handleConflict(e, game.id)) return;
+        const denied = await SBS.handleForbidden(e, game.id);
+        if (denied) {
+          // Drop the unsaved edit: show the server's copy, not the typed one.
+          // The save is debounced, so the host may have left this screen.
+          if (denied.fresh && SBS.currentScreen() === 'board') SBS.openGame(denied.fresh);
+          return;
+        }
         console.error('Save failed', e);
         showAlert('Could not save the score: ' + e.message);
       }

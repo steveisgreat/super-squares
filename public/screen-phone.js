@@ -250,7 +250,14 @@
           draw();
           showAlert('That score was changed on another device — showing the latest version.');
         } else {
-          showAlert('Could not save: ' + e.message);
+          const denied = await SBS.handleForbidden(e, id);
+          if (denied) {
+            // Show the server's copy, not the score that was just tapped.
+            if (denied.fresh) game = denied.fresh;
+            draw();
+          } else {
+            showAlert('Could not save: ' + e.message);
+          }
         }
       } finally {
         saving = false;

@@ -166,6 +166,11 @@
         SBS.go({ screen: 'picking', game: saved });
       } catch (e) {
         if (await SBS.handleConflict(e, game.id)) return;
+        const denied = await SBS.handleForbidden(e, game.id);
+        if (denied) {
+          if (SBS.currentScreen() === 'picking') SBS.openGame(denied.fresh || game);
+          return;
+        }
         showErr('Failed to save: ' + e.message);
       }
     }
@@ -218,6 +223,7 @@
 
     drawPreview();
 
+    let cutoffBlocked = false;
     async function startGame() {
       // Latched: without this a double-tap (or a stray timer) could fire two
       // saves that each generate their own axis numbers. Reset on both the
@@ -234,8 +240,17 @@
         SBS.go({ screen: 'board', game: saved });
       } catch (e) {
         lockInFlight = false;
+        // Not signed in, or not this host's board. Retrying can't help, so stop
+        // the cutoff timer before any dialog opens, or it would stack one more
+        // every few seconds. (The server locks the board on its own anyway.)
+        if (e.forbidden || e.authRequired) cutoffBlocked = true;
         if (await SBS.handleConflict(e, game.id)) return;
         game.status = 'picking';
+        const denied = await SBS.handleForbidden(e, game.id);
+        if (denied) {
+          if (denied.fresh && ['started', 'finished'].includes(denied.fresh.status) && SBS.currentScreen() === 'picking') SBS.openGame(denied.fresh);
+          return;
+        }
         showAlert('Failed to start game: ' + e.message);
       }
     }
@@ -246,7 +261,7 @@
     if (game.autoCutoffEnabled && game.autoCutoffTime) {
       const cutoffMs = new Date(game.autoCutoffTime).getTime();
       const checkCutoff = () => {
-        if (SBS.currentScreen() === 'picking' && Date.now() >= cutoffMs) startGame();
+        if (!cutoffBlocked && SBS.currentScreen() === 'picking' && Date.now() >= cutoffMs) startGame();
       };
       checkCutoff();
       SBS.setManagedInterval(checkCutoff, 5000);

@@ -23,6 +23,9 @@
       const err = new Error((data && data.error) || `Request failed (${res.status})`);
       err.status = res.status;
       if (res.status === 401 && data && data.authRequired) err.authRequired = true;
+      // Signed in, but not allowed (someone else's board). Signing in again
+      // would not help, so this never opens the prompt.
+      if (res.status === 403) err.forbidden = true;
       if (res.status === 409 && data && data.conflict) {
         err.conflict = true;
         err.game = data.game;
@@ -48,26 +51,42 @@
   // request.
   let signInPending = null;
 
+  async function passwordSignIn(message) {
+    let msg = message;
+    // Loops so a typo costs one more try, not the whole action.
+    for (;;) {
+      const password = await SBS.ui.showPasswordPrompt(msg);
+      // Dismissing is a real answer ("I'm just watching"), not an error.
+      if (password === null) return false;
+      try {
+        await rawRequest('/api/session', json('POST', { password }));
+        return true;
+      } catch (e) {
+        if (e.status !== 401) {
+          await SBS.ui.showAlert('Could not sign in: ' + SBS.ui.escapeHtml(e.message));
+          return false;
+        }
+        msg = 'That password is not right. Try again?';
+      }
+    }
+  }
+
+  // Which prompt to open depends on how the server signs hosts in, so ask it
+  // first (cheap when signed out: no database). The guard covers this lookup.
   function promptSignIn(message) {
     if (signInPending) return signInPending;
     signInPending = (async () => {
-      let msg = message;
-      // Loops so a typo costs one more try, not the whole action.
-      for (;;) {
-        const password = await SBS.ui.showPasswordPrompt(msg);
-        // Dismissing is a real answer ("I'm just watching"), not an error.
-        if (password === null) return false;
-        try {
-          await rawRequest('/api/session', json('POST', { password }));
-          return true;
-        } catch (e) {
-          if (e.status !== 401) {
-            await SBS.ui.showAlert('Could not sign in: ' + e.message);
-            return false;
-          }
-          msg = 'That password is not right. Try again?';
-        }
+      let session;
+      try {
+        session = await rawRequest('/api/session');
+      } catch (e) {
+        await SBS.ui.showAlert('Could not sign in: ' + SBS.ui.escapeHtml(e.message));
+        return false;
       }
+      // Signed in from another tab since the 401.
+      if (session && session.host) return true;
+      if (session && session.mode === 'accounts') return SBS.ui.showEmailPrompt();
+      return passwordSignIn(message);
     })().finally(() => { signInPending = null; });
     return signInPending;
   }
@@ -92,6 +111,10 @@
     getSession: () => rawRequest('/api/session'),
     signIn: (message) => promptSignIn(message),
     signOut: () => rawRequest('/api/session', { method: 'DELETE' }),
+    // Account sign-in. Raw on purpose: a 401 here must never open the prompt.
+    requestLoginCode: (email) => rawRequest('/api/login', json('POST', { email })),
+    verifyLogin: (body) => rawRequest('/api/login/verify', json('POST', body)),
+    revokeAllSessions: () => rawRequest('/api/session/revoke-all', { method: 'POST' }),
     getGame: (id) => request(`/api/game/${id}`),
     createGame: (game) => request('/api/game', json('POST', game)),
     saveGame: (game) => request(`/api/game/${game.id}`, json('PUT', game)),
@@ -99,6 +122,11 @@
     deleteGame: (id) => request(`/api/game/${id}`, { method: 'DELETE' }),
     getHosts: () => request('/api/hosts'),
     getTodaysGames: (date, league) => request(`/api/todays-games?${new URLSearchParams({ date: date || '', league: league || '' })}`)
+  };
+
+  // The host's screen for a game: the board once it has started.
+  SBS.openGame = function (game) {
+    SBS.go({ screen: (game.status === 'started' || game.status === 'finished') ? 'board' : 'picking', game });
   };
 
   // Another device saved between our last load and this save. Rather than
@@ -109,11 +137,23 @@
     await SBS.ui.showAlert('This game was just changed on another device, so your last change was not saved. Loading the latest version…');
     try {
       const fresh = e.game && e.game.squares ? e.game : await SBS.api.getGame(id);
-      SBS.go({ screen: (fresh.status === 'started' || fresh.status === 'finished') ? 'board' : 'picking', game: fresh });
+      SBS.openGame(fresh);
     } catch (err) {
       SBS.go({ screen: 'home' });
     }
     return true;
+  };
+
+  // 403: signed in, but the board is someone else's. Tell the host once, say
+  // the change was not saved, and hand back the server's copy so the caller can
+  // drop its unsaved edit. Returns null when `e` is not a 403, else
+  // { fresh } (fresh is null if the reload failed too).
+  SBS.handleForbidden = async function (e, id) {
+    if (!e || !e.forbidden) return null;
+    await SBS.ui.showAlert(SBS.ui.escapeHtml(e.message) + ' Your change was not saved.');
+    let fresh = null;
+    try { fresh = await SBS.api.getGame(id); } catch (err) { /* keep what is on screen */ }
+    return { fresh };
   };
 
   // ---------- Router ----------
@@ -140,6 +180,7 @@
     if (route.screen === 'tv') return s.tv(route.id);
     if (route.screen === 'phone') return s.phone(route.id, route.back);
     if (route.screen === 'player') return s.player(route.id);
+    if (route.screen === 'login') return s.login(route.token);
   };
 
   // Deep links, so the TV and the phone can each be pointed straight at the
@@ -163,8 +204,23 @@
     // a live "how am I doing" readout. Strictly read-only (see screen-player.js).
     const player = hash.match(new RegExp(`^#player-(${ID_RE})$`, 'i'));
     if (player) return { screen: 'player', id: player[1] };
+    // Emailed sign-in link. The token is 43 URL-safe characters; anything else
+    // still gets the login screen, in its "not valid" state.
+    if (/^#login-/i.test(hash)) {
+      const m = hash.match(/^#login-([A-Za-z0-9_-]{43})$/);
+      return { screen: 'login', token: m ? m[1] : null };
+    }
     return { screen: 'home' };
   };
+
+  // Pasting a sign-in link into a tab that is already open only changes the
+  // hash. Other deep links are read at load, as before.
+  window.addEventListener('hashchange', () => {
+    if (!/^#login-/i.test(window.location.hash || '')) return;
+    // The prompt asking for this very link would otherwise cover the page.
+    SBS.ui.closeEmailPrompt();
+    SBS.go(SBS.parseInitialRoute());
+  });
 
   // ---------- Timers ----------
   // Screens used to leave their intervals running after a re-render; on the

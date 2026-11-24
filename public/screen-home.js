@@ -219,6 +219,113 @@
     return grid;
   }
 
+  // Revokes every session for this account, this device included. Another
+  // device (a scorekeeper's phone) needs a new code afterward.
+  async function signOutEverywhere(email, btn) {
+    const ok = await showConfirm(`Sign out everywhere for ${escapeHtml(email)}? This includes this device. Any other device, such as a scorekeeper's phone, will need a new code to sign in again.`);
+    if (!ok) return;
+    btn.disabled = true;
+    try {
+      await SBS.api.revokeAllSessions();
+    } catch (e) {
+      // 401: already signed out, which is what was asked for.
+      if (e.status !== 401) {
+        btn.disabled = false;
+        showAlert('Could not sign out everywhere: ' + escapeHtml(e.message));
+        return;
+      }
+    }
+    SBS.go({ screen: 'home' });
+  }
+
+  // The page an emailed link opens (#login-<token>). It draws with no network
+  // call and signs in only on the click: mail scanners that open links must not
+  // use the token up. The token leaves the address bar at once and lives only in
+  // this closure.
+  function renderLogin(token) {
+    const app = SBS.appEl;
+    resetTeamColors();
+    app.innerHTML = '';
+    try {
+      history.replaceState(null, '', location.pathname + location.search);
+    } catch (e) { /* address bar left as is */ }
+    app.appendChild(topbar('<span><span class="brand-dollar">S</span>uper <span class="brand-dollar">S</span>quares</span>', [], { hideHome: true, pill: true }));
+    const main = el('div', 'main');
+    app.appendChild(main);
+    const card = el('div', 'card');
+    main.appendChild(card);
+    main.appendChild(SBS.ui.legalLinks());
+
+    const stale = () => !card.isConnected || SBS.currentScreen() !== 'login';
+    const goHome = () => SBS.go({ screen: 'home' });
+
+    function show(heading, text, buttons, isError) {
+      card.innerHTML = '';
+      const h = el('h2', '', escapeHtml(heading));
+      h.style.marginTop = '0';
+      card.appendChild(h);
+      if (text) {
+        const p = el('p', isError ? 'error-msg' : '', escapeHtml(text));
+        if (isError) p.setAttribute('role', 'alert');
+        card.appendChild(p);
+      }
+      const actions = el('div', 'actions');
+      buttons.forEach(b => actions.appendChild(b));
+      card.appendChild(actions);
+      buttons[0].focus();
+    }
+    const homeBtn = () => {
+      const b = el('button', 'secondary', 'Home');
+      b.type = 'button';
+      b.addEventListener('click', goHome);
+      return b;
+    };
+    const newCodeBtn = () => {
+      const b = el('button', '', 'Get a new code');
+      b.type = 'button';
+      b.addEventListener('click', async () => {
+        if (await SBS.api.signIn()) goHome();
+      });
+      return b;
+    };
+
+    if (!token) {
+      show('This link is not valid', 'Sign-in links are long. Copy the whole link from the email, or ask for a new code.', [newCodeBtn(), homeBtn()]);
+      return;
+    }
+
+    function showReady(errText) {
+      const btn = el('button', '', 'Sign in');
+      btn.type = 'button';
+      show('Sign in to Super Squares', 'Tap Sign in to finish signing in on this device.', [btn, homeBtn()]);
+      if (errText) {
+        const errBox = el('div', 'error-msg', escapeHtml(errText));
+        errBox.setAttribute('role', 'alert');
+        card.insertBefore(errBox, card.querySelector('.actions'));
+      }
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await SBS.api.verifyLogin({ token });
+        } catch (e) {
+          if (stale()) return;
+          if (e.status === 401) {
+            show('Link not accepted', 'That link is wrong, expired or already used.', [newCodeBtn(), homeBtn()], true);
+          } else if (e.status === 404) {
+            show('Sign-in links are not used here', 'This server does not use sign-in links.', [homeBtn()], true);
+          } else {
+            showReady(e.message);
+          }
+          return;
+        }
+        SBS.ui.clearPendingLogin();
+        if (!stale()) goHome();
+      });
+    }
+    showReady();
+  }
+  SBS.screens.login = renderLogin;
+
   async function renderHome() {
     const app = SBS.appEl;
     resetTeamColors();
@@ -292,39 +399,54 @@
       main.appendChild(archiveWrap);
     }
 
-    // Sign-out lives here and only here: Home is the host console, and it's
-    // the one screen a host is on when they want to hand the laptop over.
-    // Absent entirely on the LAN, where there is no sign-in to undo.
-    try {
-      const session = await SBS.api.getSession();
-      if (session.authRequired && session.host) {
-        const outBtn = el('button', 'ghost', 'Sign out');
-        outBtn.type = 'button';
-        outBtn.addEventListener('click', async () => {
-          await SBS.api.signOut();
-          SBS.go({ screen: 'home' });
-        });
-        app.querySelector('.topbar .nav').appendChild(outBtn);
-      }
-    } catch (e) {
-      // Never block Home on the session probe.
-    }
-
     const actions = el('div', 'actions');
     const newBtn = el('button', '', '+ New Game');
     newBtn.addEventListener('click', () => SBS.go({ screen: 'setup' }));
     actions.appendChild(newBtn);
     main.appendChild(actions);
 
-    // Build version, from the server (package.json is the only source).
-    // Non-blocking and silent: Home never waits on it.
+    // Build version and the account line, from one session call that Home never
+    // waits on (the shell above is already drawn). Sign-out lives here and only
+    // here: Home is the host console, and it's the one screen a host is on when
+    // they want to hand the laptop over. Absent entirely on the LAN, where
+    // there is no sign-in to undo.
     const versionNote = el('div', 'footer-note');
     versionNote.id = 'app-version';
+    const accountLine = el('div', 'footer-note account-line hidden');
+    accountLine.style.cssText = 'margin-top:12px; overflow-wrap:anywhere; display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; justify-content:center;';
     main.appendChild(versionNote);
+    main.appendChild(accountLine);
     main.appendChild(SBS.ui.legalLinks());
+    const nav = app.querySelector('.topbar .nav');
     SBS.api.getSession().then(s => {
-      if (s && s.version) versionNote.textContent = 'Super Squares v' + s.version;
-    }).catch(() => {});
+      // The answer can arrive after the host left, or after Home was drawn
+      // again: then these nodes are detached and there is nothing to update.
+      if (!s || !main.isConnected || SBS.currentScreen() !== 'home') return;
+      if (s.version) versionNote.textContent = 'Super Squares v' + s.version;
+      if (!(s.authRequired && s.host)) return;
+      const outBtn = el('button', 'ghost', 'Sign out');
+      outBtn.type = 'button';
+      outBtn.addEventListener('click', async () => {
+        outBtn.disabled = true;
+        try {
+          await SBS.api.signOut();
+        } catch (e) {
+          outBtn.disabled = false;
+          showAlert('Could not sign out: ' + escapeHtml(e.message));
+          return;
+        }
+        SBS.go({ screen: 'home' });
+      });
+      nav.appendChild(outBtn);
+      if (s.mode === 'accounts' && s.email) {
+        accountLine.appendChild(document.createTextNode('Signed in as ' + s.email + ' '));
+        const allBtn = el('button', 'ghost small', 'Sign out everywhere');
+        allBtn.type = 'button';
+        allBtn.addEventListener('click', () => signOutEverywhere(s.email, allBtn));
+        accountLine.appendChild(allBtn);
+        accountLine.classList.remove('hidden');
+      }
+    }).catch(() => { /* never block Home on the session probe */ });
 
     // Games are created/edited/deleted from other devices in the room (a
     // phone setting up a new pool while the TV sits on Home), and there's no

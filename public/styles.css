@@ -393,7 +393,7 @@ button.full-width { width: 100%; text-align: center; }
 button:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
 
 label { display: block; margin: 14px 0 6px; font-weight: 500; color: var(--muted); font-size: 0.85rem; }
-input[type=text], input[type=number], input[type=date], input[type=datetime-local], select {
+input[type=text], input[type=email], input[type=number], input[type=date], input[type=datetime-local], select {
   width: 100%;
   padding: 11px 12px;
   border-radius: var(--radius);
@@ -403,6 +403,7 @@ input[type=text], input[type=number], input[type=date], input[type=datetime-loca
   font-size: 1rem;
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
+input.code-input { font-size: 1.25rem; letter-spacing: 0.08em; }
 input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
 input[type=color] {

@@ -187,3 +187,15 @@ R2 part 1 (2026-11-23: migration 002, store, `lib/auth.js`, `lib/mailer.js`, rou
 - "Sign out everywhere" includes the device that asked. `GET /api/session` also returns
   `mode`. The cross-site check applies in every mode.
 - `LOGIN_EMAILS_PER_HOUR` defaults to 200. Password mode runs without migration 002.
+
+R2 part 2 (2026-11-23: client sign-in in `public/`):
+- A 401 asks `GET /api/session` for `mode`, then opens the password or the email prompt.
+  A device already signed in from another tab gets no prompt.
+- While a code is pending, `{requestId, email, expiry}` sits in `localStorage` for up to 15
+  minutes (never the code or a token), so an iPhone home-screen app killed while the host
+  reads mail reopens at the code step. Returning to the tab checks the session once; no timer.
+- The `#login-` page takes the token out of the address bar at once and posts it only on
+  the click. A link pasted into an open tab closes any email prompt and opens the page.
+- A 403 sets `err.forbidden`, never prompts, and `SBS.handleForbidden` shows the message
+  once and returns the server's copy. A 401 or 403 stops the auto-cutoff timer's retries.
+- Home makes one session call and does not wait for it.
