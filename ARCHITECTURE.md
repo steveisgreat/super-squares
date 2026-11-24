@@ -47,7 +47,10 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `GET /api/games` | host only; list summaries |
 | `GET /api/todays-games` | host only; the setup screen's schedule, read from the shared slate (no provider call of its own) |
 | `POST /api/game`, `PUT /api/game/:id`, `DELETE /api/game/:id` | host only |
-| `PATCH /api/game/:id/score` | host only; one manual-score operation (decision 011) |
+| `PATCH /api/game/:id/score` | host, or a scorer phone of that board (decision 018); one manual-score operation (decision 011) |
+| `POST`, `GET`, `DELETE /api/game/:id/handoff` | host only; make a one-time scorer code → `{ token, scorers, expiresInSeconds }`, count → `{ waiting, scorers }`, remove all scorer phones |
+| `POST /api/handoff` | anonymous; `{ token }` spends the code once, sets `sbs_scorer` (24 h, `Path=/api/game/<id>`) → `{ gameId }`; 401 otherwise |
+| `GET /api/game/:id/role` | public; `{ role: 'host' \| 'scorer' \| 'none' }` for this device |
 | `POST /api/tv` | anonymous; a TV asks to pair → `{ code, token }` (decision 017) |
 | `GET /api/tv/:token` | the TV reads its pairing → `{ state: 'waiting', code }` or `{ state: 'paired', gameId }`; 404 unknown or expired |
 | `POST /api/tv/pair` | owner of `gameId`; `{ code, gameId }` pairs a waiting TV and retires the code |
@@ -73,6 +76,9 @@ index on `updated_at desc` (`migrations/001_games.sql`, applied by hand, see run
 Accounts (`migrations/002_host_accounts.sql`): `hosts`, `login_requests`, and
 `games.owner_id`, a nullable column that is never copied into `doc`. The store stamps `createdAt` and `updatedAt`.
 
+Scorer phones (`migrations/006_scorer_grants.sql`): `scorer_grants`, one row per one-time
+code, which becomes that phone's grant when used (decision 018). Only hashes are stored.
+
 Live scores (`migrations/003_live_slates.sql`): `live_slates (league, et_date, payload jsonb, checked_at, fetched_at)`,
 one row per league and ET date, shared by every Live board. `checked_at` is the throttle: a
 request that finds it more than 15 s old claims the refresh with a conditional write
@@ -89,7 +95,8 @@ cutoff rules, shared with the server and unit-tested), `teams.js` (NFL/NBA names
 colors and ESPN logo URLs), `qrcode.js`, `core.js` (API client, routing, sign-in prompt by mode and 401 replay, 403 handling), `ui.js`,
 `players.js`, `board.js`, `score-panel.js` (manual score), then screens: `screen-home` (saved games, setup, version
 footer), `screen-picking`, `screen-gameday`, `screen-phone` (score entry),
-`screen-player` (read-only My Squares), and `app.js` (hash router: `#tv-<id>`,
+`screen-player` (read-only My Squares), `screen-tvpair` (TV pairing, "What's in the room?"),
+`screen-handoff` (scorer-phone code and the `#handoff-<token>` page), and `app.js` (hash router: `#tv-<id>`,
 `#score-<id>`, `#player-<id>`). Every polling screen refetches its game about every 8 s.
 It is also a PWA (`manifest.webmanifest`, icons).
 

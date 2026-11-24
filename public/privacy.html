@@ -38,6 +38,7 @@
 <ul>
 <li><strong>Host session cookie (<code>sbs_host</code>).</strong> When a host signs in, we set this cookie so they stay signed in for up to 30 days. It is HttpOnly, so page scripts cannot read it, and it holds a signed expiry value, not personal data. People who only view boards do not get it. Email sign-in, once live, replaces it with the cookie described in section 9.</li>
 <li><strong>Player view memory (browser localStorage).</strong> On a board's player page, your browser remembers which name you picked from the list so it is preselected next time. It stays on your device, is not sent to us, and you can clear it in your browser settings.</li>
+<li><strong>Scorer phone cookie (<code>sbs_scorer</code>).</strong> When a host hands score entry to a phone, that phone gets a cookie for that one board. It lasts up to 24 hours, is HttpOnly, and holds a random value, not personal data. The host can end it at any time. The browser also keeps a note (localStorage) that this phone was a scorer for that board.</li>
 <li>We do not use advertising or tracking cookies.</li>
 </ul>
 

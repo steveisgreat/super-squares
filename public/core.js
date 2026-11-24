@@ -125,7 +125,13 @@
     followTv: (gameId, o) => request('/api/tv/follow', json('POST', { gameId }), o),
     createGame: (game) => request('/api/game', json('POST', game)),
     saveGame: (game) => request(`/api/game/${game.id}`, json('PUT', game)),
-    patchScore: (id, op) => request(`/api/game/${id}/score`, json('PATCH', op)),
+    patchScore: (id, op, o) => request(`/api/game/${id}/score`, json('PATCH', op), o),
+    // Scorer-phone hand-off (R24). The phone's calls are raw: it has no host session.
+    createHandoff: (id) => request(`/api/game/${id}/handoff`, { method: 'POST' }),
+    getHandoff: (id, o) => request(`/api/game/${id}/handoff`, null, o),
+    removeScorers: (id) => request(`/api/game/${id}/handoff`, { method: 'DELETE' }),
+    useHandoff: (token) => rawRequest('/api/handoff', json('POST', { token })),
+    getRole: (id) => rawRequest(`/api/game/${id}/role`),
     patchPayout: (id, op) => request(`/api/game/${id}/payout`, json('PATCH', op)),
     deleteGame: (id) => request(`/api/game/${id}`, { method: 'DELETE' }),
     getTodaysGames: (date, league) => request(`/api/todays-games?${new URLSearchParams({ date: date || '', league: league || '' })}`)
@@ -190,6 +196,7 @@
     if (route.screen === 'player') return s.player(route.id);
     if (route.screen === 'join') return s.join(route.code);
     if (route.screen === 'login') return s.login(route.token);
+    if (route.screen === 'handoff') return s.handoff(route.token);
   };
 
   // Deep links, so the TV and the phone can each be pointed straight at the
@@ -225,13 +232,18 @@
       const m = hash.match(/^#login-([A-Za-z0-9_-]{43})$/);
       return { screen: 'login', token: m ? m[1] : null };
     }
+    // The one-time code a host shows a scorer's phone (R24), same shape.
+    if (/^#handoff-/i.test(hash)) {
+      const m = hash.match(/^#handoff-([A-Za-z0-9_-]{43})$/);
+      return { screen: 'handoff', token: m ? m[1] : null };
+    }
     return { screen: 'home' };
   };
 
   // Pasting a sign-in link into a tab that is already open only changes the
   // hash. Other deep links are read at load, as before.
   window.addEventListener('hashchange', () => {
-    if (!/^#login-/i.test(window.location.hash || '')) return;
+    if (!/^#(login|handoff)-/i.test(window.location.hash || '')) return;
     // The prompt asking for this very link would otherwise cover the page.
     SBS.ui.closeEmailPrompt();
     SBS.go(SBS.parseInitialRoute());

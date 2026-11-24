@@ -2416,3 +2416,14 @@ button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color:
 }
 .room-status { min-height: 1.3em; margin: 8px 0 0; }
 .room-status.room-error { color: var(--danger); }
+
+/* Scorer-phone hand-off (R24) */
+.handoff-card { max-width: 480px; width: 100%; margin: 0 auto; max-height: 92vh; overflow-y: auto; box-sizing: border-box; }
+.handoff-text { margin: 0 0 8px; color: var(--muted); line-height: 1.4; }
+.handoff-text:empty { display: none; }
+.handoff-qr { display: flex; justify-content: center; margin: 12px 0; }
+.handoff-qr:empty { display: none; }
+.handoff-qr svg { display: block; width: 220px; max-width: 100%; height: auto; padding: 10px; background: #fff; border-radius: 8px; box-sizing: content-box; }
+.handoff-score { margin: 0 0 8px; font-size: 1.15rem; text-align: center; }
+.handoff-card .actions { flex-wrap: wrap; }
+.handoff-card [hidden] { display: none; }

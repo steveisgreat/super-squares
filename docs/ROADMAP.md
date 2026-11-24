@@ -218,7 +218,9 @@ picks up the pairing).
 *Done:* pairing works on a smart-TV browser and a second desktop browser; a TV never
 gets write access.
 
-**R24. Scorer-phone hand-off** — `Opus` (auth) — Depends on: R2; decision entry first.
+**R24. Scorer-phone hand-off** — `Opus` (auth) — Depends on: R2. — ✅ shipped 2026-11-24
+([decision 018](decisions/018-scorer-hand-off.md), migration 006: apply before the push).
+Score entry on one board only (Steve's choice). Not scanned with a real phone camera yet.
 A one-time QR on the host's iPad or laptop signs a phone in for that board without an
 email code. Related to "per-board scorekeeper links" in Later (decision 012).
 *Done:* decision approved; token is single-use and short-lived; `/code-review high` clean.
@@ -316,7 +318,6 @@ office-pool groups.
 
 - Phone app wrappers (Capacitor) for App Store and Google Play discovery —
   check Apple's real-money gaming guideline first.
-- Per-board scorekeeper links that can only enter scores (not in R2, decision 012).
 - Guests claim their own squares from their phones, the host confirms and marks paid
   (2026-11-24 flow review; needs a claim capability and auth review, Opus).
 - Account upkeep: change email, self-service deletion, co-hosts (decision 012).

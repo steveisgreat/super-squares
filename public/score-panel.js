@@ -25,8 +25,9 @@
     return `End Q${period}`;
   }
 
-  // opts: { getGame(): game, setGame(game): void }. setGame is called with the
-  // freshest copy after every optimistic step and every server answer.
+  // opts: { getGame(): game, setGame(game): void, patch(id, op)?, onError(err)? }. setGame
+  // is called with the freshest copy after every optimistic step and every server answer.
+  // `patch` replaces the API call; `onError` returning true means it dealt with the error.
   function create(opts) {
     const root = el('section', 'score-panel');
     root.setAttribute('aria-label', 'Current score');
@@ -54,9 +55,10 @@
       pending++;
       chain = chain.then(async () => {
         try {
-          const saved = await SBS.api.patchScore(local.game.id, op);
+          const saved = await (opts.patch || SBS.api.patchScore)(local.game.id, op);
           opts.setGame(saved);
         } catch (e) {
+          if (opts.onError && opts.onError(e)) { pending--; return; }
           showAlert('Could not save the score: ' + e.message);
           try { opts.setGame(await SBS.api.getGame(local.game.id)); } catch (e2) { /* keep local copy */ }
         }

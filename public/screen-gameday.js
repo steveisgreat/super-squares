@@ -224,7 +224,7 @@
       window.open(`${location.origin}${location.pathname}#tv-${game.id}`, '_blank');
     });
     const phoneBtn = actionBtn(PHONE_ICON, 'Score on phone', 'Phone Score Entry');
-    phoneBtn.addEventListener('click', () => showPhoneLink(game.id));
+    phoneBtn.addEventListener('click', () => SBS.handoff.open(game, phoneBtn));
     // Players scan this to open the read-only companion view (their squares,
     // quarter winners, live status) — separate from the host's own score-entry
     // link above, and safe to hand out to anyone in the room.
@@ -796,42 +796,6 @@
     SBS.onLeaveScreen(() => {
       if (activeDrawReveal) { activeDrawReveal.cancel(); activeDrawReveal = null; }
     });
-  }
-
-  // The phone can't be handed a link by the PC, so show a QR and the address to type in.
-  function showPhoneLink(id) {
-    const overlay = SBS.ui.overlayEl('0.65');
-    const box = el('div', 'card');
-    box.style.cssText = 'max-width:520px; width:100%; box-shadow: var(--shadow-pop);';
-    box.innerHTML = `<h3 style="margin-top:0">Score entry on your phone</h3>
-      <p style="color:var(--muted)">Point your phone's camera at the code, or type the address in. You can tap in quarter scores there while the grid stays up on the TV.</p>
-      <div class="phone-link-list"></div>`;
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-
-    const list = box.querySelector('.phone-link-list');
-    const url = `${location.origin}${location.pathname}#score-${id}`;
-    let qr = '';
-    try {
-      qr = window.QRCode.toSvg(url, 132);
-    } catch (err) {
-      console.error('QR encode failed', err);
-    }
-    list.innerHTML = qr
-      ? `<div class="phone-qr-block"><div class="phone-qr">${qr}</div><div class="phone-link">${escapeHtml(url)}</div></div>`
-      : `<div class="phone-link">${escapeHtml(url)}</div>`;
-
-    const actions = el('div', 'actions');
-    const openHere = el('button', 'secondary', 'Open it on this device');
-    openHere.addEventListener('click', () => {
-      overlay.remove();
-      window.open(`${location.origin}${location.pathname}#score-${id}`, '_blank');
-    });
-    const close = el('button', '', 'Done');
-    close.addEventListener('click', () => overlay.remove());
-    actions.appendChild(close);
-    actions.appendChild(openHere);
-    box.appendChild(actions);
   }
 
   // ---------- TV / grid-only view (1080p, no controls, self-refreshing) ----------

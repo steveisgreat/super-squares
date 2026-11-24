@@ -139,7 +139,8 @@
       </section>
       <section class="room-opt" aria-labelledby="room-score-h">
         <h4 id="room-score-h">Score from another phone</h4>
-        <p>Open this board on the other phone and sign in as the host (the same email and code you used here). The Score on phone button then shows the score entry screen.</p>
+        <p>Hand score entry for this board to one phone. It scans a code; no sign-in.</p>
+        <div class="room-row"><button type="button" id="room-score">Show the scoring code</button></div>
       </section>
       <section class="room-opt" aria-labelledby="room-invite-h">
         <h4 id="room-invite-h">Invite players</h4>
@@ -154,6 +155,11 @@
     const input = box.querySelector('#room-code');
     const status = box.querySelector('#room-status');
     const pairBtn = box.querySelector('#room-pair');
+
+    box.querySelector('#room-score').addEventListener('click', () => {
+      close();
+      SBS.handoff.open(game, opener);
+    });
 
     const inviteRow = box.querySelector('.room-opt:last-of-type .room-row');
     if (game.joinCode) {

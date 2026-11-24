@@ -33,10 +33,33 @@
     let game = null;
     let activeQ = null;
     let saving = false;
+    // A scorer phone (R24) holds one board's score entry and nothing else, so every control
+    // that saves the whole document is left out. The server refuses them anyway.
+    let scorer = false;
+    let ended = false;
     const scorePanel = SBS.scorePanel.create({
       getGame: () => game,
-      setGame: (g) => { game = g; drawAround(); }
+      setGame: (g) => {
+        game = g;
+        // Resuming the live feed leaves manual entry, so the whole screen changes.
+        if (isManual()) drawAround(); else draw();
+      },
+      patch: (gid, op) => SBS.api.patchScore(gid, op, scorer ? { prompt: false } : undefined),
+      onError: (e) => grantEnded(e) && endScoring()
     });
+    // 403, not 401, when this phone happens to be signed in as some other host.
+    const grantEnded = (e) => scorer && (e.status === 401 || e.status === 403);
+
+    // The grant ran out or the host removed it. Never the host sign-in prompt.
+    function endScoring() {
+      ended = true;
+      header.innerHTML = '';
+      tabs.innerHTML = '';
+      footer.innerHTML = '';
+      panel.innerHTML = `<div class="card handoff-card"><h2 class="room-title">Scoring has ended on this phone</h2>
+        <p class="error-msg" role="alert">This phone can no longer enter scores for this board. Ask the host to show a new code and scan it.</p></div>`;
+      return true;
+    }
     const isManual = () => game && window.GameLogic.manualEntry(game);
 
     function firstUnscored(g) {
@@ -45,7 +68,7 @@
     }
 
     function draw() {
-      if (!game) return;
+      if (!game || ended) return;
       const computed = computeGame(game);
       applyTeamColors(game);
 
@@ -71,9 +94,10 @@
       });
       actions.appendChild(manageBtn);
       actions.appendChild(gridBtn);
-      header.appendChild(actions);
+      if (!scorer) header.appendChild(actions);
 
       if (isManual()) { drawManual(computed); return; }
+      if (scorer) { drawReadOnly(computed); return; }
 
       // --- quarter tabs ---
       tabs.innerHTML = '';
@@ -157,11 +181,50 @@
       drawAround(computed);
     }
 
+    // A scorer looking at a board nobody enters by hand: a Live board with its feed up, or a
+    // simulation. Taking over a Live board is a score operation, so the scorer may.
+    function drawReadOnly(computed) {
+      tabs.innerHTML = '';
+      const live = window.GameLogic.scoringMode(game) === 'live' && game.status === 'started';
+      const cur = game.liveScore;
+      panel.innerHTML = '';
+      const box = el('div', 'card handoff-card');
+      box.innerHTML = cur
+        ? `<p class="handoff-score">${escapeHtml(game.teamA)} <strong>${Number(cur.a) || 0}</strong> &ndash; <strong>${Number(cur.b) || 0}</strong> ${escapeHtml(game.teamB)}</p>`
+        : '';
+      const note = el('p', 'handoff-text');
+      note.textContent = game.status === 'finished' ? 'This game is final.'
+        : live ? 'Scores are coming from the live feed.'
+          : 'This board is simulated, so there is nothing to enter.';
+      box.appendChild(note);
+      if (live) {
+        const take = el('button', 'phone-draw', 'Enter the score myself');
+        take.type = 'button';
+        take.addEventListener('click', async () => {
+          take.disabled = true;
+          const s = window.GameLogic.manualState(game);
+          try {
+            game = await SBS.api.patchScore(id, { op: 'set', a: s.a, b: s.b, override: true }, { prompt: false });
+          } catch (e) {
+            if (grantEnded(e)) { endScoring(); return; }
+            showAlert('Could not take over the score: ' + e.message);
+          }
+          draw();
+        });
+        box.appendChild(take);
+      }
+      panel.appendChild(box);
+      drawAround(computed);
+    }
+
     function drawAround(computedNow) {
+      if (ended) return;
       const computed = computedNow || computeGame(game);
       manualExtras.innerHTML = '';
       const fin = computed.results.final;
-      if (fin.needsDraw) {
+      if (fin.needsDraw && scorer) {
+        manualExtras.appendChild(el('div', 'phone-outcome push', 'That square is empty. The host draws the winner on Game Day.'));
+      } else if (fin.needsDraw) {
         manualExtras.appendChild(el('div', 'phone-outcome push', 'That square is empty — a winner has to be drawn.'));
         const drawBtn = el('button', 'phone-draw', 'Randomly Draw Winner');
         drawBtn.addEventListener('click', async () => {
@@ -272,9 +335,26 @@
       }
     }
 
+    // What a poll compares. A scorer sees the feed's score, which moves without a save.
+    function shownKey(g) {
+      if (!scorer) return g.updatedAt;
+      const l = g.liveScore || {};
+      return JSON.stringify([g.updatedAt, g.status, l.a, l.b, l.period, g.liveFeed && g.liveFeed.available]);
+    }
+
     async function load(initial) {
+      if (ended) return;
       try {
+        // No answer means the host's screen, as before R24: the server decides each save.
+        const asked = initial ? SBS.api.getRole(id).catch(() => ({ role: 'host' })) : null;
         const fresh = await SBS.api.getGame(id);
+        if (initial) {
+          const { role } = await asked;
+          scorer = role === 'scorer';
+          if (role === 'host') SBS.scorerPhone.forget(id);
+          if (role === 'none' && SBS.scorerPhone.was(id)) { endScoring(); return; }
+        }
+        if (ended) return;
         if (initial) {
           game = fresh;
           activeQ = firstUnscored(fresh);
@@ -286,13 +366,14 @@
             return;
           }
           draw();
-        } else if (!saving && !scorePanel.busy() && fresh.updatedAt !== game.updatedAt) {
+        } else if (!saving && !scorePanel.busy() && shownKey(fresh) !== shownKey(game)) {
           game = fresh;
           draw();
         }
       } catch (e) {
         // Deleted on another device — nothing left here to show.
         if (e && e.status === 404) {
+          if (scorer) { endScoring(); return; } // Home would ask for the host sign-in
           SBS.go({ screen: 'home' });
           return;
         }
