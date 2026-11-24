@@ -952,7 +952,6 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: 1.5rem; }
 
 .hidden { display: none !important; }
 
-.games-picker label { margin-top: 0; }
 .games-picker-msg { color: var(--muted); font-size: 0.9rem; margin: 10px 0 0; }
 
 @media (min-width: 1400px) {
@@ -1788,23 +1787,6 @@ body.tv-fullscreen .tv-meta { font-size: 1.5rem; }
 .manage-modal-head h3 { margin: 0; color: var(--text); font-family: var(--serif); font-size: 1.25rem; }
 .modal-close { padding: 8px 12px; border-radius: var(--radius); }
 
-/* --- Game Details (raw API response) modal --- */
-.details-modal { max-width: 720px; }
-.details-json {
-  margin: 0;
-  max-height: 60vh;
-  overflow: auto;
-  background: var(--panel2, #1a222b);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px;
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 0.8rem;
-  line-height: 1.5;
-  color: var(--text);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
 
 .player-list {
   display: flex;

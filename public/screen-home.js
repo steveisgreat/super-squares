@@ -55,24 +55,6 @@
     }
   }
 
-  // A read-only popup showing the raw ESPN API payload for one matchup — lets
-  // the host sanity-check a bad team match or a stalled score against exactly
-  // what the API returned, without opening dev tools.
-  function showGameDetailsModal(rawGame) {
-    const overlay = SBS.ui.overlayEl('0.65');
-    const box = el('div', 'card manage-modal details-modal');
-    const head = el('div', 'manage-modal-head');
-    head.innerHTML = `<h3>Game Details (API Response)</h3>`;
-    const closeBtn = el('button', 'ghost modal-close', 'Close');
-    closeBtn.addEventListener('click', () => overlay.remove());
-    head.appendChild(closeBtn);
-    box.appendChild(head);
-    const pre = el('pre', 'details-json', escapeHtml(JSON.stringify(rawGame, null, 2)));
-    box.appendChild(pre);
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-  }
-
   // Vibrant accent colors used to flash individual letters of the
   // "Picking Squares" status while a game is in the picking phase.
   const PICKING_FX_COLORS = ['#FF3366', '#00FFCC', '#FFD700', '#FF6600', '#9D00FF', '#00FF66', '#FF0055', '#00E5FF'];
@@ -487,9 +469,6 @@
     const main = el('div', 'main');
     app.appendChild(main);
 
-    const gamesCard = el('div', 'card games-picker hidden');
-    main.appendChild(gamesCard);
-
     const card = el('div', 'card');
     main.appendChild(card);
     card.appendChild(el('h2', '', 'Game Setup'));
@@ -516,16 +495,13 @@
         <div class="pill${editGame && editGame.league === 'other' ? ' active' : ''}" data-val="other">Other</div>
       </div>
 
-      <div class="row">
-        <div>
-          <label>Square Price ($)</label>
-          <input type="number" id="f-price" value="${editGame ? escapeHtml(editGame.squarePrice) : 10}" min="0" step="0.01">
-        </div>
-        <div>
-          <label>Game Date</label>
-          <input type="date" id="f-gamedate" value="${editGame && editGame.gameDate ? escapeHtml(editGame.gameDate) : todayValue()}">
-        </div>
-      </div>
+      <label for="f-gamedate">Game Date</label>
+      <input type="date" id="f-gamedate" value="${editGame && editGame.gameDate ? escapeHtml(editGame.gameDate) : todayValue()}">
+
+      <div id="games-picker" class="games-picker"></div>
+
+      <label for="f-price">Square Price ($)</label>
+      <input type="number" id="f-price" value="${editGame ? escapeHtml(editGame.squarePrice) : 10}" min="0" step="0.01">
 
       <label>Description</label>
       <input type="text" id="f-description" placeholder="e.g. Super Bowl LX, Office Pool" maxlength="80" value="${editGame ? escapeHtml(editGame.description || '') : ''}">
@@ -587,7 +563,7 @@
         <div class="pill${scoringStart === 'live' ? ' active' : ''}" data-val="live" role="radio" tabindex="0" aria-checked="${scoringStart === 'live'}">Live</div>
         <div class="pill${scoringStart === 'simulation' ? ' active' : ''}${simLocked ? ' disabled' : ''}" data-val="simulation" role="radio" tabindex="${simLocked ? -1 : 0}" aria-checked="${scoringStart === 'simulation'}"${simLocked ? ' aria-disabled="true" title="Simulation has to be chosen before the grid numbers are generated."' : ''}>Simulation</div>
       </div>
-      <p style="color:var(--muted); font-size:0.9rem;">Manual: you enter the score yourself on the phone or Game Day screen, and the app never contacts a score feed. Live: the score comes from a live score feed while the game is on, and you can enter it yourself if the feed drops. Simulation: for testing or demos, the app invents a random game and plays it out (2-minute quarters) starting the moment you generate the grid numbers.</p>
+      <p style="color:var(--muted); font-size:0.9rem;">Manual: you enter the score yourself on the phone or Game Day screen, and the app never contacts a score feed. Live: pick a game above and the score comes from a live score feed while the game is on; you can enter it yourself if the feed drops. Simulation: for testing or demos, the app invents a random game and plays it out (2-minute quarters) starting the moment you generate the grid numbers.</p>
     `;
 
     let league = editGame && window.GameLogic.LEAGUES.includes(editGame.league) ? editGame.league : 'nfl';
@@ -631,112 +607,122 @@
     form.querySelector('#f-teamA-color').addEventListener('input', refreshPreviews);
     form.querySelector('#f-teamB-color').addEventListener('input', refreshPreviews);
 
-    // A "Details" button that pops up the raw ESPN API response for whichever
-    // game is currently selected — disabled whenever there's no selection, no
-    // games at all, or the picker isn't available in the first place (ESPN
-    // down, or the 'other' league, which has no ESPN schedule to query).
-    function appendDetailsButton(select, games) {
-      const btn = el('button', 'secondary small', 'Details');
-      btn.type = 'button';
-      btn.disabled = true;
-      btn.style.marginTop = '10px';
-      btn.addEventListener('click', () => {
-        if (!select) return;
-        const g = games[select.value];
-        if (!g) return;
-        showGameDetailsModal(g.raw !== undefined ? g.raw : g);
+    let pickMode = editGame ? editGame.pickMode : 'both';
+    let cutoffEnabled = editGame ? !!editGame.autoCutoffEnabled : false;
+    let scoring = scoringStart;
+
+    function setScoring(val) {
+      scoring = val;
+      form.querySelectorAll('#scoring-group .pill').forEach(x => {
+        const on = x.dataset.val === val;
+        x.classList.toggle('active', on);
+        x.setAttribute('aria-checked', String(on));
       });
-      gamesCard.appendChild(btn);
-      return btn;
+    }
+    function setCutoffEnabled(on) {
+      cutoffEnabled = on;
+      form.querySelectorAll('#cutoff-toggle .pill').forEach(x => x.classList.toggle('active', (x.dataset.val === 'yes') === on));
+      form.querySelector('#cutoff-time-wrap').classList.toggle('hidden', !on);
+    }
+    // ISO instant -> the local "YYYY-MM-DDTHH:MM" a datetime-local input takes.
+    function toLocalInput(iso) {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      const p = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
     }
 
-    // Lets the host pick that date's matchup instead of typing team names —
-    // best-effort against ESPN's unofficial endpoint, so a fetch failure
-    // just falls back to manual entry rather than blocking setup. Not
-    // available at all for the 'other' league, which has no ESPN schedule.
-    async function loadGamesForDate(dateVal) {
-      gamesCard.innerHTML = '';
-      gamesCard.classList.add('hidden');
+    // Live-first: the host picks that date's game and the form fills itself
+    // (teams, description, kickoff, cutoff) with Scoring on Live. Manual is the
+    // fallback: no pick, league "Other", feed down, or no games that day.
+    // Best-effort against ESPN's unofficial endpoint, never blocking setup.
+    const pickerBox = form.querySelector('#games-picker');
+    const MSG_MANUAL = 'Pick a game for live scores, or leave it and enter scores yourself.';
+    let loadSeq = 0;
+    async function loadGamesForDate(dateVal, initial) {
+      const seq = ++loadSeq;
+      pickerBox.innerHTML = '';
       selectedKickoff = null;
+      if (!initial && scoring === 'live') setScoring('manual');
+      if (initial && editGame) selectedKickoff = editGame.kickoffTime || null;
       if (league === 'other') return;
+      const note = (msg) => {
+        pickerBox.innerHTML = `<p class="games-picker-msg" role="status">${escapeHtml(msg)}</p>`;
+      };
       let games;
       try {
         const data = await SBS.api.getTodaysGames(dateVal, league);
         games = data.games || [];
       } catch (e) {
-        gamesCard.innerHTML = `<p class="games-picker-msg">The score feed is not available, so Auto Fetch Score will not be available.</p>`;
-        appendDetailsButton(null, []);
-        gamesCard.classList.remove('hidden');
+        if (seq === loadSeq) note('The score feed is not available, so scoring stays Manual. Enter the teams yourself.');
         return;
       }
+      if (seq !== loadSeq) return;
       if (games.length === 0) {
-        gamesCard.innerHTML = `<p class="games-picker-msg">There are no ${league.toUpperCase()} games on this date so Auto Fetch Score will not be available.</p>`;
-        appendDetailsButton(null, []);
-        gamesCard.classList.remove('hidden');
+        note(`There are no ${league.toUpperCase()} games on this date, so scoring stays Manual. Enter the teams yourself.`);
         return;
       }
-      gamesCard.innerHTML = `
-        <label>Games</label>
+      pickerBox.innerHTML = `
+        <label for="f-games-picker">Game</label>
         <select id="f-games-picker">
-          <option value="">Select a game…</option>
+          <option value="">No game / enter manually</option>
           ${games.map((g, i) => `<option value="${i}">${escapeHtml(g.teamA)} @ ${escapeHtml(g.teamB)}${g.date ? ' — ' + escapeHtml(SBS.ui.formatKickoffTime(g.date)) : ''}</option>`).join('')}
         </select>
-        <p class="games-picker-msg">Auto Fetch Score Enabled</p>
+        <p class="games-picker-msg" id="games-picker-msg" role="status"></p>
       `;
-      gamesCard.classList.remove('hidden');
-      const select = gamesCard.querySelector('#f-games-picker');
-      const detailsBtn = appendDetailsButton(select, games);
-      // Re-selecting an already-edited game re-syncs its kickoff time with
-      // whatever the picker shows now, without forcing the host to reopen
-      // the dropdown themselves.
-      if (editGame) {
+      const select = pickerBox.querySelector('#f-games-picker');
+      const msg = pickerBox.querySelector('#games-picker-msg');
+      msg.textContent = MSG_MANUAL;
+      // An existing board shows its picked game; its Scoring stays as saved.
+      if (initial && editGame) {
         const matchIdx = games.findIndex(g => g.teamA === editGame.teamA && g.teamB === editGame.teamB);
         if (matchIdx !== -1) {
           select.value = String(matchIdx);
-          selectedKickoff = games[matchIdx].date || null;
-          detailsBtn.disabled = false;
+          selectedKickoff = games[matchIdx].date || editGame.kickoffTime || null;
+          if (scoring === 'live') msg.textContent = 'Live scores on';
         }
       }
       select.addEventListener('change', (e) => {
         const g = games[e.target.value];
-        detailsBtn.disabled = !g;
-        selectedKickoff = g ? (g.date || null) : null;
-        if (!g) return;
+        if (!g) {
+          // Cleared: back to Manual, keep whatever the host typed.
+          selectedKickoff = null;
+          if (scoring === 'live') setScoring('manual');
+          msg.textContent = MSG_MANUAL;
+          return;
+        }
+        selectedKickoff = g.date || null;
         form.querySelector('#f-teamA').value = g.teamA;
         form.querySelector('#f-teamB').value = g.teamB;
         form.querySelector('#f-description').value = `${g.teamA} @ ${g.teamB}`;
+        const v = g.date ? toLocalInput(g.date) : '';
+        if (v) { form.querySelector('#f-cutoff').value = v; setCutoffEnabled(true); }
+        setScoring('live');
+        msg.textContent = 'Live scores on';
         refreshPreviews();
       });
     }
-    loadGamesForDate(form.querySelector('#f-gamedate').value);
-    form.querySelector('#f-gamedate').addEventListener('change', (e) => loadGamesForDate(e.target.value));
+    form.querySelector('#f-gamedate').addEventListener('change', (e) => loadGamesForDate(e.target.value, false));
 
-    function applyLeagueUI() {
+    function applyLeagueUI(initial) {
       otherColorRow.classList.toggle('hidden', league !== 'other');
+      if (league === 'other' && scoring === 'live') setScoring('manual');
       refreshPreviews();
-      loadGamesForDate(form.querySelector('#f-gamedate').value);
+      loadGamesForDate(form.querySelector('#f-gamedate').value, !!initial);
     }
     form.querySelectorAll('#league-group .pill').forEach(p => {
       p.addEventListener('click', () => {
         form.querySelectorAll('#league-group .pill').forEach(x => x.classList.remove('active'));
         p.classList.add('active');
         league = p.dataset.val;
-        applyLeagueUI();
+        applyLeagueUI(false);
       });
     });
-    applyLeagueUI();
-
-    let pickMode = editGame ? editGame.pickMode : 'both';
-    let cutoffEnabled = editGame ? !!editGame.autoCutoffEnabled : false;
-    let scoring = scoringStart;
 
     form.querySelectorAll('#scoring-group .pill').forEach(p => {
       const choose = () => {
         if (p.getAttribute('aria-disabled') === 'true') return;
-        form.querySelectorAll('#scoring-group .pill').forEach(x => { x.classList.remove('active'); x.setAttribute('aria-checked', 'false'); });
-        p.classList.add('active');
-        p.setAttribute('aria-checked', 'true');
-        scoring = p.dataset.val;
+        setScoring(p.dataset.val);
       };
       p.addEventListener('click', choose);
       p.addEventListener('keydown', (e) => {
@@ -753,13 +739,9 @@
     });
 
     form.querySelectorAll('#cutoff-toggle .pill').forEach(p => {
-      p.addEventListener('click', () => {
-        form.querySelectorAll('#cutoff-toggle .pill').forEach(x => x.classList.remove('active'));
-        p.classList.add('active');
-        cutoffEnabled = p.dataset.val === 'yes';
-        form.querySelector('#cutoff-time-wrap').classList.toggle('hidden', !cutoffEnabled);
-      });
+      p.addEventListener('click', () => setCutoffEnabled(p.dataset.val === 'yes'));
     });
+    applyLeagueUI(true);
 
     function updatePctTotal() {
       const total = ['f-pq1', 'f-pq2', 'f-pq3', 'f-pfinal'].reduce((s, id) => s + (parseFloat(form.querySelector('#' + id).value) || 0), 0);

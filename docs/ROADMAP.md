@@ -175,7 +175,7 @@ warning, Limit IP Address Tracking). Show it only on the LAN build. The player v
 "Scan to view your squares" pop-up had the same certificate line; fixed with it.
 *Done:* cloud pop-up has no LAN text; LAN pop-up unchanged.
 
-**R19. Live-first setup** — `Sonnet`.
+**R19. Live-first setup** — `Sonnet` — ✅ shipped 2026-11-24.
 The game picker moves into the form after league and date; picking a game fills teams,
 description and kickoff, sets the cutoff to kickoff and switches Scoring to Live.
 Manual is the fallback (no game picked, or Other). "Auto Fetch Score" becomes "Live";
