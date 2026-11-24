@@ -90,7 +90,7 @@
     const bg = teamColor(game, side);
     const fade = bg + '00';
     const gradientDir = axis === 'x' ? 'to right' : 'to bottom';
-    return `background:linear-gradient(${gradientDir}, ${fade}, ${bg}, ${fade}); color:${readableTextColor(bg)};`;
+    return `--team:${bg}; background:linear-gradient(${gradientDir}, ${fade}, ${bg}, ${fade}); color:${readableTextColor(bg)};`;
   }
 
   // A square is flagged when the person holding it still owes for it, so the
@@ -107,6 +107,46 @@
     const color = players[name] && players[name].color;
     const style = isColor(color) ? ` style="color:${color};"` : '';
     return `<div class="name-txt"${style}>${escapeHtml(name)}</div>`;
+  }
+
+  // The grid's frame: a 2x2 grid where teamB's bar sits over the numbered columns (top-right) and
+  // teamA's bar sits beside the numbered rows (bottom-left), starting flush with the top of the
+  // grid's own blank corner cell — not stretched up alongside teamB's bar, which used to leave it
+  // starting a row too low. mount() puts it in `holder` with the grid and fits the names.
+  function boardFrame(game) {
+    const outer = el('div', 'board-grid-outer');
+    const teamALabel = el('div', 'teamA-label', `<span class="teamA-label-text">${escapeHtml(game.teamA)}</span>${teamLogoTag(game, 'A', 32)}`);
+    teamALabel.style.cssText = badgeStyle(game, 'A', 'y');
+    outer.appendChild(teamALabel);
+
+    const teamBLabel = el('div', 'teamB-label', `${teamLogoTag(game, 'B', 32)}<span>${escapeHtml(game.teamB)}</span>`);
+    teamBLabel.style.cssText = badgeStyle(game, 'B', 'x');
+    outer.appendChild(teamBLabel);
+
+    // Full team names (e.g. "Washington Commanders") routinely don't fit in
+    // these narrow axis bars — teamA's runs vertically up a column-width
+    // strip, teamB's horizontally across a row-height one. Fall back to the
+    // same abbreviation the rest of the app already uses for tight spaces,
+    // but only once the full name actually overflows its bar (checked
+    // after layout, since that's the only reliable way to know).
+    // The full and short names ride on the text element, so a resize or a phone turned
+    // sideways can fit it again (fitAxisLabels below).
+    function fitAxisLabel(labelEl, textEl, side, vertical) {
+      textEl.dataset.full = side === 'A' ? game.teamA : game.teamB;
+      textEl.dataset.abbr = teamStyle(game, side).abbr;
+      labelEl.dataset.vertical = vertical ? '1' : '';
+      refitAxisLabel(labelEl, textEl);
+    }
+
+    function mount(holder, scroll) {
+      outer.appendChild(scroll);
+      holder.appendChild(outer);
+      syncCornerInsets(holder);
+      fitAxisLabel(teamALabel, teamALabel.querySelector('.teamA-label-text'), 'A', true);
+      fitAxisLabel(teamBLabel, teamBLabel.querySelector('span'), 'B', false);
+    }
+
+    return { mount };
   }
 
   // Step 2 preview. `state` is { selecting, selected, target, pickColor, onFilled, onOpen }.
@@ -126,10 +166,16 @@
     const tappable = [];
 
     table.appendChild(el('div', 'cell head corner', ''));
-    for (let c = 0; c < 10; c++) table.appendChild(el('div', 'cell head x pending', '–'));
+    // "?" until the lock draws the numbers, on a tint of the team the axis belongs to.
+    const head = (axis, side) => {
+      const h = el('div', `cell head ${axis} pending`, '?');
+      h.style.setProperty('--axis', teamColor(game, side));
+      return h;
+    };
+    for (let c = 0; c < 10; c++) table.appendChild(head('x', 'B'));
 
     for (let r = 0; r < 10; r++) {
-      table.appendChild(el('div', 'cell head y pending', '–'));
+      table.appendChild(head('y', 'A'));
       for (let c = 0; c < 10; c++) {
         const idx = r * 10 + c;
         const sq = game.squares[idx];
@@ -148,6 +194,8 @@
         }
         const cell = el('div', cls, label);
         cell.dataset.i = String(idx);
+        const who = sq && (game.players || {})[sq.name];
+        if (who && isColor(who.color)) cell.style.setProperty('--who', who.color);
         let handler = null;
         if (sq && state.onFilled) {
           // The host taps a claimed square to see who has it (and remove or reassign it).
@@ -186,7 +234,8 @@
     }
 
     scroll.appendChild(table);
-    holder.appendChild(scroll);
+    boardFrame(game).mount(holder, scroll);
+    fitNames(holder);
 
     // The one tab stop: where the keyboard last was if that square can still be tapped, else the
     // first that can.
@@ -216,33 +265,7 @@
     const liveBar = renderLiveScoreBar(game);
     if (liveBar) holder.appendChild(liveBar);
 
-    // A 2x2 grid: teamB's bar sits over the numbered columns (top-right),
-    // teamA's bar sits beside the numbered rows (bottom-left) starting flush
-    // with the top of the grid's own blank corner cell — not stretched up
-    // alongside teamB's bar, which used to leave it starting a row too low.
-    const outer = el('div', 'board-grid-outer');
-    const teamALabel = el('div', 'teamA-label', `<span class="teamA-label-text">${escapeHtml(game.teamA)}</span>${teamLogoTag(game, 'A', 32)}`);
-    teamALabel.style.cssText = badgeStyle(game, 'A', 'y');
-    outer.appendChild(teamALabel);
-
-    const teamBLabel = el('div', 'teamB-label', `${teamLogoTag(game, 'B', 32)}<span>${escapeHtml(game.teamB)}</span>`);
-    teamBLabel.style.cssText = badgeStyle(game, 'B', 'x');
-    outer.appendChild(teamBLabel);
-
-    // Full team names (e.g. "Washington Commanders") routinely don't fit in
-    // these narrow axis bars — teamA's runs vertically up a column-width
-    // strip, teamB's horizontally across a row-height one. Fall back to the
-    // same abbreviation the rest of the app already uses for tight spaces,
-    // but only once the full name actually overflows its bar (checked below,
-    // after layout, since that's the only reliable way to know).
-    // The full and short names ride on the text element, so a resize or a phone turned
-    // sideways can fit it again (fitAxisLabels below).
-    function fitAxisLabel(labelEl, textEl, side, vertical) {
-      textEl.dataset.full = side === 'A' ? game.teamA : game.teamB;
-      textEl.dataset.abbr = teamStyle(game, side).abbr;
-      labelEl.dataset.vertical = vertical ? '1' : '';
-      refitAxisLabel(labelEl, textEl);
-    }
+    const frame = boardFrame(game);
 
     const scroll = el('div', 'board-scroll');
     const table = el('div', 'board-table');
@@ -286,13 +309,7 @@
     }
 
     scroll.appendChild(table);
-    outer.appendChild(scroll);
-    holder.appendChild(outer);
-
-    syncCornerInsets(holder);
-
-    fitAxisLabel(teamALabel, teamALabel.querySelector('.teamA-label-text'), 'A', true);
-    fitAxisLabel(teamBLabel, teamBLabel.querySelector('span'), 'B', false);
+    frame.mount(holder, scroll);
   }
 
   // Both team bars span their full grid cell by default, which includes the
@@ -331,12 +348,12 @@
     });
   }
 
-  // Phone Party View: a name never breaks inside a word. One too wide for its square gets smaller, down
+  // Phone Party View and the picking board: a name never breaks inside a word. One too wide for its square gets smaller, down
   // to MIN_NAME_PX; past that the CSS cuts it with an ellipsis. Widths are read in one pass and
   // sizes written in another, so 100 squares cost one layout.
   const MIN_NAME_PX = 7;
   function fitNames(root) {
-    const names = Array.prototype.slice.call((root || document).querySelectorAll('.mirror-screen .name-txt'));
+    const names = Array.prototype.slice.call((root || document).querySelectorAll('.mirror-screen .name-txt, .pick-fill .name-txt'));
     if (!names.length) return;
     names.forEach(n => { n.style.fontSize = ''; });
     const sizes = names.map(n => {
@@ -356,7 +373,7 @@
   let axisResizeTimer = null;
   window.addEventListener('resize', () => {
     clearTimeout(axisResizeTimer);
-    axisResizeTimer = setTimeout(() => { fitAxisLabels(document); fitNames(document); }, 120);
+    axisResizeTimer = setTimeout(() => { document.querySelectorAll('.pick-fill .board-grid-outer').forEach(syncCornerInsets); fitAxisLabels(document); fitNames(document); }, 120);
   });
 
   SBS.board = { renderPickBoard, renderFullBoard, renderLiveScoreBar, syncCornerInsets, fitAxisLabels, fitNames };

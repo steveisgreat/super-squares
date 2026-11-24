@@ -105,14 +105,14 @@ check('a name already on the board is an error that says how many', () => {
   const g = board([['Lee', 3], ['Ann', 1]]);
   const r = parse('Lee 2\nann 1\nBo 4', g);
   eq(r.rows.map(x => x.name), ['Bo'], 'rows');
-  eq(msgs(r), ['1:Lee already has 3 squares. Add more under Claim Squares.', '2:ann already has 1 square. Add more under Claim Squares.'], 'messages');
+  eq(msgs(r), ['1:Lee already has 3 squares. Add more under One player.', '2:ann already has 1 square. Add more under One player.'], 'messages');
 });
 
 check('a board name with a subscript still blocks the bare name', () => {
   const g = board([['Lee₁', 2], ['Lee₂', 2]]);
   const r = parse('Lee 1', g);
   eq(r.errors.length, 1, 'errors');
-  eq(r.errors[0].message, 'Lee already has 4 squares. Add more under Claim Squares.', 'message');
+  eq(r.errors[0].message, 'Lee already has 4 squares. Add more under One player.', 'message');
 });
 
 check('more squares than are open is an error', () => {

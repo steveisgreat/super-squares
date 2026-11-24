@@ -6,7 +6,7 @@
   const SBS = window.SBS = window.SBS || {};
   const { el, escapeHtml, money, overlayEl, showChoice, showConfirm, showAlert } = SBS.ui;
 
-  const { isPlayerName, pickPlayerColor, owedSummary, paidAfterAdd, pruneEmptyPlayers } = window.GameLogic;
+  const { isPlayerName, pickPlayerColor, owedSummary, hostAddSquares, setPaidCount, pruneEmptyPlayers } = window.GameLogic;
 
   const MAX_NAME_LEN = 10;
 
@@ -37,42 +37,10 @@
     return players[name].color;
   }
 
-  // Claiming more squares must never quietly un-pay a player: if Steve already
-  // paid and later grabs two more squares with the box unchecked, he stays paid.
-  // Only the Manage Payments modal can move someone back to unpaid.
-  function markPlayerPaid(game, name, paidChecked) {
-    const players = ensurePlayers(game);
-    const alreadyPaid = !!(players[name] && players[name].paid);
-    const existingColor = players[name] && players[name].color;
-    // Keeps fields the host screens don't know (a guest's tag, `g`). Marking a name paid
-    // settles it in full, so a part-paid count (`paidSquares`) is dropped.
-    const next = Object.assign({}, players[name], { paid: alreadyPaid || !!paidChecked, color: existingColor });
-    if (next.paid) delete next.paidSquares;
-    players[name] = next;
-    ensurePlayerColor(game, name);
-  }
-
-  // The one way the host puts squares under a name: stamps the time, and charges right.
-  // A name a guest picked under keeps its part-paid count: with Mark as Paid ticked only the
-  // squares added here become paid. Other names behave as they always did.
+  // Puts squares under a name for the host (the paid rules are in compute.js hostAddSquares).
   function addSquares(game, name, indexes, ticked) {
-    const players = ensurePlayers(game);
-    const before = owedSummary(game)[name];
-    const beforeCount = before ? before.count : 0;
-    const beforePaid = before ? before.paidCount : 0;
-    // A name with no squares is nobody's: an old phone's tag must not own these.
-    if (!beforeCount && players[name]) { players[name].paid = false; delete players[name].g; delete players[name].paidSquares; }
-    const at = Math.floor(Date.now() / 1000);
-    indexes.forEach(i => { game.squares[i] = { name, at }; });
-    if (players[name] && players[name].g) {
-      const r = paidAfterAdd(beforePaid, beforeCount, indexes.length, !!ticked);
-      const next = Object.assign({}, players[name], { paid: r.paid });
-      if (r.paidSquares === undefined) delete next.paidSquares; else next.paidSquares = r.paidSquares;
-      players[name] = next;
-      ensurePlayerColor(game, name);
-    } else {
-      markPlayerPaid(game, name, ticked);
-    }
+    hostAddSquares(game, name, indexes, ticked, Math.floor(Date.now() / 1000));
+    ensurePlayerColor(game, name);
   }
 
   // Replaces what `game` holds with a newer copy, in place, so every screen that holds the
@@ -199,27 +167,106 @@
   const changedMsg = "That player's squares just changed. Check the list and try again.";
   const countOf = (doc, name) => doc.squares.filter(sq => sq && sq.name === name).length;
 
-  // The one guarded way to mark a name paid or unpaid (Manage Players and the picking screen's
-  // Paid pill both save it): `p` is the summary the host was looking at. If a guest changed that
-  // name's squares since, the mark could settle squares nobody has paid for, so it is refused.
-  function paidChange(p, checked) {
-    return (doc) => {
-      if (countOf(doc, p.name) !== p.count) return changedMsg;
-      const players = ensurePlayers(doc);
-      players[p.name] = Object.assign({}, players[p.name], { paid: checked });
-      delete players[p.name].paidSquares; // paid or unpaid in full, the host's word
-    };
+  // The one guarded way to say what a name has paid for (the Paid pill, the payment box and Manage
+  // Players all save it): `p` is the summary the host was looking at and `n` how many of its squares
+  // are paid. If that name's squares changed since, the mark could settle squares nobody has paid
+  // for, so it is refused.
+  function paidCountChange(p, n) {
+    return (doc) => (countOf(doc, p.name) === p.count && setPaidCount(doc, p.name, n) ? undefined : changedMsg);
+  }
+  const paidChange = (p, checked) => paidCountChange(p, checked ? p.count : 0);
+
+  // 'paid', 'part' or 'none', and the word the host sees for it.
+  const payState = (p) => (p.paid ? 'paid' : p.paidCount > 0 ? 'part' : 'none');
+  const PAY_WORD = { paid: 'Paid', part: 'Part paid', none: 'Unpaid' };
+
+  // How many of one player's squares are paid for: a stepper, saved once on Done (or at once by
+  // Paid in full). `p` is the summary the host tapped; `apply(n)` saves and resolves to a message
+  // when it was refused, null when it was saved or the failure was dealt with elsewhere.
+  function openPaymentBox(p, price, apply, refocus) {
+    const opener = document.activeElement;
+    let n = p.paidCount;
+    let saving = false;
+    const overlay = overlayEl('0.65');
+    const box = el('div', 'card pick-dialog pay-dialog');
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-labelledby', 'pay-name');
+    box.innerHTML = `
+      <h3 id="pay-name">${escapeHtml(p.name)}</h3>
+      <p class="pick-dialog-sub">${p.count} square${p.count === 1 ? '' : 's'} &middot; ${money(p.total)}</p>
+      <div class="pay-row"><span>Squares paid for</span>
+        <div class="pay-step">
+          <button type="button" class="secondary" data-act="less" aria-label="One less">&minus;</button>
+          <span class="pay-count" role="status"></span>
+          <button type="button" class="secondary" data-act="more" aria-label="One more">+</button>
+        </div></div>
+      <div class="money-boxes">
+        <div class="money-box"><span class="lbl">Paid</span><span class="val is-good" data-v="paid"></span></div>
+        <div class="money-box"><span class="lbl">Owes</span><span class="val" data-v="owes"></span></div>
+      </div>
+      <div class="error-msg hidden" role="alert"></div>
+      <div class="pick-dialog-actions">
+        <button type="button" class="pay-full" data-act="full">Paid in full</button>
+        <button type="button" data-act="done">Done</button>
+      </div>`;
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    const q = (act) => box.querySelector(`[data-act="${act}"]`);
+    function draw() {
+      box.querySelector('.pay-count').textContent = `${n} of ${p.count}`;
+      box.querySelector('[data-v="paid"]').textContent = money(n * price);
+      box.querySelector('[data-v="owes"]').textContent = money((p.count - n) * price);
+      box.querySelector('[data-v="owes"]').classList.toggle('is-owed', n < p.count);
+      q('less').disabled = saving || n <= 0;
+      q('more').disabled = saving || n >= p.count;
+      q('full').disabled = q('done').disabled = saving;
+    }
+    function close() {
+      if (!overlay.isConnected) return; // also runs when the screen changes
+      document.removeEventListener('keydown', onKey);
+      overlay.remove();
+      if (opener && opener !== document.body && opener.isConnected) opener.focus(); else refocus(); // a save rebuilt the row
+    }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    async function commit(to) {
+      if (saving) return;
+      if (to === p.paidCount) return close();
+      saving = true;
+      draw();
+      const refused = await apply(to);
+      saving = false;
+      if (!refused) return close();
+      const err = box.querySelector('.error-msg');
+      err.textContent = refused;
+      err.classList.remove('hidden');
+      draw();
+    }
+    document.addEventListener('keydown', onKey);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    q('less').addEventListener('click', () => { if (n > 0) n--; draw(); });
+    q('more').addEventListener('click', () => { if (n < p.count) n++; draw(); });
+    q('full').addEventListener('click', () => commit(p.count));
+    q('done').addEventListener('click', () => commit(n));
+    if (SBS.onLeaveScreen) SBS.onLeaveScreen(close);
+    draw();
+    q('done').focus();
   }
 
-  // The Players card in the panel of a wide screen (the picking screen and Game Day share it):
-  // name, squares, what is owed, a Paid/Unpaid pill and the Manage Players button. The pill makes
-  // the same guarded save as Manage Players (paidChange).
+  // The Players card of a wide screen (the picking screen and Game Day share it): what is
+  // collected and still owed, then each name, its squares, what it owes, a Paid, Part paid or
+  // Unpaid pill, and the Manage Players button. The pill makes the same guarded save as Manage
+  // Players (paidCountChange); a name, or a Part paid pill, opens the payment box.
   // opts: { getGame(), save(change, showErr) -> result or null, onSaved(result), manage(), cls?,
-  //         busy?(), setBusy?(bool) }. `save` is the screen's own saver (it knows how to handle a
-  // conflict there); null means it dealt with the failure. `onSaved` redraws the screen.
+  //         busy?(), setBusy?(bool), emptyText? }. `save` is the screen's own saver (it knows how
+  //         to handle a conflict there); null means it dealt with the failure. `onSaved` redraws.
   function playersCard(opts) {
     const card = el('div', 'card players-card' + (opts.cls ? ' ' + opts.cls : ''));
-    card.appendChild(el('h3', '', 'Players'));
+    card.innerHTML = `<div class="players-head"><h3>Players</h3><span class="players-n"></span></div>
+      <div class="money-boxes">
+        <div class="money-box"><span class="lbl">Collected</span><span class="val is-good" data-v="in"></span></div>
+        <div class="money-box"><span class="lbl">Still owed</span><span class="val" data-v="owed"></span></div>
+      </div>`;
     const msg = el('div', 'paste-bad');
     msg.setAttribute('role', 'status');
     card.appendChild(msg);
@@ -228,7 +275,7 @@
     const manage = el('button', 'secondary', 'Manage Players');
     manage.type = 'button';
     manage.addEventListener('click', () => opts.manage());
-    card.appendChild(el('div', 'actions', '')).appendChild(manage);
+    card.appendChild(el('div', 'actions players-foot', '')).appendChild(manage);
 
     let busyNow = false;
     const busy = () => (opts.busy ? opts.busy() : busyNow);
@@ -239,42 +286,71 @@
     // from the pill), and a rebuild puts focus back on the same person's pill.
     function draw() {
       const sums = playerSummaries(opts.getGame());
-      const next = JSON.stringify(sums.map(p => [p.name, p.count, p.paid, p.owed, p.paidCount, p.unpaidCount, p.total]));
+      const next = JSON.stringify(sums.map(p => [p.name, p.count, p.paid, p.owed, p.paidCount, p.unpaidCount, p.total, p.color]));
       if (next === sig) return;
       sig = next;
-      const focused = document.activeElement && list.contains(document.activeElement) ? document.activeElement.dataset.name : null;
+      const total = sums.reduce((t, p) => t + p.total, 0);
+      const owed = sums.reduce((t, p) => t + p.owed, 0);
+      card.querySelector('.players-n').textContent = `${sums.length} player${sums.length === 1 ? '' : 's'}`;
+      card.querySelector('[data-v="in"]').textContent = money(total - owed);
+      card.querySelector('[data-v="owed"]').textContent = money(owed);
+      card.querySelector('[data-v="owed"]').classList.toggle('is-owed', owed > 0);
+      const act = document.activeElement;
+      const focused = act && list.contains(act) ? [act.dataset.name, act.dataset.part] : null;
       list.innerHTML = '';
-      if (!sums.length) list.appendChild(el('p', 'player-muted', 'No squares picked yet.'));
+      if (!sums.length) list.appendChild(el('p', 'players-empty', opts.emptyText || 'No squares picked yet.'));
       sums.forEach(p => {
+        const st = payState(p);
         const row = el('div', 'fill-player');
-        const info = el('div', 'fill-player-info');
-        info.innerHTML = `<div class="player-name">${escapeHtml(p.name)}</div><div class="player-sub">${ownedLine(p)}</div>`;
-        const pill = el('button', 'paid-pill ' + (p.paid ? 'is-paid' : 'is-unpaid'), p.paid ? 'Paid' : 'Unpaid');
+        const dot = el('span', 'fill-player-dot');
+        dot.setAttribute('aria-hidden', 'true');
+        dot.style.background = p.color;
+        const info = el('button', 'fill-player-info' + (st === 'part' ? ' is-part' : ''),
+          `<span class="player-name">${escapeHtml(p.name)}</span><span class="player-sub">${ownedLine(p)}</span>`);
+        info.type = 'button';
+        info.setAttribute('aria-haspopup', 'dialog');
+        info.setAttribute('aria-label', `${p.name}, ${p.paidCount} of ${p.count} paid. Payment`);
+        info.addEventListener('click', () => pay(p));
+        const pill = el('button', `paid-pill is-${st === 'none' ? 'unpaid' : st}`, PAY_WORD[st]);
         pill.type = 'button';
-        pill.dataset.name = p.name;
-        pill.setAttribute('aria-label', `${p.name}: ${p.paid ? 'paid' : 'unpaid'}. ${p.paid ? 'Mark unpaid' : 'Mark paid'}`);
-        pill.addEventListener('click', () => toggle(p));
-        row.appendChild(info);
-        row.appendChild(pill);
+        pill.setAttribute('aria-label', st === 'part'
+          ? `${p.name}: part paid, ${p.paidCount} of ${p.count}. Change`
+          : `${p.name}: ${st === 'paid' ? 'paid. Mark unpaid' : 'unpaid. Mark paid'}`);
+        pill.addEventListener('click', () => (st === 'part' ? pay(p) : toggle(p)));
+        [info, pill].forEach((b, i) => { b.dataset.name = p.name; b.dataset.part = String(i); });
+        row.append(dot, info, pill);
         list.appendChild(row);
-        if (focused === p.name) pill.focus();
+        if (focused && focused[0] === p.name) (focused[1] === '0' ? info : pill).focus();
       });
     }
 
-    // Refused if someone changed this name's squares since the list was drawn.
-    async function toggle(p) {
-      if (busy()) return;
+    // Refused if someone changed this name's squares since the list was drawn. Resolves to the
+    // message to show, or null.
+    async function set(p, n) {
+      if (busy()) return 'Still saving. Try again.';
       setBusy(true);
+      let failed = '';
       let r = null;
       try {
-        r = await opts.save(paidChange(p, !p.paid), m => { msg.textContent = m; });
+        r = await opts.save(paidCountChange(p, n), m => { failed = m; });
       } finally {
         setBusy(false);
       }
-      if (!r) { sig = null; return draw(); }
-      msg.textContent = r.refused || '';
       sig = null;
+      if (!r) { draw(); return failed || null; }
       opts.onSaved(r);
+      return r.refused || null;
+    }
+    async function toggle(p) {
+      if (busy()) return;
+      msg.textContent = (await set(p, p.paid ? 0 : p.count)) || '';
+    }
+    function pay(p) {
+      msg.textContent = '';
+      openPaymentBox(p, parseFloat(opts.getGame().squarePrice) || 0, (n) => set(p, n), () => {
+        const again = Array.from(list.querySelectorAll('.fill-player-info')).find(b => b.dataset.name === p.name);
+        if (again) again.focus();
+      });
     }
 
     return { el: card, draw };
@@ -344,7 +420,7 @@
             </div>
             <label class="paid-toggle ${p.paid ? 'is-paid' : ''}">
               <input type="checkbox" ${p.paid ? 'checked' : ''}>
-              <span>${p.paid ? 'Paid' : 'Unpaid'}</span>
+              <span>${PAY_WORD[payState(p)]}</span>
             </label>
             <button class="ghost small btn-delete">Remove</button>
           `;
@@ -408,7 +484,7 @@
   }
 
   SBS.players = {
-    ensurePlayers, ensurePlayerColor, markPlayerPaid, addSquares, replaceGame, formatAt, renameSquares,
+    ensurePlayers, ensurePlayerColor, addSquares, replaceGame, formatAt, renameSquares,
     collectNameGroups, resolveNameForPick, paidChange, ownedLine,
     playerSummaries, unpaidTotal, playersCard, openManagePlayersModal,
     toSubscript, fromSubscript, stripSubscript

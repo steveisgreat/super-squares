@@ -965,7 +965,7 @@
       const key = baseKey(name);
       if (seen[key]) { err(`${name} is already on line ${seen[key]}. List each person once.`); continue; }
       seen[key] = line;
-      if (held[key]) { err(`${name} already has ${held[key]} square${held[key] === 1 ? '' : 's'}. Add more under Claim Squares.`); continue; }
+      if (held[key]) { err(`${name} already has ${held[key]} square${held[key] === 1 ? '' : 's'}. Add more under One player.`); continue; }
       out.rows.push({ line, name, count: Number(countTok), paid });
       out.total += Number(countTok);
     }
@@ -1062,7 +1062,7 @@
     return out;
   }
 
-  // The paid fields of a guest's name after the host adds squares with Mark as Paid ticked or
+  // The paid fields of a name after the host adds squares with Already paid ticked or
   // not: only the added squares become paid. { paid, paidSquares } where paidSquares is
   // undefined for none. `beforePaid` and `beforeCount` are read before the squares are added.
   function paidAfterAdd(beforePaid, beforeCount, added, ticked) {
@@ -1070,6 +1070,43 @@
     const paid = Math.min(beforePaid + (ticked ? added : 0), total);
     if (paid >= total) return { paid: true, paidSquares: undefined };
     return { paid: false, paidSquares: paid > 0 ? paid : undefined };
+  }
+
+  // The host's own word on how many of a name's squares are paid for (0 to all of them). Returns
+  // false, and changes nothing, for a name with no squares or a number that does not fit.
+  function setPaidCount(game, name, n) {
+    const count = squaresOf(game, name).length;
+    if (!count || !isWhole(n, count)) return false;
+    writePaid(game, name, n, count);
+    return true;
+  }
+
+  // Paid in full is `paid` alone; `paidSquares` is there only for a part-paid name.
+  function writePaid(game, name, n, count) {
+    const next = Object.assign({}, playerOf(game, name), { paid: n >= count });
+    if (n > 0 && n < count) next.paidSquares = n; else delete next.paidSquares;
+    game.players[name] = next;
+  }
+
+  // The one way the host puts squares under a name: stamps the time (`at`, epoch seconds) and
+  // charges right. Already paid (`ticked`) speaks only for the squares added here, for every name
+  // (decision 020). A name with no squares yet starts clean: an old phone's tag or an old paid
+  // mark must not come with it. The caller gives the name its color.
+  function hostAddSquares(game, name, indexes, ticked, at) {
+    if (!game.players) game.players = {};
+    const beforeCount = squaresOf(game, name).length;
+    const beforePaid = paidSquareCount(game, name);
+    const p = playerOf(game, name);
+    if (!beforeCount && p) {
+      const clean = Object.assign({}, p, { paid: false });
+      delete clean.g;
+      delete clean.paidSquares;
+      game.players[name] = clean;
+    }
+    indexes.forEach(i => { game.squares[i] = { name, at }; });
+    const count = squaresOf(game, name).length;
+    const r = paidAfterAdd(beforePaid, beforeCount, count - beforeCount, !!ticked);
+    writePaid(game, name, r.paid ? count : r.paidSquares || 0, count);
   }
 
   // A name left with no squares must not keep its players entry: its tag would give an old
@@ -1125,7 +1162,7 @@
     }
 
     if (!game || game.status !== 'picking' || cutoffPassed(game, now)) return refuse('Picking is closed.');
-    if (!isRecord(game.guestPick) || game.guestPick.on !== true) return refuse('The host has not opened picking to guests.');
+    if (!isRecord(game.guestPick) || game.guestPick.on !== true) return refuse('The host has not opened picking to players.');
     if (!release) {
       const mode = game.pickMode || 'both';
       if (byCount && mode === 'manual') return refuse('This board is Manual Only: pick your squares one by one.');
@@ -1207,7 +1244,7 @@
   return {
     PLAYER_COLORS, pickPlayerColor,
     applyGuestOp, guestCap, guestNameOf, paidSquareCount, unpaidSquares, cleanGuestName, nameKey,
-    owedSummary, paidAfterAdd, pruneEmptyPlayers, unpaidGuestPicks, parsePlayerList,
+    owedSummary, paidAfterAdd, hostAddSquares, setPaidCount, pruneEmptyPlayers, unpaidGuestPicks, parsePlayerList,
     QUARTERS, QLABEL, STATUSES, LEAGUES, SCORING_MODES,
     scoringMode, manualEntry, applyScoreOp, scoreKeyOp, inverseScoreOp, setQuarterScore, belowEndedQuarter, manualState, hasResult,
     shuffle, shuffledDigits, emptyGrid,

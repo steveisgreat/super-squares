@@ -1,6 +1,6 @@
 # 019 — Guest picks: a guest claims squares by name, from one device
 
-**Date:** 2026-11-24 · **Status:** accepted (approved by Steve 2026-11-24) · **Roadmap:** R28 · **Related:** 004, 008, 009, 011, 012, 016, 018
+**Date:** 2026-11-24 · **Status:** accepted (approved by Steve 2026-11-24) · **Roadmap:** R28 · **Related:** 004, 008, 009, 011, 012, 016, 018, 020 (section 5 now covers every name; the app calls guest picks "player picks" and the page "Player View")
 
 ## Context
 Until now only the host writes to a board. The host wants to share the `/<code>` link

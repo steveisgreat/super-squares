@@ -114,6 +114,21 @@
     await copyJoinLink(game, note);
   }
 
+  // The join-code chip in a wide screen's top bar (Game Day and picking): copies the link.
+  function joinChip(game) {
+    const wrap = el('div', 'gd-chip-wrap');
+    const chip = el('button', 'gd-chip',
+      `<span class="gd-chip-label">Join</span><span class="gd-chip-code">${escapeHtml(game.joinCode)}</span>${SBS.ui.COPY_ICON}`);
+    chip.type = 'button';
+    chip.setAttribute('aria-label', `Join code ${game.joinCode.split('').join(' ')}. Copy the join link`);
+    const note = el('div', 'gd-chip-note');
+    note.setAttribute('role', 'status');
+    note.setAttribute('aria-live', 'polite');
+    chip.addEventListener('click', () => SBS.playerView.copyJoinLink(game, note));
+    wrap.append(chip, note);
+    return wrap;
+  }
+
   // Puts the join link on the clipboard (no share sheet) and says so in `note`, a role=status
   // element. Resolves true when it copied.
   async function copyJoinLink(game, note) {
@@ -138,29 +153,6 @@
       note._t = setTimeout(() => { note.textContent = ''; }, 6000);
     }
     return copied;
-  }
-
-  // The code in large type (so it can be read aloud) and the Share button.
-  // Null when the board has no code (older board not yet read by its owner).
-  function joinCard(game) {
-    if (!game || !game.joinCode) return null;
-    const card = el('div', 'card join-card');
-    const spoken = game.joinCode.split('').join(' ');
-    card.innerHTML = `
-      <div class="join-card-label">Join code</div>
-      <div class="join-code" aria-label="Join code ${escapeHtml(spoken)}">${escapeHtml(game.joinCode)}</div>
-      <div class="join-url">${escapeHtml(joinUrl(game).replace(/^https?:\/\//, ''))}</div>`;
-    const row = el('div', 'join-actions');
-    const btn = el('button', 'join-share-btn', 'Share link');
-    btn.type = 'button';
-    const note = el('div', 'join-note');
-    note.setAttribute('role', 'status');
-    note.setAttribute('aria-live', 'polite');
-    btn.addEventListener('click', () => shareBoard(game, note));
-    row.appendChild(btn);
-    card.appendChild(row);
-    card.appendChild(note);
-    return card;
   }
 
   // A guest passing the link on: text it, share it, or let someone scan it. There is
@@ -688,7 +680,7 @@
 
       header.innerHTML = `
         <div class="player-title-row badge-fit">
-          <div class="player-title">${guestPickingOn(game) ? 'Pick your squares' : 'Player Grid Watch'}</div>
+          <div class="player-title">${guestPickingOn(game) ? 'Pick your squares' : 'Player View'}</div>
         </div>
         ${tickerHtml}
       `;
@@ -938,8 +930,8 @@
     box.style.cssText = 'max-width:520px; width:100%; box-shadow: var(--shadow-pop);';
     box.innerHTML = `<h3 style="margin-top:0">Scan to view your squares</h3>
       <p style="color:var(--muted)">${guestPickingOn(game)
-        ? "Point a phone's camera at this code to open the player view. Guests can claim and release their own squares while picking is open, then follow their squares, quarter winners and a live status readout. They can't change anything else."
-        : "Point a phone's camera at this code to open the same read-only player view — your squares, quarter winners, and a live status readout. Nothing here can change the game."}</p>
+        ? "Point a phone's camera at this code to open Player View. Players can claim and release their own squares while picking is open, then follow their squares, quarter winners and a live status readout. They can't change anything else."
+        : "Point a phone's camera at this code to open the same read-only Player View — your squares, quarter winners, and a live status readout. Nothing here can change the game."}</p>
       <div class="phone-link-list"></div>`;
     overlay.appendChild(box);
     document.body.appendChild(overlay);
@@ -1014,5 +1006,5 @@
 
   SBS.screens.player = renderPlayer;
   SBS.screens.join = renderJoin;
-  SBS.playerView = { showPlayerLink, joinCard, shareBoard, copyJoinLink, printSign, buildSign, joinUrl };
+  SBS.playerView = { showPlayerLink, joinChip, shareBoard, copyJoinLink, printSign, buildSign, joinUrl };
 })();

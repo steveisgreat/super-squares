@@ -439,26 +439,6 @@ input[type=color] {
   .pick-layout.board-first { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* --- Step 2 fill-the-grid layout (R25) ---
-   Below 1024 px (or on a phone) it is the older layout: join code, stats and guest picks, then
-   the claim card and board (side by side from 901 px). From 1024 px the board sits on the left, sticky, sized from both the width and the height so the whole 10x10 grid and the claim
-   card show without scrolling; the panel is on the right and scrolls with the page. */
-.pick-fill .fill-only, .pick-fill .fill-head { display: none; }
-@media (min-width: 901px) {
-  .pick-fill { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); column-gap: 22px; align-items: start; }
-  .pick-fill > * { grid-column: 1 / -1; }
-  .pick-fill > .claim-card { grid-column: 1; grid-row: 4 / span 2; }
-  .pick-fill > .board-card { grid-column: 2; grid-row: 4; }
-  .pick-fill > .finish-card { grid-column: 2; grid-row: 5; }
-}
-.claim-card .manual-banner { flex-direction: column; align-items: stretch; margin-top: 12px; }
-.claim-card .manual-banner .manual-for { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
-.claim-card .manual-banner .manual-name { font-size: 1.5rem; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
-.claim-card .manual-banner .manual-count { font-size: 1.05rem; font-weight: 600; }
-.claim-card .manual-banner .manual-paid { font-size: 0.95rem; }
-.claim-card .manual-banner .manual-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
-.claim-card .manual-banner .manual-actions button { min-height: 44px; }
-.tap-hint { margin: 10px 0 0; color: var(--muted); font-size: 0.85rem; }
 .cell[role=button] { cursor: pointer; }
 .cell[role=button]:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; z-index: 1; }
 .cell.empty-pick[role=button] { min-width: 44px; min-height: 44px; }
@@ -479,57 +459,34 @@ input[type=color] {
 .paste-ok { color: var(--muted); }
 .paste-bad { color: var(--danger); }
 .paste-msg { color: var(--accent-hi); font-weight: 600; }
-.fill-player { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.fill-player { display: flex; align-items: center; gap: 7px; padding: 6px 0; border-bottom: 1px solid var(--border); }
 .fill-player:last-child { border-bottom: none; }
-.fill-player-info { min-width: 0; }
-.fill-player-info .player-name { overflow-wrap: anywhere; }
-button.paid-pill { min-width: 88px; min-height: 44px; border-radius: 22px; padding: 6px 16px; font-size: 0.9rem; flex-shrink: 0; }
+.fill-player-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+button.fill-player-info {
+  flex: 1; min-width: 0; min-height: 44px; padding: 0; text-align: left;
+  background: transparent; border: 0; box-shadow: none; color: var(--text); font-weight: 400;
+}
+button.fill-player-info:hover .player-name { color: var(--accent-hi); }
+.fill-player-info .player-name { display: block; overflow-wrap: anywhere; font-size: 1rem; font-weight: 600; }
+.fill-player-info .player-sub { display: block; font-size: 0.82rem; }
+.fill-player-info.is-part .player-sub { color: #a5d0f7; }
+.players-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.players-head h3 { margin: 0; }
+.players-n { color: var(--muted); font-size: 0.9rem; }
+.players-empty { color: var(--muted); font-size: 1rem; line-height: 1.45; margin: 16px 0; }
+.money-boxes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.money-box { display: flex; flex-direction: column; padding: 8px 12px; border-radius: 8px; background: var(--panel2); }
+.money-box .lbl, .board-stat .lbl { font-size: 0.78rem; color: var(--muted); }
+.money-box .val, .board-stat .val { font-size: 1.35rem; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.money-box .val.is-good { color: var(--good); }
+.money-box .val.is-owed { color: var(--warn); }
+.players-foot { margin-top: 12px; }
+.players-foot button { width: 100%; min-height: 44px; }
+button.paid-pill { min-width: 86px; min-height: 44px; border-radius: 22px; padding: 6px 8px; font-size: 0.86rem; flex-shrink: 0; }
 button.paid-pill.is-paid { background: var(--good-soft); color: var(--good); border-color: var(--good); }
+button.paid-pill.is-part { background: #16273a; color: #a5d0f7; border-color: #a5d0f7; }
 button.paid-pill.is-unpaid { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
 button.paid-pill:hover { filter: brightness(1.2); }
-
-@media (min-width: 1024px) {
-  .pick-fill:not(.is-phone) {
-    --panel-w: clamp(340px, 30vw, 440px);
-    /* The board's cell: what the width allows and what the height allows (11 rows, plus the top
-       bar, header line, card padding and legend), never under 44 px, then the page scrolls. */
-    --cell: clamp(44px, min(calc((min(100vw, 1600px) - 136px - var(--panel-w)) / 11), calc((100vh - 212px - var(--sat)) / 11)), 100px);
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) var(--panel-w);
-    column-gap: 22px;
-    align-items: start;
-  }
-  .main:has(.pick-fill:not(.is-phone)) .pick-title { display: none; }
-  .pick-fill:not(.is-phone) > *,
-  .pick-fill:not(.is-phone) > .claim-card,
-  .pick-fill:not(.is-phone) > .finish-card { grid-column: 2; grid-row: auto; }
-  .pick-fill:not(.is-phone) > .board-card {
-    grid-column: 1;
-    grid-row: 1 / span 8;
-    position: sticky;
-    top: calc(76px + var(--sat));
-    padding: 12px 14px 8px;
-    margin-bottom: 0;
-  }
-  .pick-fill:not(.is-phone) .fill-only { display: block; }
-  .pick-fill:not(.is-phone) .fill-head { display: block; font-size: 1.05rem; margin: 0 0 8px; color: var(--muted); }
-  .pick-fill:not(.is-phone) .fill-head strong { color: var(--text); }
-  .pick-fill:not(.is-phone) .board-title { display: none; }
-  .pick-fill:not(.is-phone) .board-scroll { padding-bottom: 0; overflow-x: auto; }
-  .pick-fill:not(.is-phone) .board-table {
-    grid-template-columns: repeat(11, var(--cell));
-    grid-auto-rows: var(--cell);
-    width: max-content;
-    margin: 0 auto;
-  }
-  .pick-fill:not(.is-phone) .cell { min-height: 0; }
-  .pick-fill:not(.is-phone) .cell.head { font-size: 1rem; }
-  .pick-fill:not(.is-phone) .cell .name-txt { padding-top: 0; font-size: clamp(0.62rem, calc(var(--cell) * 0.2), 0.85rem); }
-  .pick-fill:not(.is-phone) .board-legend { margin-top: 6px; }
-  .pick-fill:not(.is-phone) .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pick-fill:not(.is-phone) .stat-box.fill-dup { display: none; }
-  .pick-fill:not(.is-phone) .stat-box { padding: 6px 12px; }
-}
 
 .manual-banner {
   background: var(--accent-soft);
@@ -2344,12 +2301,8 @@ button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color:
 .gd-phone .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 /* ---- Join code card, share button, guest mini grid (R22) ---- */
-.join-card { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 14px 16px; margin-bottom: 12px; }
-.join-card-label { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
 .join-code { font-size: clamp(2rem, 11vw, 3rem); font-weight: 800; letter-spacing: 0.18em; padding-left: 0.18em; color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1.1; }
 .join-url { font-size: 0.85rem; color: var(--muted); overflow-wrap: anywhere; }
-.join-actions { margin-top: 4px; }
-.join-share-btn { min-height: 44px; min-width: 140px; }
 .join-note { min-height: 1.2em; font-size: 0.9rem; color: var(--good); overflow-wrap: anywhere; }
 
 .mini-grid { display: grid; grid-template-columns: 1.4em repeat(10, minmax(0, 1fr)); gap: 2px; max-width: 360px; margin: 10px auto 0; }
@@ -2463,13 +2416,6 @@ button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color:
 .gp-auto-btn { flex: 0 0 auto; min-height: 44px; }
 @media (min-width: 600px) { .gp-actions { flex-direction: row; } .gp-action { width: auto; min-width: 200px; } }
 
-.guest-card { margin-bottom: 16px; }
-.guest-card h3 { margin-top: 0; }
-.guest-actions { margin-top: 10px; }
-.guest-cap-row { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-top: 12px; }
-.guest-cap-row label { flex: 1 0 100%; margin: 0; }
-.guest-cap-row input { width: 110px; }
-.guest-limit { color: var(--muted); }
 .cell.is-tappable { cursor: pointer; }
 .cell.is-tappable:hover { box-shadow: inset 0 0 0 2px var(--accent); }
 .square-dialog .player-sub { margin: 0 0 8px; }
@@ -2657,6 +2603,205 @@ button.gd-onair {
 .gd-topbar-phone .gd-match { font-size: 1rem; }
 .gd-topbar-phone .gd-match .team-badge { font-size: 0.9rem; }
 .gd-topbar-phone button.gd-bar-btn.gd-connect { padding: 0 12px; }
+
+/* ---- Picking screen (redesign of R25) ----
+   Three columns from 1280 px (panel, board, players: the order of the tabs), two from 1024 px (board, panel; the players
+   are a tab), one below that and on a phone (tabs, board, then player picks and the lock). In the
+   wide layouts the board sets the height: its cell comes from both the width and the height, so
+   the grid shows whole, and the columns beside it are as tall as it is and scroll inside. */
+.main.pick-main { max-width: 1800px; padding: 16px 24px calc(16px + var(--sab)); }
+.pick-fill { display: flex; flex-direction: column; gap: 16px; max-width: 760px; margin: 0 auto; }
+.pick-fill > .card { margin: 0; border-radius: 10px; }
+.pick-sec[hidden], .pick-tabs[hidden], .one-pane[hidden], .paste-card[hidden], .room-opt[hidden] { display: none; }
+.pick-sec h3 { margin: 0 0 4px; }
+.pick-sec > p { margin: 0 0 12px; color: var(--muted); font-size: 0.9rem; line-height: 1.45; }
+.pick-side, .pick-foot.card { padding: 0; }
+.pick-side .pick-sec, .pick-foot .pick-sec { padding: 16px 18px 18px; }
+.pick-tabs { margin: 0; padding: 4px 12px 0; }
+.add-sec .add-title { margin-bottom: 12px; }
+.pick-fill:not(.is-three) .add-title { display: none; }
+.pick-seg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; margin-bottom: 14px; border-radius: 10px; background: var(--bg); }
+.pick-seg button { min-height: 44px; padding: 0 8px; border: 0; border-radius: 7px; box-shadow: none; background: transparent; color: var(--muted); font-size: 0.9rem; font-weight: 700; }
+.pick-seg button:hover { color: var(--text); background: var(--panel2); }
+.pick-seg button[aria-pressed="true"] { background: var(--panel3); color: var(--text); }
+.pick-fields { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }
+.pick-form label, .paste-card label { margin-top: 0; }
+.pick-form .checkbox-label { min-height: 44px; margin: 6px 0; font-weight: 600; font-size: 1rem; }
+button.add-btn, button.lock-btn { min-height: 48px; padding-left: 6px; padding-right: 6px; font-size: 1rem; font-weight: 800; white-space: nowrap; }
+.tap-hint { margin: 10px 0 0; text-align: center; color: var(--muted); font-size: 0.9rem; }
+.full-note { margin: 0; text-align: left; }
+.add-sec.is-full .pick-seg, .add-sec.is-full .one-pane, .add-sec.is-full .paste-card,
+.add-sec.is-claiming .pick-seg, .add-sec.is-claiming .pick-fields, .add-sec.is-claiming .add-btn, .add-sec.is-claiming .tap-hint { display: none; }
+.add-sec .manual-banner { flex-direction: column; align-items: stretch; gap: 2px; margin: 0 0 4px; }
+.manual-banner .manual-for { font-size: 0.85rem; color: var(--muted); }
+.manual-banner .manual-name { font-size: 1.5rem; font-weight: 800; line-height: 1.2; color: var(--text); overflow-wrap: anywhere; }
+.manual-banner .manual-count { font-size: 1.05rem; font-weight: 600; }
+.manual-banner .manual-paid { font-size: 0.95rem; }
+.manual-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.manual-actions button { min-height: 48px; }
+.manual-actions [data-act="auto"] { flex: 1 0 100%; }
+.manual-actions [data-act="done"] { flex: 1; }
+.picks-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.picks-row h3 { font-size: 1rem; }
+.picks-info { min-width: 0; }
+.picks-info p { margin: 0; color: var(--muted); font-size: 0.85rem; line-height: 1.4; }
+.picks-row button { min-height: 44px; flex: none; }
+.lock-sec { border-top: 1px solid var(--border); }
+button.lock-btn { background: transparent; color: var(--accent-hi); border-color: var(--border-strong); box-shadow: none; }
+button.lock-btn:hover { background: var(--accent-soft); color: var(--accent-hi); border-color: var(--accent); }
+.lock-sec.is-ready button.lock-btn { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+
+.board-head { display: flex; align-items: center; gap: 20px; min-height: 44px; margin-bottom: 12px; }
+.board-head .sold { flex: 1; min-width: 0; }
+.sold-line { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
+.sold-line strong { font-size: 1.15rem; color: var(--text); }
+.sold-bar { height: 6px; border-radius: 3px; background: var(--panel3); overflow: hidden; }
+.sold-bar div { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.2s ease; }
+.board-stat { display: flex; flex-direction: column; text-align: right; }
+.board-stat .val.is-pot { color: var(--accent); }
+.pick-fill .board-card { padding: 14px; }
+.pick-fill .board-legend { justify-content: space-between; gap: 16px; margin-top: 12px; font-weight: 500; }
+.legend-unpaid { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.pick-fill .board-grid-outer { gap: 4px; }
+.pick-fill .teamA-label, .pick-fill .teamB-label { border-radius: 6px; background: var(--team) padding-box !important; }
+.pick-fill .teamB-label { border-left: 3px solid transparent; }
+.pick-fill .teamA-label { border-top: 3px solid transparent; }
+.pick-fill .teamB-label { padding: 3px 10px; font-size: 1.05rem; }
+.pick-fill .teamA-label { padding: 10px 3px; }
+.pick-fill .teamA-label-text { font-size: 1.05rem; }
+.pick-fill .board-table { background: transparent; gap: 3px; padding: 0; }
+.pick-fill .cell { border-radius: 6px; background: #192230; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07); }
+.pick-fill .cell.head { background: var(--panel3); box-shadow: none; }
+.pick-fill .cell.head.pending { color: var(--muted); font-weight: 700; }
+.pick-fill .cell.head.corner { background: transparent; }
+.pick-fill .cell.filled { box-shadow: inset 0 0 0 1px var(--border-strong); }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .pick-fill .cell.head.pending { background: color-mix(in srgb, var(--axis, #202a38) 45%, var(--panel2)); color: #edf2f6; }
+  .pick-fill .cell.filled { background: color-mix(in srgb, var(--who, #202a38) 16%, var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--who, #00e5ff) 38%, transparent); }
+}
+.pick-fill .cell .name-txt { max-width: 100%; overflow: hidden; text-overflow: ellipsis; word-break: normal; font-weight: 600; }
+.pick-fill .cell.empty-pick:hover { box-shadow: inset 0 0 0 2px var(--pick-color, var(--accent)); }
+.pick-fill .cell.empty-pick:not(.selected)[role=button]:hover::after { content: "+"; font-size: 1.3rem; font-weight: 600; color: var(--pick-color, var(--accent)); }
+.pick-fill .cell.selected, .pick-fill .cell.empty-pick.selected:hover { background: var(--pick-color, var(--accent)); box-shadow: none; }
+.pick-fill .cell.selected::after { content: "\2713"; font-size: 1.2rem; font-weight: 800; color: var(--on-accent); }
+.pick-fill .cell.is-unpaid { box-shadow: inset 0 0 0 2px var(--danger); }
+.pick-fill .cell.is-tappable:hover { box-shadow: inset 0 0 0 2px var(--accent); }
+/* Under 700 px the grid scrolls sideways (squares stay at least 44 px), so the team bars, which
+   would not scroll with it, give way to the matchup in the top bar. */
+@media (max-width: 699px) {
+  .main.pick-main { padding: 12px 10px calc(16px + var(--sab)); }
+  .pick-fill .board-grid-outer { display: block; }
+  .pick-fill .teamA-label, .pick-fill .teamB-label { display: none; }
+  .pick-fill .board-card { padding: 12px; }
+  .board-head { gap: 14px; }
+  .pick-fill .board-legend { flex-direction: column; align-items: flex-start; gap: 6px; }
+}
+
+@media (min-width: 1024px) {
+  .pick-fill.is-two, .pick-fill.is-three {
+    --cell-min: 44px;
+    /* What the height leaves for 11 rows: the top bar, page and card padding, stats, team bar,
+       gaps and legend are the rest. */
+    --cell-h: calc((100vh - 298px - var(--sat) - var(--sab)) / 11);
+    display: grid;
+    max-width: none;
+    justify-content: center;
+    align-items: stretch;
+    gap: 18px;
+  }
+  .pick-fill.is-three {
+    --side-w: clamp(280px, 21.5vw, 380px);
+    --cell: clamp(var(--cell-min), min(calc((min(100vw, 1800px) - 48px - 36px - 100px - 2 * var(--side-w)) / 11), var(--cell-h)), 100px);
+    grid-template-columns: var(--side-w) max-content var(--side-w);
+  }
+  .pick-fill.is-two {
+    --side-w: clamp(330px, 31vw, 420px);
+    --cell: clamp(var(--cell-min), min(calc((100vw - 48px - 18px - 100px - var(--side-w)) / 11), var(--cell-h)), 100px);
+    grid-template-columns: max-content var(--side-w);
+  }
+  .pick-fill.is-two > .card, .pick-fill.is-three > .card { min-width: 0; }
+  .pick-fill.is-wide > .pick-players, .pick-fill.is-wide > .pick-side { display: flex; flex-direction: column; height: 0; min-height: 100%; }
+  .pick-fill .pick-players.card { padding: 16px 18px; }
+  .pick-side, .pick-fill .fill-players { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+  .pick-fill.is-three .fill-players { flex: 1 1 0; min-height: 80px; overflow-y: auto; scrollbar-gutter: stable; padding-right: 4px; border-top: 1px solid var(--border); }
+  .pick-fill.is-wide .pick-side { overflow-y: auto; }
+  .pick-fill.is-wide .pick-side > .pick-sec { flex: 0 0 auto; }
+  /* The lock closes the panel at the same line as the board. */
+  .pick-fill.is-wide .pick-foot { flex: 1 0 auto; display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+  .pick-fill.is-wide .lock-sec { margin-top: auto; }
+  .pick-fill.is-two .players-sec { flex: 1 1 0 !important; min-height: 0; overflow-y: auto; }
+  .pick-fill.is-two .players-sec:not([hidden]) + .pick-foot { flex: 0 0 auto; }
+  .pick-fill.is-wide .board-card { justify-self: center; }
+  .pick-fill.is-wide .board-scroll { padding-bottom: 0; overflow: visible; }
+  .pick-fill.is-wide .board-table { grid-template-columns: repeat(11, var(--cell)); grid-auto-rows: var(--cell); width: max-content; }
+  .pick-fill.is-wide .cell,
+  .pick-fill.is-wide .cell.empty-pick[role=button] { min-width: 0; min-height: 0; }
+  .pick-fill.is-wide .cell.head { font-size: 1rem; }
+  .pick-fill.is-wide .cell .name-txt { padding-top: 0; font-size: clamp(0.62rem, calc(var(--cell) * 0.2), 0.85rem); }
+}
+/* A short laptop window: tighter, so the panel and the grid still fit. */
+@media (min-width: 1024px) and (max-height: 800px) {
+  .main.pick-main { padding: 8px 24px; }
+  .pick-fill.is-two, .pick-fill.is-three { --cell-h: calc((100vh - 258px - var(--sat)) / 11); }
+  .topbar.pick-topbar:not(.gd-topbar-phone) { min-height: 64px; padding: 4px 20px; }
+  .pick-topbar:not(.gd-topbar-phone) .gd-head { gap: 0; }
+  .pick-fill .board-card { padding: 10px 14px; }
+  .board-head { margin-bottom: 8px; min-height: 40px; }
+  .pick-fill .board-legend { margin-top: 8px; }
+  .pick-fill .teamB-label { padding: 0 10px; }
+  .pick-side .pick-sec, .pick-foot .pick-sec { padding: 10px 16px 12px; }
+  .add-sec .add-title, .pick-seg { margin-bottom: 8px; }
+  .pick-form .checkbox-label { margin: 0; }
+  button.add-btn, button.lock-btn { min-height: 44px; padding-top: 6px; padding-bottom: 6px; }
+  .tap-hint { margin-top: 6px; }
+  .pick-sec > p:not(.tap-hint) { margin-bottom: 8px; font-size: 0.85rem; line-height: 1.35; }
+  .pick-fill .pick-players.card { padding: 12px 16px; }
+}
+/* A mouse needs less than a finger, so a short laptop window still shows the whole grid. */
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .pick-fill.is-two, .pick-fill.is-three { --cell-min: 34px; }
+}
+
+/* The picking screen's top bar: the same Home, matchup and Connect as Game Day, with the matchup
+   in the exact center whatever is on either side. */
+.pick-topbar.gd-topbar-phone .gd-meta { white-space: normal; line-height: 1.25; font-size: 0.75rem; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.topbar.pick-topbar { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; min-height: 72px; gap: 10px; }
+.pick-topbar .home-btn { justify-self: start; }
+.pick-topbar .gd-head { align-items: center; text-align: center; gap: 3px; }
+.pick-topbar .gd-match { max-width: 100%; justify-content: center; }
+.pick-topbar .gd-meta { max-width: 100%; }
+.pick-topbar .nav { justify-content: flex-end; }
+.pick-topbar button.gd-bar-btn.gd-connect { width: 44px; padding: 0; }
+.pick-topbar .gd-connect span { display: none; }
+@media (min-width: 1024px) {
+  .topbar.pick-topbar:not(.gd-topbar-phone) { grid-template-columns: 300px minmax(0, 1fr) 300px; }
+  .pick-topbar:not(.gd-topbar-phone) .gd-head { flex-direction: column; align-items: center; gap: 3px; }
+  .pick-topbar:not(.gd-topbar-phone) button.gd-bar-btn.gd-connect { width: auto; padding: 0 16px; }
+  .pick-topbar:not(.gd-topbar-phone) .gd-connect span { display: inline; }
+}
+
+/* ---- Small dialogs: payment, player picks ---- */
+.pick-dialog { width: 100%; max-width: 420px; margin: 0; border-radius: 12px; border-color: var(--border-strong); box-shadow: var(--shadow-pop); display: flex; flex-direction: column; gap: 14px; }
+.pick-dialog h3 { margin: 0; font-size: 1.3rem; }
+.pick-dialog-sub { margin: -10px 0 0; color: var(--muted); font-size: 0.9rem; }
+.dialog-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 44px; margin: 0; font-size: 1rem; font-weight: 600; color: var(--text); }
+.dialog-row label { margin: 0; font-size: 1rem; font-weight: 600; color: var(--text); }
+.dialog-row small { display: block; font-size: 0.85rem; font-weight: 400; color: var(--muted); }
+.dialog-row input[type=checkbox] { width: 24px; height: 24px; flex: none; accent-color: var(--accent); }
+.dialog-row input[type=number] { width: 96px; flex: none; }
+button.danger-line { min-height: 46px; background: transparent; color: #ff8a80; border-color: var(--danger-border); box-shadow: none; }
+button.danger-line:hover { background: var(--danger-soft); color: #ff8a80; border-color: var(--danger); }
+.pick-dialog-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.pick-dialog-actions button { min-height: 48px; }
+.pick-dialog .money-boxes { margin: 0; }
+.pay-dialog { max-width: 380px; }
+.pay-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 600; }
+.pay-step { display: flex; align-items: center; gap: 8px; }
+.pay-step button { width: 44px; height: 44px; padding: 0; font-size: 1.25rem; }
+.pay-count { min-width: 64px; text-align: center; font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+button.pay-full { background: transparent; color: var(--good); border-color: var(--good); box-shadow: none; }
+button.pay-full:hover { background: var(--good-soft); color: var(--good); border-color: var(--good); }
+
 
 /* ---- Connect (R29): a bottom sheet on a phone, a popover on a wide screen ---- */
 .connect-layer { position: fixed; inset: 0; z-index: 100; }

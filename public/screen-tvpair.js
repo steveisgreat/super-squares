@@ -111,6 +111,18 @@
   // an HDMI TV, Mirror this phone) and Scoring (hand score entry to another phone). A bottom sheet on
   // a phone, a popover under the Connect button on a wide screen. Party View is its own top-bar
   // button, so there is no "open it here" row.
+  // Tabler "devices" (MIT, 24 px outline), for the Connect button.
+  const DEVICES_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 9a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1v-10z"/><path d="M18 8v-3a1 1 0 0 0 -1 -1h-13a1 1 0 0 0 -1 1v12a1 1 0 0 0 1 1h9"/><path d="M16 9h2"/></svg>';
+  // The top-bar button that opens Connect (Game Day and picking).
+  function button(game) {
+    const btn = el('button', 'gd-bar-btn gd-connect room-btn', `${DEVICES_ICON}<span>Connect</span>`);
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Connect');
+    btn.setAttribute('aria-haspopup', 'dialog');
+    btn.addEventListener('click', () => open(game, btn));
+    return btn;
+  }
+
   let openChooser = null;
   // The board this host's TVs were last moved to from this tab, so returning to an
   // earlier board moves them back (a Set would skip it).
@@ -164,7 +176,7 @@
           <div class="room-row"><button type="button" id="room-mirror">Mirror this phone</button></div>
         </div>
       </section>
-      <section class="room-opt" aria-labelledby="room-score-h">
+      <section class="room-opt" aria-labelledby="room-score-h"${game.status === 'picking' ? ' hidden' : ''}>
         <h4 id="room-score-h">Scoring</h4>
         <p><strong>Score from another phone.</strong> Hand score entry for this board to one phone. It scans a code; no sign-in.</p>
         <div class="room-row"><button type="button" id="room-score">Show the scoring code</button></div>
@@ -319,6 +331,6 @@
     SBS.api.followTv(game.id, { prompt: false }).catch(() => { /* not the owner, or signed out */ });
   }
 
-  SBS.deviceChooser = { open, onGameDay };
+  SBS.deviceChooser = { open, button, onGameDay };
   SBS.screens.tvPair = renderTvPair;
 })();

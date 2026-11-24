@@ -771,7 +771,7 @@
         <p style="color:var(--muted); font-size:0.9rem;">At this time, the app will automatically lock square picking and generate the grid numbers.</p>
       </div>
 
-      <label class="checkbox-label"><input type="checkbox" id="f-guest-on"${guestStart.on ? ' checked' : ''}> <span>Let guests pick their own squares</span></label>
+      <label class="checkbox-label"><input type="checkbox" id="f-guest-on"${guestStart.on ? ' checked' : ''}> <span>Allow picks in Player View</span></label>
       <div id="guest-wrap" class="${guestStart.on ? '' : 'hidden'}">
         <label for="f-guest-max">Most squares per person</label>
         <input type="number" id="f-guest-max" min="1" max="100" step="1" value="${escapeHtml(guestStart.max)}">
@@ -1016,7 +1016,7 @@
         return showErr('Most squares per person must be a whole number from 1 to 100.');
       }
       if (guestOn && guestLiftValue && isNaN(new Date(guestLiftValue).getTime())) {
-        return showErr('Choose a valid date and time for the guest limit, or clear it.');
+        return showErr('Choose a valid date and time for the pick limit, or clear it.');
       }
       // UTC with its zone, like the cutoff, so the server's clock agrees with the host's.
       const guestLiftAt = guestLiftValue && !isNaN(new Date(guestLiftValue).getTime()) ? new Date(guestLiftValue).toISOString() : null;

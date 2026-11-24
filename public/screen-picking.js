@@ -3,8 +3,8 @@
   'use strict';
 
   const SBS = window.SBS = window.SBS || {};
-  const { el, textEl, escapeHtml, money, topbar, showConfirm, showAlert, applyTeamColors, teamBadge, fitTeamBadges, overlayEl } = SBS.ui;
-  const { unpaidTotal, openManagePlayersModal, resolveNameForPick, ensurePlayerColor, addSquares, replaceGame, formatAt, ensurePlayers, renameSquares, collectNameGroups } = SBS.players;
+  const { el, textEl, escapeHtml, money, topbar, showConfirm, showAlert, applyTeamColors, teamBadge, fitTeamBadges, isPhone, overlayEl } = SBS.ui;
+  const { openManagePlayersModal, resolveNameForPick, ensurePlayerColor, addSquares, replaceGame, formatAt, ensurePlayers, renameSquares, collectNameGroups } = SBS.players;
   const { shuffle, lockGame, isPlayerName, unpaidGuestPicks, pruneEmptyPlayers, parsePlayerList } = window.GameLogic;
 
   // Guards the one irreversible action in the app (drawing the axis numbers).
@@ -15,6 +15,9 @@
   // loses it. One board at a time.
   let pasteDraft = { id: null, text: '' };
 
+  // Which tab and which way of adding is open, kept the same way (every save redraws the screen).
+  let view = { id: null, tab: 'add', mode: 'one' };
+
   const NAME_RACE = 'Someone just picked under that name. Check the list and try again.';
 
   function renderPicking(game) {
@@ -23,38 +26,26 @@
     app.innerHTML = '';
     const reopen = () => SBS.go({ screen: 'picking', game });
 
+    const phone = isPhone();
+    if (view.id !== game.id) view = { id: game.id, tab: 'add', mode: pasteDraft.id === game.id && pasteDraft.text ? 'paste' : 'one' };
     const headerMeta = [SBS.ui.leagueBadge(game.league), escapeHtml(SBS.ui.shownDescription(game) || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
-    const bar = topbar(`${teamBadge(game, 'A', { logoSize: 22, cls: 'team-badge-sm' })}<span class="vs-sep">vs</span>${teamBadge(game, 'B', { logoSize: 22, cls: 'team-badge-sm' })}<span class="header-year">${headerMeta}</span>`);
+    // The top bar: Home, the matchup in the exact center, then (wide) the join chip, and Connect.
+    const bar = topbar('', [], { hideIcon: true, homeLeft: true });
+    bar.classList.add('gd-topbar', 'pick-topbar');
+    if (phone) bar.classList.add('gd-topbar-phone');
+    const head = el('div', 'gd-head');
+    const match = el('h1', 'gd-match badge-fit',
+      `${teamBadge(game, 'A', { logoSize: 20, cls: 'team-badge-sm' })}<span class="vs-sep">vs</span>${teamBadge(game, 'B', { logoSize: 20, cls: 'team-badge-sm' })}`);
+    head.append(match, el('div', 'gd-meta', headerMeta));
+    bar.replaceChild(head, bar.querySelector('h1'));
     const nav = bar.querySelector('.nav');
-    const manageBtn = el('button', 'secondary', 'Manage Players');
-    manageBtn.addEventListener('click', () => openManagePlayersModal(game, reopen));
-    nav.appendChild(manageBtn);
+    if (!phone && game.joinCode) nav.appendChild(SBS.playerView.joinChip(game));
+    nav.appendChild(SBS.deviceChooser.button(game));
     app.appendChild(bar);
     fitTeamBadges(bar);
 
-    const main = el('div', 'main');
+    const main = el('div', 'main pick-main');
     app.appendChild(main);
-
-    main.appendChild(el('h2', 'pick-title', 'Pick Your Squares'));
-    // The cards below are built here and put in the layout, in their reading order, further
-    // down: on a wide screen that order is the visual one (board left, panel right), and on a
-    // phone it is the order of the page, so the keyboard always follows what is on screen.
-    const joinCard = SBS.playerView.joinCard(game);
-
-    const strip = el('div', 'stat-strip');
-    function drawStrip() {
-      const filled = game.squares.filter(s => s).length;
-      const unpaid = unpaidTotal(game);
-      // Sold and pot sit above the board on a wide screen, so only the other two show there.
-      strip.innerHTML = `
-        <div class="stat-box fill-dup"><div class="val">${100 - filled}</div><div class="lbl">Squares Available</div></div>
-        <div class="stat-box"><div class="val">${money(game.squarePrice)}</div><div class="lbl">Per Square</div></div>
-        <div class="stat-box fill-dup"><div class="val">${money(filled * game.squarePrice)}</div><div class="lbl">Pot So Far</div></div>
-        <div class="stat-box ${unpaid > 0 ? 'warn' : ''} clickable" id="unpaid-stat"><div class="val">${money(unpaid)}</div><div class="lbl">Unpaid Total</div></div>
-      `;
-      strip.querySelector('#unpaid-stat').addEventListener('click', () => openManagePlayersModal(game, reopen));
-    }
-    drawStrip();
 
     // A save that lost to a guest's pick is re-applied to the newer board (SBS.saveWith).
     // null: the failure was handled here (a dialog, or the screen moved on).
@@ -79,117 +70,202 @@
       SBS.go({ screen: 'picking', game });
     }
 
-    // ---- Guest picks card (only on a board where guests were ever allowed) ----
-    let gcard = null;
-    if (game.guestPick) {
+    // ---- Player picks: a row in the panel; the settings open in a dialog ----
+    const picksSec = el('section', 'pick-sec picks-row');
+    picksSec.setAttribute('aria-label', 'Player picks');
+    function drawPicksRow() {
       const gp = game.guestPick;
-      gcard = el('div', 'card guest-card');
-      const unpaidGuest = unpaidGuestPicks(game);
-      const limit = gp.lifted ? 'No limit'
-        : gp.liftAt && Date.parse(gp.liftAt) > Date.now() ? `Up to ${gp.max} squares each until ${formatAt(Date.parse(gp.liftAt) / 1000)}`
-        : gp.liftAt ? 'No limit (the time has passed)' : `Up to ${gp.max} squares each`;
-      gcard.innerHTML = `<h3>Guest picks</h3>
-        <p class="guest-state" role="status">${gp.on ? 'On: anyone with the link can claim squares.' : 'Off: guests can only look. Their picks stay.'} <span class="guest-limit">${escapeHtml(limit)}.</span></p>`;
-      const gerr = el('div', 'error-msg hidden');
-      gcard.appendChild(gerr);
-      const showGErr = (m) => { gerr.textContent = m; gerr.classList.remove('hidden'); };
-      const row = el('div', 'actions guest-actions');
-      const setGuest = async (patch) => {
-        const r = await persist(doc => { doc.guestPick = Object.assign({}, doc.guestPick, patch); }, showGErr);
-        if (!r) return;
-        SBS.go({ screen: 'picking', game: r.game });
-      };
-      const addBtn = (cls, label, onClick) => { const b = textEl('button', cls, label); b.type = 'button'; b.addEventListener('click', onClick); row.appendChild(b); return b; };
-      addBtn(gp.on ? 'secondary' : '', gp.on ? 'Turn guest picks off' : 'Turn guest picks on', () => setGuest({ on: !gp.on }));
-      addBtn('secondary', gp.lifted ? 'Bring the limit back' : 'Let everyone pick more', () => setGuest({ lifted: !gp.lifted }));
-      gcard.appendChild(row);
+      const limit = !gp || !gp.on ? 'Only you can add squares'
+        : gp.lifted || (gp.liftAt && Date.parse(gp.liftAt) <= Date.now()) ? 'No limit per person'
+        : `Up to ${gp.max} square${gp.max === 1 ? '' : 's'} each${gp.liftAt ? ` until ${formatAt(Date.parse(gp.liftAt) / 1000)}` : ''}`;
+      picksSec.innerHTML = `<div class="picks-info"><h3>Player picks: ${gp && gp.on ? 'On' : 'Off'}</h3><p>${escapeHtml(limit)}</p></div>`;
+      const change = textEl('button', 'secondary', 'Change');
+      change.type = 'button';
+      change.setAttribute('aria-label', 'Change player picks');
+      change.setAttribute('aria-haspopup', 'dialog');
+      change.addEventListener('click', openPicksDialog);
+      picksSec.appendChild(change);
+    }
 
-      const capRow = el('div', 'guest-cap-row');
-      capRow.innerHTML = `<label for="g-max">Most squares per person</label><input type="number" id="g-max" min="1" max="100" step="1" value="${escapeHtml(gp.max)}">`;
-      const capSave = textEl('button', 'secondary', 'Save limit');
-      capSave.type = 'button';
-      capSave.addEventListener('click', () => {
-        const v = Number(capRow.querySelector('#g-max').value);
-        if (!Number.isInteger(v) || v < 1 || v > 100) return showGErr('Enter a whole number from 1 to 100.');
-        setGuest({ max: v });
-      });
-      capRow.appendChild(capSave);
-      gcard.appendChild(capRow);
+    function openPicksDialog() {
+      const opener = document.activeElement;
+      const gp = game.guestPick || { on: false, max: 5, liftAt: null, lifted: false };
+      const overlay = overlayEl('0.65');
+      const box = el('div', 'card pick-dialog');
+      box.setAttribute('role', 'dialog');
+      box.setAttribute('aria-modal', 'true');
+      box.setAttribute('aria-labelledby', 'pp-title');
+      box.innerHTML = `
+        <h3 id="pp-title">Player picks</h3>
+        <label class="dialog-row"><span>Allow picks in Player View<small>Anyone with the link can claim squares.</small></span><input type="checkbox" id="pp-on"${gp.on ? ' checked' : ''}></label>
+        <div class="dialog-row"><label for="pp-max">Most squares per person</label><input type="number" id="pp-max" min="1" max="100" step="1" value="${escapeHtml(gp.max)}"></div>
+        <label class="dialog-row"><span>Lift the limit now<small>${gp.liftAt && !gp.lifted ? `It ${Date.parse(gp.liftAt) > Date.now() ? 'ends on its own' : 'ended'} ${escapeHtml(formatAt(Date.parse(gp.liftAt) / 1000))}.` : 'Players can pick as many as they like.'}</small></span><input type="checkbox" id="pp-lift"${gp.lifted ? ' checked' : ''}></label>
+        <div class="error-msg hidden" role="alert"></div>`;
+      const err = box.querySelector('.error-msg');
+      const showE = (m) => { err.textContent = m; err.classList.remove('hidden'); };
 
-      const clear = textEl('button', 'danger', 'Remove unpaid guest picks');
+      const unpaid = unpaidGuestPicks(game);
+      const n = unpaid.squares.length;
+      const clear = textEl('button', 'danger-line', n ? `Remove ${n} unpaid player pick${n === 1 ? '' : 's'}` : 'No unpaid player picks');
       clear.type = 'button';
-      clear.disabled = unpaidGuest.squares.length === 0;
+      clear.disabled = n === 0;
+      box.appendChild(clear);
+
+      const actions = el('div', 'pick-dialog-actions');
+      const cancel = textEl('button', 'secondary', 'Cancel');
+      const save = textEl('button', '', 'Save');
+      [cancel, save].forEach(b => { b.type = 'button'; actions.appendChild(b); });
+      box.appendChild(actions);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+      box.querySelector('#pp-on').focus();
+
+      function onKey(e) { if (e.key === 'Escape') close(); }
+      function close() {
+        if (!overlay.isConnected) return; // also runs when the screen changes
+        document.removeEventListener('keydown', onKey);
+        overlay.remove();
+        if (opener && opener.isConnected) opener.focus();
+      }
+      document.addEventListener('keydown', onKey);
+      overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+      SBS.onLeaveScreen(close);
+      cancel.addEventListener('click', close);
+
+      save.addEventListener('click', async () => {
+        const next = { on: box.querySelector('#pp-on').checked, max: Number(box.querySelector('#pp-max').value), lifted: box.querySelector('#pp-lift').checked };
+        if (!Number.isInteger(next.max) || next.max < 1 || next.max > 100) return showE('Enter a whole number from 1 to 100.');
+        // Only what the host changed here is written, so another device's change is kept.
+        const patch = {};
+        Object.keys(next).forEach(k => { if (next[k] !== gp[k]) patch[k] = next[k]; });
+        if (!Object.keys(patch).length) return close();
+        save.disabled = true;
+        const r = await persist(doc => { doc.guestPick = Object.assign({ on: false, max: 5, liftAt: null, lifted: false }, doc.guestPick, patch); }, showE);
+        save.disabled = false;
+        if (!r) return;
+        close();
+        SBS.go({ screen: 'picking', game: r.game });
+      });
+
       clear.addEventListener('click', async () => {
-        const n = unpaidGuest.squares.length;
-        const ok = await showConfirm(`Remove ${n} unpaid square${n === 1 ? '' : 's'} picked by ${unpaidGuest.people} guest${unpaidGuest.people === 1 ? '' : 's'}? Squares marked paid stay. This cannot be undone.`);
+        const ok = await showConfirm(`Remove ${n} unpaid square${n === 1 ? '' : 's'} picked by ${unpaid.people} player${unpaid.people === 1 ? '' : 's'} in Player View? Squares marked paid stay. This cannot be undone.`);
         if (!ok) return;
         const r = await persist(doc => {
           const now = unpaidGuestPicks(doc);
-          if (now.squares.length !== n) return 'Guest picks changed while you were confirming. Check the card and try again.';
+          if (now.squares.length !== n) return 'Player picks changed while you were confirming. Check and try again.';
           now.squares.forEach(i => { doc.squares[i] = null; });
           pruneEmptyPlayers(doc);
-        }, showGErr);
+        }, showE);
         if (!r) return;
+        close();
         if (r.refused) return refusedReload(r);
         SBS.go({ screen: 'picking', game: r.game });
       });
-      const clearWrap = el('div', 'actions');
-      clearWrap.appendChild(clear);
-      gcard.appendChild(clearWrap);
-      gcard.appendChild(el('p', 'player-muted', unpaidGuest.squares.length
-        ? `${unpaidGuest.squares.length} unpaid square${unpaidGuest.squares.length === 1 ? '' : 's'} from ${unpaidGuest.people} guest${unpaidGuest.people === 1 ? '' : 's'}.`
-        : 'No unpaid guest picks.'));
     }
 
-    // pick-fill is the fill-the-grid layout (R25): it only applies from 1024 px up, and never on
-    // a phone. Below that this is one column in the same reading order.
-    const layout = el('div', 'pick-fill');
-    if (SBS.ui.isPhone()) layout.classList.add('is-phone');
+    // From 1280 px: panel, board, players (the order of the tabs). From 1024 px: board, panel (players are a tab). Below
+    // that, or on a phone, one column: the tabs, the board, then player picks and the lock.
+    const layout = el('div', 'pick-fill' + (phone ? ' is-phone' : ''));
     main.appendChild(layout);
+    const boardCard = el('div', 'card board-card');
+    const side = el('div', 'card pick-side');
+    const foot = el('div', 'pick-foot');
 
-    // ---- Claim card: the pick form ----
-    const formCard = el('div', 'card claim-card');
-    formCard.appendChild(el('h3', '', 'Claim Squares'));
+    // ---- Tabs (hidden when the players have their own column) ----
+    const tabBar = el('div', 'gd-tabs pick-tabs');
+    tabBar.setAttribute('role', 'tablist');
+    tabBar.setAttribute('aria-label', 'Squares');
+    const addSec = el('section', 'pick-sec add-sec');
+    const playersSec = el('section', 'pick-sec players-sec');
+    const tabs = { add: { panel: addSec, label: 'Add squares' }, players: { panel: playersSec, label: 'Players' } };
+    Object.keys(tabs).forEach((k, i, keys) => {
+      const t = tabs[k].btn = el('button', 'gd-tab', tabs[k].label);
+      t.type = 'button';
+      t.id = `pick-tab-${k}`;
+      t.setAttribute('role', 'tab');
+      t.setAttribute('aria-controls', `pick-panel-${k}`);
+      tabs[k].panel.id = `pick-panel-${k}`;
+      t.addEventListener('click', () => selectTab(k));
+      t.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        e.preventDefault();
+        const to = keys[1 - i];
+        selectTab(to);
+        tabs[to].btn.focus();
+      });
+      tabBar.appendChild(t);
+    });
+    let threeCols = false;
+    function selectTab(k) {
+      view.tab = k;
+      Object.keys(tabs).forEach(o => {
+        const on = o === k;
+        tabs[o].btn.setAttribute('aria-selected', String(on));
+        tabs[o].btn.tabIndex = on ? 0 : -1;
+        tabs[o].panel.hidden = threeCols ? o !== 'add' : !on;
+      });
+    }
+    side.append(tabBar, addSec, playersSec);
+
+    // ---- Add squares: one player, or a pasted list ----
+    addSec.appendChild(el('h3', 'add-title', 'Add squares'));
+    const onePane = el('div', 'one-pane');
+    const canPaste = game.pickMode !== 'manual';
+    const seg = el('div', 'pick-seg');
+    if (canPaste) {
+      seg.setAttribute('role', 'group');
+      seg.setAttribute('aria-label', 'How to add squares');
+      [['one', 'One player'], ['paste', 'Paste a list']].forEach(([k, label]) => {
+        const b = textEl('button', '', label);
+        b.type = 'button';
+        b.dataset.mode = k;
+        b.addEventListener('click', () => setMode(k));
+        seg.appendChild(b);
+      });
+      addSec.appendChild(seg);
+    } else {
+      view.mode = 'one';
+    }
+    function setMode(k) {
+      view.mode = k;
+      seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === k)));
+      onePane.hidden = k !== 'one';
+      if (pasteCard) pasteCard.hidden = k !== 'paste';
+    }
 
     const errBox = el('div', 'error-msg hidden');
-    formCard.appendChild(errBox);
-    function showErr(msg) { errBox.textContent = msg; errBox.classList.remove('hidden'); }
+    errBox.setAttribute('role', 'alert');
+    addSec.append(errBox, onePane);
+    // Whatever tab is open, the message is where the host can see it.
+    function showErr(msg) { errBox.textContent = msg; errBox.classList.remove('hidden'); selectTab('add'); }
     function clearErr() { errBox.classList.add('hidden'); }
 
-    const formWrap = el('div');
+    // "Claiming for" panel: shown in place of the form from the first selected square until Done or
+    // Cancel. Already paid stays, so it can still be changed.
+    const manualBanner = el('div', 'manual-banner hidden');
+    manualBanner.setAttribute('aria-label', 'Claiming for');
+    const manualBtns = el('div', 'manual-actions hidden');
+    const formWrap = el('div', 'pick-form');
     formWrap.innerHTML = `
-      <label>Player Name</label>
-      <input type="text" id="p-name" placeholder="Enter name" maxlength="10">
-      <label># of Squares</label>
-      <input type="number" id="p-count" min="1" max="100">
-      <label class="checkbox-label"><input type="checkbox" id="p-paid" checked> <span>Mark as Paid</span></label>
+      <div class="pick-fields">
+        <div><label for="p-name">Name</label><input type="text" id="p-name" placeholder="Enter name" maxlength="10" autocomplete="off"></div>
+        <div><label for="p-count">Squares</label><input type="number" id="p-count" min="1" max="100"></div>
+      </div>
+      <label class="checkbox-label"><input type="checkbox" id="p-paid" checked> <span>Already paid</span></label>
     `;
-    formCard.appendChild(formWrap);
+    onePane.append(manualBanner, formWrap, manualBtns);
 
-    let mode = game.pickMode === 'both' ? 'auto' : game.pickMode;
-    if (game.pickMode === 'both') {
-      const modeGroup = el('div', 'radio-group centered', '');
-      modeGroup.style.margin = '14px 0';
-      const autoP = el('div', 'pill active', 'Auto Pick'); autoP.dataset.val = 'auto';
-      const manP = el('div', 'pill', 'Manual Pick'); manP.dataset.val = 'manual';
-      [autoP, manP].forEach(p => {
-        p.addEventListener('click', () => {
-          modeGroup.querySelectorAll('.pill').forEach(x => x.classList.remove('active'));
-          p.classList.add('active');
-          mode = p.dataset.val;
-        });
-      });
-      modeGroup.appendChild(autoP);
-      modeGroup.appendChild(manP);
-      formCard.appendChild(el('label', '', 'Pick Method'));
-      formCard.appendChild(modeGroup);
-    }
-
-    const actionBtn = el('button', 'pick full-width', game.pickMode === 'manual' ? 'Start Manual Pick' : 'Pick Squares');
-    formCard.appendChild(el('div', 'actions', '')).appendChild(actionBtn);
     // Tapping open squares claims them in manual and both modes; in auto they stay inert.
     const tapToClaim = game.pickMode !== 'auto';
-    if (tapToClaim) formCard.appendChild(el('p', 'tap-hint', 'Or type a name, then tap open squares on the board.'));
+    let actionBtn = null;
+    if (game.pickMode !== 'manual') {
+      actionBtn = el('button', 'full-width add-btn', 'Auto-pick squares');
+      actionBtn.type = 'button';
+      onePane.appendChild(actionBtn);
+    }
+    if (tapToClaim) onePane.appendChild(el('p', 'tap-hint', actionBtn ? 'or tap open squares on the board' : 'Type a name, then tap open squares on the board.'));
+    const fullNote = el('p', 'tap-hint full-note hidden', 'Every square is taken. Tap a square on the board to remove it or give it to someone else.');
+    addSec.insertBefore(fullNote, canPaste ? seg : errBox);
 
     // ---- Manual selection state ----
     let manualSelecting = false;
@@ -201,19 +277,18 @@
     let manualHadName = false;
     let saving = false;
 
-    // "Claiming for" panel: shown from the first selected square until Done or Cancel.
     // manualTarget 0 means no target (the # of squares was left blank): "3 picked".
-    const manualBanner = el('div', 'manual-banner hidden');
-    manualBanner.setAttribute('aria-label', 'Claiming for');
-    formCard.insertBefore(manualBanner, errBox);
     const playerPrice = () => parseFloat(game.squarePrice) || 0;
     const openSquares = () => game.squares.map((s, i) => s ? -1 : i).filter(i => i >= 0);
 
     function updateManualBanner() {
       // The banner is redrawn on every tap and poll: keep the keyboard on the same button.
-      const had = document.activeElement && manualBanner.contains(document.activeElement) ? document.activeElement.dataset.act : null;
+      const had = document.activeElement && manualBtns.contains(document.activeElement) ? document.activeElement.dataset.act : null;
       manualBanner.innerHTML = '';
+      manualBtns.innerHTML = '';
       manualBanner.classList.toggle('hidden', !manualSelecting);
+      manualBtns.classList.toggle('hidden', !manualSelecting);
+      addSec.classList.toggle('is-claiming', manualSelecting);
       if (!manualSelecting) return;
       const n = manualSelected.length;
       const count = manualTarget ? `${n} of ${manualTarget} picked` : `${n} picked`;
@@ -224,7 +299,7 @@
       status.setAttribute('role', 'status');
       manualBanner.appendChild(status);
       manualBanner.appendChild(el('div', 'manual-paid', `${escapeHtml(manualName)} ${manualPaid ? 'paid' : 'owes'} ${escapeHtml(amount)}`));
-      const btns = el('div', 'manual-actions');
+      const btns = manualBtns;
       const other = manualTarget - n;
       if (game.pickMode === 'both' && manualTarget && other > 0) {
         const autoBtn = el('button', 'secondary', `Auto-pick the other ${other}`);
@@ -246,12 +321,13 @@
         manualSelecting = false;
         manualSelected = [];
         pruneEmptyPlayers(game); // the preview gave this name a color; without squares it is nobody
-        renderPicking(game);
+        const y = window.scrollY;
+        reopen(); // through SBS.go, so this screen's poll and cutoff timers end with it
+        window.scrollTo(0, y);
       });
       btns.appendChild(confirmBtn);
       btns.appendChild(cancelBtn);
-      manualBanner.appendChild(btns);
-      if (had) { const b = manualBanner.querySelector(`[data-act="${had}"]`); if (b && !b.disabled) b.focus(); }
+      if (had) { const b = manualBtns.querySelector(`[data-act="${had}"]`); if (b && !b.disabled) b.focus(); }
     }
 
     // Adds random open squares to the selection until it reaches the target. Done still saves once.
@@ -296,7 +372,6 @@
         manualSelected = manualSelected.filter(i => !game.squares[i]);
         const lost = before - manualSelected.length;
         showErr(lost ? `${lost} of your squares ${lost === 1 ? 'was' : 'were'} just taken. The rest are still selected.` : r.refused);
-        drawStrip();
         return refreshPreview();
       }
       manualSelecting = false;
@@ -304,7 +379,7 @@
       SBS.go({ screen: 'picking', game: r.game });
     }
 
-    actionBtn.addEventListener('click', async () => {
+    if (actionBtn) actionBtn.addEventListener('click', async () => {
       clearErr();
       const rawName = formWrap.querySelector('#p-name').value.trim();
       const count = parseInt(formWrap.querySelector('#p-count').value, 10);
@@ -312,39 +387,26 @@
       if (!rawName) return showErr('Please enter a player name.');
       if (!isPlayerName(rawName)) return showErr('That name is not allowed. Choose a different name.');
       if (!count || count < 1) return showErr('Please enter a valid number of squares.');
-      const emptyIdx = game.squares.map((s, i) => s ? -1 : i).filter(i => i >= 0);
-      if (count > emptyIdx.length) return showErr(`Only ${emptyIdx.length} squares remain.`);
+      const open = openSquares().length;
+      if (count > open) return showErr(`Only ${open} squares remain.`);
 
       const out = {};
       const hadName = collectNameGroups(game).has(rawName.toLowerCase());
       const name = await resolveNameForPick(game, rawName, out);
       if (!name) return; // host cancelled at the duplicate-name prompt
-
-      if (mode === 'auto') {
-        if (saving) return;
-        saving = true;
-        const r = await persist(doc => {
-          const refused = nameGuard(doc, name, out.rename, hadName);
-          if (refused) return refused;
-          const empty = doc.squares.map((s, i) => s ? -1 : i).filter(i => i >= 0);
-          if (count > empty.length) return `Only ${empty.length} squares remain.`;
-          addSquares(doc, name, shuffle(empty).slice(0, count), paidChecked);
-        }, showErr);
-        saving = false;
-        if (!r) return;
-        if (r.refused) return refusedReload(r);
-        SBS.go({ screen: 'picking', game: r.game });
-      } else {
-        manualSelecting = true;
-        manualTarget = count;
-        manualSelected = [];
-        manualName = name;
-        manualPaid = paidChecked;
-        manualRename = out.rename || null;
-        manualHadName = hadName;
-        updateManualBanner();
-        refreshPreview();
-      }
+      if (saving) return;
+      saving = true;
+      const r = await persist(doc => {
+        const refused = nameGuard(doc, name, out.rename, hadName);
+        if (refused) return refused;
+        const empty = doc.squares.map((s, i) => s ? -1 : i).filter(i => i >= 0);
+        if (count > empty.length) return `Only ${empty.length} squares remain.`;
+        addSquares(doc, name, shuffle(empty).slice(0, count), paidChecked);
+      }, showErr);
+      saving = false;
+      if (!r) return;
+      if (r.refused) return refusedReload(r);
+      SBS.go({ screen: 'picking', game: r.game });
     });
 
     formWrap.querySelector('#p-paid').addEventListener('change', (e) => {
@@ -354,8 +416,7 @@
     });
 
     // ---- Tap an open square (manual and both modes) ----
-    // With no selection yet, the tap starts one with the typed name (the same checks as the
-    // button); with one, it selects or un-selects the square.
+    // With no selection yet, the tap starts one with the typed name; with one, it selects or un-selects the square.
     let starting = false;
     async function onOpenTap(idx) {
       if (saving || starting) return;
@@ -369,12 +430,13 @@
           manualSelected.push(idx);
         }
         clearErr();
+        selectTab('add');
         return refreshPreview();
       }
       clearErr();
       const nameInput = formWrap.querySelector('#p-name');
       const rawName = nameInput.value.trim();
-      if (!rawName) { showErr('Type a name first, then tap squares.'); nameInput.focus(); return; }
+      if (!rawName) { setMode('one'); showErr('Type a name first, then tap squares.'); nameInput.focus(); return; }
       if (!isPlayerName(rawName)) return showErr('That name is not allowed. Choose a different name.');
       // The # of squares is optional here: blank means no target.
       const countRaw = formWrap.querySelector('#p-count').value.trim();
@@ -399,6 +461,8 @@
       manualPaid = formWrap.querySelector('#p-paid').checked;
       manualRename = out.rename || null;
       manualHadName = hadName;
+      selectTab('add');
+      setMode('one');
       refreshPreview();
     }
 
@@ -418,7 +482,7 @@
       const when = typeof sq.at === 'number' ? `Claimed ${formatAt(sq.at)}` : 'Claim time not recorded';
       box.innerHTML = `<h3 style="margin-top:0"></h3>
         <p class="player-sub">Row ${Math.floor(idx / 10) + 1}, column ${idx % 10 + 1}</p>
-        <p>${escapeHtml(when)}${byGuest ? '. Picked by the guest on their own phone.' : '. Picked by you.'}</p>`;
+        <p>${escapeHtml(when)}${byGuest ? '. Picked in Player View.' : '. Picked by you.'}</p>`;
       box.querySelector('h3').textContent = sq.name;
       const err = el('div', 'error-msg hidden');
       box.appendChild(err);
@@ -500,31 +564,53 @@
       });
     }
 
-    // ---- Right: board preview + host controls ----
-    const finishWrap = el('div', 'card finish-card');
-    finishWrap.innerHTML = `<h3>Host Controls</h3><p style="color:var(--muted)">When picking is complete (or you want to lock it early), generate the grid numbers and begin the game. This cannot be undone.</p>`;
-    const lockBtn = el('button', 'danger', 'Finish Picking & Generate Numbers');
+    // ---- Lock the board ----
+    const lockSec = el('section', 'pick-sec lock-sec');
+    lockSec.setAttribute('aria-label', 'Lock the board');
+    lockSec.innerHTML = '<h3></h3><p></p>';
+    const lockBtn = el('button', 'full-width lock-btn', 'Lock board and draw numbers');
+    lockBtn.type = 'button';
     lockBtn.addEventListener('click', async () => {
       const ok = await showConfirm('Lock the grid and randomly generate axis numbers now? Square picking cannot be resumed after this.');
       if (!ok) return;
       startGame();
     });
-    finishWrap.appendChild(el('div', 'actions', '')).appendChild(lockBtn);
+    lockSec.appendChild(lockBtn);
+    foot.append(picksSec, lockSec);
 
-    const boardCard = el('div', 'card board-card');
-    const fillHead = el('div', 'fill-head');
-    boardCard.appendChild(fillHead);
-    const boardTitle = el('h3', 'board-title', '');
-    boardCard.appendChild(boardTitle);
+    // ---- The board: what is sold above it, how to use it below ----
+    const boardHead = el('div', 'board-head');
+    boardHead.innerHTML = `
+      <div class="sold"><div class="sold-line"><span><strong data-v="sold"></strong> of 100 sold</span><span data-v="open"></span></div>
+        <div class="sold-bar" aria-hidden="true"><div></div></div></div>
+      <div class="board-stat"><span class="lbl">Pot</span><span class="val is-pot" data-v="pot"></span></div>
+      <div class="board-stat"><span class="lbl">Per square</span><span class="val" data-v="price"></span></div>`;
+    boardCard.appendChild(boardHead);
     const boardHolder = el('div');
     boardHolder.id = 'board-holder';
     boardCard.appendChild(boardHolder);
-    boardCard.appendChild(el('div', 'board-legend', '<span class="legend-chip"></span> Square is claimed but not paid for'));
+    const boardFoot = el('div', 'board-legend', '<span class="board-hint"></span><span class="legend-unpaid"><span class="legend-chip"></span> Not paid yet</span>');
+    boardCard.appendChild(boardFoot);
 
     function drawPreview() {
       const filled = game.squares.filter(s => s).length;
-      boardTitle.textContent = `Board Preview (${filled}/100 sold) ${manualSelecting ? '— tap empty squares to claim' : tapToClaim ? '— tap an open square to claim it, or a claimed one to see who has it' : '— tap a claimed square to see who has it'}`;
-      fillHead.innerHTML = `<strong>${filled}</strong> of 100 sold &middot; <strong>${money(filled * game.squarePrice)}</strong> so far`;
+      const open = 100 - filled;
+      const full = open === 0;
+      const put = (k, v) => { boardHead.querySelector(`[data-v="${k}"]`).textContent = v; };
+      put('sold', String(filled));
+      put('open', `${open} open`);
+      put('pot', money(filled * game.squarePrice));
+      put('price', money(game.squarePrice));
+      boardHead.querySelector('.sold-bar div').style.width = filled + '%';
+      boardFoot.querySelector('.board-hint').textContent = manualSelecting ? 'Tap more squares, or tap a picked one to undo.'
+        : tapToClaim && !full ? 'Tap an open square to claim it, or a name to see who has it.' : 'Tap a name to see who has it.';
+      addSec.classList.toggle('is-full', full && !manualSelecting);
+      fullNote.classList.toggle('hidden', !full || manualSelecting);
+      lockSec.classList.toggle('is-ready', full);
+      lockSec.querySelector('h3').textContent = full ? 'Sold out' : 'When everyone is in';
+      lockSec.querySelector('p').textContent = full
+        ? 'Lock the board to draw the numbers and go to Game Day. This cannot be undone.'
+        : `${open} square${open === 1 ? ' is' : 's are'} still open. Locking draws the numbers and ends picking for good.`;
       SBS.board.renderPickBoard(boardHolder, game, {
         selecting: manualSelecting,
         selected: manualSelected,
@@ -540,9 +626,10 @@
       updateManualBanner();
     }
 
-    // ---- Players in the panel (wide screens): who has what, and the Paid pill (shared with Game Day) ----
+    // ---- Players: who has what and who owes (shared with Game Day) ----
     const players = SBS.players.playersCard({
-      cls: 'fill-only',
+      cls: 'pick-players',
+      emptyText: 'No one is in yet. Add the first player, or share the join code.',
       getGame: () => game,
       save: persist,
       manage: () => openManagePlayersModal(game, reopen),
@@ -553,29 +640,29 @@
     const playersCard = players.el;
     const drawPlayers = players.draw;
 
-    // ---- Paste a list of players (wide screens; auto and both modes) ----
+    // ---- Paste a list of players (auto and both modes) ----
     let pasteCard = null;
     let pasteBox = null;
     let pasteNote = '';
     let pasteStatus = null;
     let pasteMsg = null;
     let pasteBtn = null;
-    if (game.pickMode !== 'manual') {
-      pasteCard = el('div', 'card paste-card fill-only');
-      pasteCard.innerHTML = `<h3>Paste a list</h3>
-        <label for="paste-list">One player per line: name, number of squares, then unpaid if they have not paid.</label>
+    if (canPaste) {
+      pasteCard = el('div', 'paste-card');
+      pasteCard.innerHTML = `<label for="paste-list">One player per line: name, squares, then “unpaid” if they still owe.</label>
         <textarea id="paste-list" rows="5" spellcheck="false" autocomplete="off" placeholder="Lee 5&#10;Ann 3 unpaid"></textarea>`;
       pasteBox = pasteCard.querySelector('#paste-list');
       pasteStatus = el('div', 'paste-status');
       pasteStatus.setAttribute('role', 'status');
       pasteMsg = el('div', 'paste-msg');
       pasteMsg.setAttribute('role', 'status');
-      pasteBtn = el('button', 'pick full-width', 'Add and auto-pick');
+      pasteBtn = el('button', 'full-width add-btn', 'Add everyone');
       pasteBtn.type = 'button';
       pasteBtn.addEventListener('click', addPasted);
       pasteCard.appendChild(pasteStatus);
       pasteCard.appendChild(pasteMsg);
-      pasteCard.appendChild(el('div', 'actions', '')).appendChild(pasteBtn);
+      pasteCard.appendChild(pasteBtn);
+      addSec.appendChild(pasteCard);
       if (pasteDraft.id === game.id) pasteBox.value = pasteDraft.text;
       pasteBox.addEventListener('input', () => {
         pasteDraft = { id: game.id, text: pasteBox.value };
@@ -649,33 +736,47 @@
         const lost = before - manualSelected.length;
         showErr(`${lost} of your squares ${lost === 1 ? 'was' : 'were'} just taken. The rest are still selected.`);
       }
-      drawStrip();
       drawPlayers();
+      drawPicksRow();
       updatePaste();
       refreshPreview();
     }
 
-    // The page order is the visual order, so the keyboard follows it: the panel order on a wide
-    // screen, and join code, stats and guest picks first everywhere else.
+    // The page order is the visual order, so the keyboard follows it.
     const wideQuery = window.matchMedia('(min-width: 1024px)');
+    const threeQuery = window.matchMedia('(min-width: 1280px)');
     function placeCards() {
-      const wide = wideQuery.matches && !SBS.ui.isPhone();
-      const order = wide
-        ? [formCard, boardCard, pasteCard, playersCard, joinCard, strip, gcard, finishWrap]
-        : [joinCard, strip, gcard, formCard, boardCard, finishWrap, pasteCard, playersCard];
+      const wide = wideQuery.matches && !phone;
+      threeCols = threeQuery.matches && !phone;
       const focused = document.activeElement;
-      order.forEach(n => { if (n) layout.appendChild(n); });
+      layout.classList.toggle('is-wide', wide);
+      layout.classList.toggle('is-three', threeCols);
+      layout.classList.toggle('is-two', wide && !threeCols);
+      tabBar.hidden = threeCols;
+      Object.keys(tabs).forEach(k => {
+        if (threeCols) { tabs[k].panel.removeAttribute('role'); tabs[k].panel.removeAttribute('aria-labelledby'); }
+        else { tabs[k].panel.setAttribute('role', 'tabpanel'); tabs[k].panel.setAttribute('aria-labelledby', tabs[k].btn.id); }
+      });
+      playersCard.classList.toggle('card', threeCols);
+      foot.classList.toggle('card', !wide);
+      if (!threeCols) playersSec.appendChild(playersCard);
+      if (wide) side.appendChild(foot);
+      const order = threeCols ? [side, boardCard, playersCard] : wide ? [boardCard, side] : [side, boardCard, foot];
+      order.forEach(n => layout.appendChild(n));
+      selectTab(view.tab);
       if (focused && focused !== document.activeElement && layout.contains(focused)) focused.focus();
     }
-    placeCards();
     // (addListener: iPads before Safari 14 have no addEventListener on a media query)
-    if (wideQuery.addEventListener) wideQuery.addEventListener('change', placeCards); else wideQuery.addListener(placeCards);
+    [wideQuery, threeQuery].forEach(q => { if (q.addEventListener) q.addEventListener('change', placeCards); else q.addListener(placeCards); });
     SBS.onLeaveScreen(() => {
-      if (wideQuery.removeEventListener) wideQuery.removeEventListener('change', placeCards); else wideQuery.removeListener(placeCards);
+      [wideQuery, threeQuery].forEach(q => { if (q.removeEventListener) q.removeEventListener('change', placeCards); else q.removeListener(placeCards); });
     });
+    setMode(view.mode);
     drawPlayers();
+    drawPicksRow();
     updatePaste();
-    drawPreview();
+    placeCards();
+    drawPreview(); // last: the frame measures the board where it ends up
 
     let cutoffBlocked = false;
     async function startGame() {
@@ -720,8 +821,9 @@
       SBS.setManagedInterval(checkCutoff, 5000);
     }
 
-    // Something the host has typed or is typing here. A full redraw would wipe it.
+    // Something the host has typed or is typing here, or has open. A full redraw would wipe it.
     function hostIsTyping() {
+      if (document.querySelector('.pick-dialog, .connect-layer')) return true;
       const a = document.activeElement;
       if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && a.type !== 'checkbox' && main.contains(a)) return true;
       return !!formWrap.querySelector('#p-name').value || !!formWrap.querySelector('#p-count').value || !!(pasteBox && pasteBox.value);
@@ -738,8 +840,7 @@
         if (!fresh.updatedAt || fresh.updatedAt === game.updatedAt) return;
         if (fresh.status === 'started' || fresh.status === 'finished' || (!manualSelecting && !hostIsTyping())) {
           const locked = fresh.status === 'started' || fresh.status === 'finished';
-          // The panel is tall on a wide screen and guests pick often: keep the place instead of
-          // jumping to the top.
+          // Players pick often: keep the place instead of jumping to the top.
           const y = window.scrollY;
           SBS.go({ screen: locked ? 'board' : 'picking', game: fresh });
           if (!locked) window.scrollTo(0, y);

@@ -7,8 +7,6 @@
   const { el, escapeHtml, money, topbar, showAlert, showConfirm, applyTeamColors, teamBadge, teamStyle, fitTeamBadges, readableTextColor, isPhone } = SBS.ui;
   const { unpaidTotal, openManagePlayersModal } = SBS.players;
   const { disturbMessage } = SBS.ui;
-  // Tabler "devices" (MIT, 24 px outline), for the Connect button.
-  const DEVICES_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 9a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1v-10z"/><path d="M18 8v-3a1 1 0 0 0 -1 -1h-13a1 1 0 0 0 -1 1v12a1 1 0 0 0 1 1h9"/><path d="M16 9h2"/></svg>';
   const { QUARTERS, QLABEL, computeGame, payoutAmount, drawnDigits, payoutStatus, whoToPay, paidQuartersDisturbed } = window.GameLogic;
 
   // Silver Lombardi-style trophy for the NFL quarter-end celebration.
@@ -221,19 +219,7 @@
     bar.replaceChild(head, bar.querySelector('h1'));
     const nav = bar.querySelector('.nav');
 
-    if (!phone && game.joinCode) {
-      const wrap = el('div', 'gd-chip-wrap');
-      const chip = el('button', 'gd-chip',
-        `<span class="gd-chip-label">Join</span><span class="gd-chip-code">${escapeHtml(game.joinCode)}</span>${SBS.ui.COPY_ICON}`);
-      chip.type = 'button';
-      chip.setAttribute('aria-label', `Join code ${game.joinCode.split('').join(' ')}. Copy the join link`);
-      const note = el('div', 'gd-chip-note');
-      note.setAttribute('role', 'status');
-      note.setAttribute('aria-live', 'polite');
-      chip.addEventListener('click', () => SBS.playerView.copyJoinLink(game, note));
-      wrap.append(chip, note);
-      nav.appendChild(wrap);
-    }
+    if (!phone && game.joinCode) nav.appendChild(SBS.playerView.joinChip(game));
     if (!phone) {
       const pill = el('button', 'gd-onair', '<span class="gd-onair-dot" aria-hidden="true"></span>On the TV &middot; Stop');
       pill.type = 'button';
@@ -252,11 +238,7 @@
     partyBtn.addEventListener('click', () => {
       SBS.go(phone ? { screen: 'mirror', id: game.id, from: 'board' } : { screen: 'tv', id: game.id, from: 'board' });
     });
-    const connectBtn = el('button', 'gd-bar-btn gd-connect room-btn', `${DEVICES_ICON}<span>Connect</span>`);
-    connectBtn.type = 'button';
-    connectBtn.setAttribute('aria-haspopup', 'dialog');
-    connectBtn.addEventListener('click', () => SBS.deviceChooser.open(game, connectBtn));
-    nav.append(partyBtn, connectBtn);
+    nav.append(partyBtn, SBS.deviceChooser.button(game));
     app.appendChild(bar);
     const main = el('div', 'main' + (phone ? ' gd-phone' : ''));
     app.appendChild(main);

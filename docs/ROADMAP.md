@@ -299,6 +299,17 @@ the account button drops its chevron). Party View adds one history entry, so a p
 remote's Back leaves it like Exit, and that entry remembers where it was opened from, so Exit
 still returns Home after a reload. Not tried: a real TV remote and TV browser.
 
+**R31. Picking screen redesign and part payments** — `Opus` — ✅ built 2026-11-24 (Steve approved
+the mock, then moved Players to the right). Depends on: R25, R28, R29. Centered matchup with the
+join chip and Connect; the board in a team-colored frame with "?" until the lock; three columns
+from 1280 px (Add squares, Player picks and the lock; the board; Players), two from 1024 px with
+Players as a tab, one below that and on a phone. Manual pick is a tap on the board, and paste a
+list works on every size. Player picks settings open in a dialog, and the screen's join card and
+Connect's Scoring section (before the lock) are gone. "Guest picks" is now "Player picks: Allow
+picks in Player View"; the guest page is Player View. Part payments:
+[decision 020](decisions/020-paid-per-square.md). Not tried on a real iPad or phone. The privacy
+and terms pages still say "guest picks" (wording waits for the lawyer review).
+
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
 
 **R8. Cache board reads at the edge** — `Opus` — Depends on: R3, R4a.

@@ -59,7 +59,7 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `GET /api/join/:code` | public; a join code resolves to `{ id }` (decision 016); 400 malformed, 404 unknown |
 | `POST /api/game/:id/guest` | anyone with the board id; `{ name }` this device holds, sets `sbs_guest` (180 d, `Path=/api/game/<id>`) if it has none; 409 unless guest picks are on and the board is picking (decision 019) |
 | `PATCH /api/game/:id/guest` | a device with that key; claim or release its own squares, one atomic write → `{ game, name }`; 400, 401 (never the host prompt), 409 with the current `game` |
-| `GET /<code>` (6 characters) | static; serves `index.html`, which resolves the code and opens the guest view |
+| `GET /<code>` (6 characters) | static; serves `index.html`, which resolves the code and opens Player View |
 | `PATCH /api/game/:id/payout` | host only; mark a quarter paid out, undo, or settle (decision 015); a record only, no money moves |
 
 "Host only" means the board's owner in accounts mode: another account gets 403, and the
@@ -97,8 +97,8 @@ cutoff rules, shared with the server and unit-tested), `teams.js` (NFL/NBA names
 colors and ESPN logo URLs), `qrcode.js`, `core.js` (API client, routing, sign-in prompt by mode and 401 replay, 403 handling), `ui.js`,
 `players.js`, `board.js`, `score-panel.js` (manual score; keyboard scoring on a laptop), `present.js` (Present on an HDMI TV:
 Party View in its own window, on the second screen when the browser can), then screens: `screen-home` (Home: top bar with New game and the account menu, Today / Coming up / Past games sections of cards with a primary button, Party View and a ⋯ menu, tiles for a TV browser; also setup and the version
-footer), `screen-picking`, `screen-gameday`, `screen-phone` (score entry),
-`screen-player` (read-only My Squares), `screen-tvpair` (TV pairing and the Connect box),
+footer), `screen-picking` (three columns from 1280 px, two from 1024 px, else one; `players.js` has the Players card and payment box it shares with Game Day), `screen-gameday`, `screen-phone` (score entry),
+`screen-player` (Player View: pick while picking is open, then My Squares), `screen-tvpair` (TV pairing and the Connect box),
 `screen-mirror` (Mirror mode for one phone, `#mirror-<id>`: TV-style board, score strip on tap),
 `screen-handoff` (scorer-phone code and the `#handoff-<token>` page), and `app.js` (hash router: `#tv-<id>`,
 `#score-<id>`, `#player-<id>`). Every polling screen refetches its game about every 8 s.

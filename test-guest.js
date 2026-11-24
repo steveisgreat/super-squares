@@ -414,6 +414,45 @@ function pure() {
     eq(G.paidAfterAdd(0, 0, 2, false), { paid: false, paidSquares: undefined }, 'nothing paid');
     eq(G.paidAfterAdd(0, 0, 2, true), { paid: true, paidSquares: undefined }, 'new name, ticked');
   });
+  t('hostAddSquares: adding squares never pays for, or un-pays, the ones a name already had', () => {
+    const add = (players, ticked) => {
+      const g = held({ 0: 'Ann', 1: 'Ann', 2: 'Ann', 3: 'Ann' }, players);
+      G.hostAddSquares(g, 'Ann', [10, 11], ticked, 500);
+      const s = G.owedSummary(g).Ann;
+      return [s.count, s.paidCount, s.owed, s.paid];
+    };
+    const price = held({}, {}).squarePrice;
+    // A name only the host has added (no tag) follows the same rule as one picked in Player View.
+    eq(add({ Ann: { paid: true } }, false), [6, 4, 2 * price, false], 'paid for 4, then 2 unpaid');
+    eq(add({ Ann: { paid: false } }, true), [6, 2, 4 * price, false], 'owes for 4, then 2 paid');
+    eq(add({ Ann: { paid: true } }, true), [6, 6, 0, true], 'all paid');
+    eq(add({ Ann: { paid: false } }, false), [6, 0, 6 * price, false], 'none paid');
+    eq(add({ Ann: { paid: false, paidSquares: 1 } }, true), [6, 3, 3 * price, false], 'part paid grows');
+    eq(add({ Ann: { paid: true, g: T1 } }, false), [6, 4, 2 * price, false], 'tagged name, as before');
+    eq(add({}, false), [6, 0, 6 * price, false], 'no entry yet');
+  });
+  t('hostAddSquares: stamps the squares, keeps the tag and color, and a name with none left starts clean', () => {
+    const g = held({ 0: 'Ann' }, { Ann: { paid: true, g: T1, color: '#abc123' }, Bo: { paid: true, g: T2, paidSquares: 3 } });
+    G.hostAddSquares(g, 'Ann', [5], false, 777);
+    eq(g.squares[5], { name: 'Ann', at: 777 }, 'stamped');
+    eq(g.players.Ann, { paid: false, g: T1, color: '#abc123', paidSquares: 1 }, 'kept');
+    G.hostAddSquares(g, 'Bo', [6, 7], false, 778);
+    eq(g.players.Bo, { paid: false }, 'nothing carried over');
+    G.hostAddSquares(g, 'Cy', [8], true, 779);
+    eq(g.players.Cy, { paid: true }, 'new name, paid');
+  });
+  t('setPaidCount: the host says how many squares are paid for', () => {
+    const g = held({ 0: 'Ann', 1: 'Ann', 2: 'Ann' }, { Ann: { paid: false, g: T1, color: '#abc123' } });
+    eq(G.setPaidCount(g, 'Ann', 2), true, 'set');
+    eq(g.players.Ann, { paid: false, g: T1, color: '#abc123', paidSquares: 2 }, 'part');
+    eq(G.setPaidCount(g, 'Ann', 3), true, 'set full');
+    eq(g.players.Ann, { paid: true, g: T1, color: '#abc123' }, 'full drops the count');
+    eq(G.setPaidCount(g, 'Ann', 0), true, 'set none');
+    eq(g.players.Ann, { paid: false, g: T1, color: '#abc123' }, 'none');
+    [-1, 4, 1.5, '2', NaN, undefined].forEach(n => eq(G.setPaidCount(g, 'Ann', n), false, 'refused ' + n));
+    eq(G.setPaidCount(g, 'Zed', 0), false, 'nobody');
+    eq(g.players.Ann, { paid: false, g: T1, color: '#abc123' }, 'unchanged');
+  });
   t('pruneEmptyPlayers: a name with no squares loses its entry (and tag); others stay', () => {
     const g = held({ 0: 'Ann' }, { Ann: { paid: false, g: T1 }, Bo: { paid: true, g: T2 }, Cy: { paid: false } });
     G.pruneEmptyPlayers(g);
