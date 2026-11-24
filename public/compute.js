@@ -918,7 +918,7 @@
   function guestCap(game, now) {
     const gp = isRecord(game.guestPick) ? game.guestPick : {};
     if (gp.lifted === true) return Infinity;
-    if (typeof gp.liftAt === 'string') {
+    if (typeof gp.liftAt === 'string' && ZONED_RE.test(gp.liftAt)) {
       const t = Date.parse(gp.liftAt);
       if (!isNaN(t) && (now === undefined ? Date.now() : now) >= t) return Infinity;
     }
