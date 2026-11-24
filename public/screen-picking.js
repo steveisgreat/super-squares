@@ -163,15 +163,15 @@
       });
     }
 
-    // From 1280 px: panel, board, players (the order of the tabs). From 1024 px: board, panel (players are a tab). Below
-    // that, or on a phone, one column: the tabs, the board, then player picks and the lock.
+    // From 1024 px: the board, then one panel. Below that, or on a phone, one column: the tabs, the
+    // board, then player picks and the lock.
     const layout = el('div', 'pick-fill' + (phone ? ' is-phone' : ''));
     main.appendChild(layout);
     const boardCard = el('div', 'card board-card');
     const side = el('div', 'card pick-side');
     const foot = el('div', 'pick-foot');
 
-    // ---- Tabs (hidden when the players have their own column) ----
+    // ---- Tabs ----
     const tabBar = el('div', 'gd-tabs pick-tabs');
     tabBar.setAttribute('role', 'tablist');
     tabBar.setAttribute('aria-label', 'Squares');
@@ -185,6 +185,8 @@
       t.setAttribute('role', 'tab');
       t.setAttribute('aria-controls', `pick-panel-${k}`);
       tabs[k].panel.id = `pick-panel-${k}`;
+      tabs[k].panel.setAttribute('role', 'tabpanel');
+      tabs[k].panel.setAttribute('aria-labelledby', t.id);
       t.addEventListener('click', () => selectTab(k));
       t.addEventListener('keydown', (e) => {
         if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
@@ -195,20 +197,18 @@
       });
       tabBar.appendChild(t);
     });
-    let threeCols = false;
     function selectTab(k) {
       view.tab = k;
       Object.keys(tabs).forEach(o => {
         const on = o === k;
         tabs[o].btn.setAttribute('aria-selected', String(on));
         tabs[o].btn.tabIndex = on ? 0 : -1;
-        tabs[o].panel.hidden = threeCols ? o !== 'add' : !on;
+        tabs[o].panel.hidden = !on;
       });
     }
     side.append(tabBar, addSec, playersSec);
 
     // ---- Add squares: one player, or a pasted list ----
-    addSec.appendChild(el('h3', 'add-title', 'Add squares'));
     const onePane = el('div', 'one-pane');
     const canPaste = game.pickMode !== 'manual';
     const seg = el('div', 'pick-seg');
@@ -637,8 +637,13 @@
       setBusy: (v) => { saving = v; },
       onSaved: (r) => { replaceGame(game, r.game); afterGameChange(); }
     });
-    const playersCard = players.el;
-    const drawPlayers = players.draw;
+    players.el.classList.remove('card'); // it sits inside the panel
+    playersSec.appendChild(players.el);
+    function drawPlayers() {
+      players.draw();
+      const n = new Set(game.squares.filter(Boolean).map(sq => sq.name)).size;
+      tabs.players.btn.textContent = n ? `Players (${n})` : 'Players';
+    }
 
     // ---- Paste a list of players (auto and both modes) ----
     let pasteCard = null;
@@ -744,32 +749,21 @@
 
     // The page order is the visual order, so the keyboard follows it.
     const wideQuery = window.matchMedia('(min-width: 1024px)');
-    const threeQuery = window.matchMedia('(min-width: 1280px)');
     function placeCards() {
       const wide = wideQuery.matches && !phone;
-      threeCols = threeQuery.matches && !phone;
       const focused = document.activeElement;
       layout.classList.toggle('is-wide', wide);
-      layout.classList.toggle('is-three', threeCols);
-      layout.classList.toggle('is-two', wide && !threeCols);
-      tabBar.hidden = threeCols;
-      Object.keys(tabs).forEach(k => {
-        if (threeCols) { tabs[k].panel.removeAttribute('role'); tabs[k].panel.removeAttribute('aria-labelledby'); }
-        else { tabs[k].panel.setAttribute('role', 'tabpanel'); tabs[k].panel.setAttribute('aria-labelledby', tabs[k].btn.id); }
-      });
-      playersCard.classList.toggle('card', threeCols);
       foot.classList.toggle('card', !wide);
-      if (!threeCols) playersSec.appendChild(playersCard);
       if (wide) side.appendChild(foot);
-      const order = threeCols ? [side, boardCard, playersCard] : wide ? [boardCard, side] : [side, boardCard, foot];
+      const order = wide ? [boardCard, side] : [side, boardCard, foot];
       order.forEach(n => layout.appendChild(n));
       selectTab(view.tab);
       if (focused && focused !== document.activeElement && layout.contains(focused)) focused.focus();
     }
     // (addListener: iPads before Safari 14 have no addEventListener on a media query)
-    [wideQuery, threeQuery].forEach(q => { if (q.addEventListener) q.addEventListener('change', placeCards); else q.addListener(placeCards); });
+    if (wideQuery.addEventListener) wideQuery.addEventListener('change', placeCards); else wideQuery.addListener(placeCards);
     SBS.onLeaveScreen(() => {
-      [wideQuery, threeQuery].forEach(q => { if (q.removeEventListener) q.removeEventListener('change', placeCards); else q.removeListener(placeCards); });
+      if (wideQuery.removeEventListener) wideQuery.removeEventListener('change', placeCards); else wideQuery.removeListener(placeCards);
     });
     setMode(view.mode);
     drawPlayers();

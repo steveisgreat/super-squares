@@ -300,10 +300,10 @@ remote's Back leaves it like Exit, and that entry remembers where it was opened 
 still returns Home after a reload. Not tried: a real TV remote and TV browser.
 
 **R31. Picking screen redesign and part payments** — `Opus` — ✅ built 2026-11-24 (Steve approved
-the mock, then moved Players to the right). Depends on: R25, R28, R29. Centered matchup with the
-join chip and Connect; the board in a team-colored frame with "?" until the lock; three columns
-from 1280 px (Add squares, Player picks and the lock; the board; Players), two from 1024 px with
-Players as a tab, one below that and on a phone. Manual pick is a tap on the board, and paste a
+the mock, then dropped its three-column layout for two). Depends on: R25, R28, R29. Centered matchup with the
+join chip and Connect; the board in a team-colored frame with "?" until the lock; two columns
+from 1024 px (the board; one panel with Add squares and Players tabs, Player picks and the lock),
+one below that and on a phone. Manual pick is a tap on the board, and paste a
 list works on every size. Player picks settings open in a dialog, and the screen's join card and
 Connect's Scoring section (before the lock) are gone. "Guest picks" is now "Player picks: Allow
 picks in Player View"; the guest page is Player View. Part payments:
