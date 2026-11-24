@@ -392,7 +392,7 @@
     box.style.cssText = 'max-width:520px; width:100%; box-shadow: var(--shadow-pop);';
     box.innerHTML = `<h3 style="margin-top:0">Scan to view your squares</h3>
       <p style="color:var(--muted)">Point a phone's camera at this code to open the same read-only player view — your squares, quarter winners, and a live status readout. Nothing here can change the game.</p>
-      <p style="color:var(--muted)">First time on this WiFi, the phone may warn the connection isn't private — that's expected on a home network. Tap "Advanced" then "proceed" to continue.</p>
+      <div class="phone-link-intro"></div>
       <div class="phone-link-list">Loading addresses…</div>`;
     overlay.appendChild(box);
     document.body.appendChild(overlay);
@@ -415,6 +415,8 @@
           ? `<div class="phone-qr-block"><div class="phone-qr">${qr}</div><div class="phone-link">${escapeHtml(url)}</div></div>`
           : `<div class="phone-link">${escapeHtml(url)}</div>`;
       } else {
+        // LAN build only: the self-signed certificate warning.
+        box.querySelector('.phone-link-intro').innerHTML = `<p style="color:var(--muted)">First time on this WiFi, the phone may warn the connection isn't private — that's expected on a home network. Tap "Advanced" then "proceed" to continue.</p>`;
         const scheme = hosts.httpsReady ? 'https' : 'http';
         const urls = hosts.addresses.map(ip => `${scheme}://${ip}:${hosts.port}${path}`);
         let qr = '';

@@ -167,11 +167,12 @@ Mock: the "Super-Squares flow redesign mock" design canvas (claude.ai artifact
 `EdFD9pgkFqqtHXdzQgiQmv`, private), with a device map of which screens get their own
 layout. The phone is the baseline (every screen works at 360 px); iPad and laptop get
 their own layouts only around the grid; the TV only shows boards. The order below is
-a proposal; Steve picks what is a launch must-have.
+Steve's call (2026-11-24): all nine are launch must-haves, built in roadmap order.
 
-**R18. Score-link pop-up copy on cloud** — `Haiku` — bug.
+**R18. Score-link pop-up copy on cloud** — `Haiku` — bug — ✅ shipped 2026-11-24.
 "Phone Score Entry" on Vercel shows LAN-only text (same WiFi, self-signed certificate
-warning, Limit IP Address Tracking). Show it only on the LAN build.
+warning, Limit IP Address Tracking). Show it only on the LAN build. The player view's
+"Scan to view your squares" pop-up had the same certificate line; fixed with it.
 *Done:* cloud pop-up has no LAN text; LAN pop-up unchanged.
 
 **R19. Live-first setup** — `Sonnet`.
@@ -314,4 +315,3 @@ office-pool groups.
 2. Ad budget for the final three weeks?
 3. Form an LLC before taking payments?
 4. Product name (R16): pick the public name. Decides the domain.
-5. Milestone 1b (R18–R26): which items are launch must-haves, and in what order?

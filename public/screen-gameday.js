@@ -550,18 +550,18 @@
     const box = el('div', 'card');
     box.style.cssText = 'max-width:520px; width:100%; box-shadow: var(--shadow-pop);';
     box.innerHTML = `<h3 style="margin-top:0">Score entry on your phone</h3>
-      <p style="color:var(--muted)">Point your phone's camera at the code, or type the address in (same WiFi as this PC). You can tap in quarter scores there while the grid stays up on the TV.</p>
-      <p style="color:var(--muted)">The first time you open it, your phone will warn that the connection isn't private — that's expected on a home network with no internet. Tap "Advanced" then "proceed" to continue.</p>
-      <p style="color:var(--muted)">Page won't load at all? On iPhone, go to Settings → Wi-Fi → (ⓘ) next to this network and turn off "Limit IP Address Tracking" — with it on, the phone can't reach other devices on the same network.</p>
+      <div class="phone-link-intro"></div>
       <div class="phone-link-list">Loading addresses…</div>`;
     overlay.appendChild(box);
     document.body.appendChild(overlay);
 
     const list = box.querySelector('.phone-link-list');
+    const intro = box.querySelector('.phone-link-intro');
     try {
       const hosts = await SBS.api.getHosts();
       const path = `${location.pathname}#score-${id}`;
       if (!hosts.addresses.length) {
+        intro.innerHTML = `<p style="color:var(--muted)">Point your phone's camera at the code, or type the address in. You can tap in quarter scores there while the grid stays up on the TV.</p>`;
         // Cloud deploy: there's one public origin and the browser already
         // knows it, so there's no LAN address list to report.
         const url = `${location.origin}${path}`;
@@ -575,6 +575,10 @@
           ? `<div class="phone-qr-block"><div class="phone-qr">${qr}</div><div class="phone-link">${escapeHtml(url)}</div></div>`
           : `<div class="phone-link">${escapeHtml(url)}</div>`;
       } else {
+        // LAN build only: the same-WiFi, certificate and iPhone tips.
+        intro.innerHTML = `<p style="color:var(--muted)">Point your phone's camera at the code, or type the address in (same WiFi as this PC). You can tap in quarter scores there while the grid stays up on the TV.</p>
+          <p style="color:var(--muted)">The first time you open it, your phone will warn that the connection isn't private — that's expected on a home network with no internet. Tap "Advanced" then "proceed" to continue.</p>
+          <p style="color:var(--muted)">Page won't load at all? On iPhone, go to Settings → Wi-Fi → (ⓘ) next to this network and turn off "Limit IP Address Tracking" — with it on, the phone can't reach other devices on the same network.</p>`;
         // Show one QR code, for the first (primary) address — a QR per
         // address was confusing when a PC has more than one adapter. Any
         // other addresses are still listed as plain text as a fallback.
