@@ -887,7 +887,7 @@
       }
     }
     SBS.setManagedInterval(pollLive, 8000);
-    SBS.deviceChooser.onGameDay(game, connectBtn);
+    SBS.deviceChooser.onGameDay(game);
     SBS.onLeaveScreen(() => {
       if (activeDrawReveal) { activeDrawReveal.cancel(); activeDrawReveal = null; }
     });

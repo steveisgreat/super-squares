@@ -32,8 +32,9 @@ another board the TV should move too. A TV must never be able to change anything
   read-only TV view (`renderTV`), without the Exit button.
 - **Device chooser.** "What's in the room?" on Game Day once the board is locked: Show on
   a TV (type the code), Score from another phone (text pointing to today's path, signing
-  in as the host; R24 replaces it), Invite players (the R22 share). It opens once per
-  board on lock and stays on an **In the room** button.
+  in as the host; R24 replaces it), Invite players (the R22 share). It stays on an
+  **In the room** button (**Connect** since R29). It first opened by itself once per board on
+  lock; Steve dropped that on 2026-11-24, so it opens only from the button.
 
 ## Consequences
 - **Deploy order:** apply migration 005 to production before the push that ships R23.

@@ -116,9 +116,7 @@
   // earlier board moves them back (a Set would skip it).
   let lastFollowed = null;
 
-  function seenKey(id) { return `sbs.room.${id}`; }
-
-  function open(game, opener, opts) {
+  function open(game, opener) {
     if (openChooser) return;
     const phone = SBS.ui.isPhone();
     const { CLOSE_ICON, PRINT_ICON } = SBS.ui;
@@ -307,27 +305,18 @@
       }
     });
 
-    // Opened by itself on a phone: don't raise the keyboard over the choices.
     const firstBtn = playersRow.querySelector('button');
-    if (opts && opts.auto && phone) box.querySelector('#room-close').focus();
-    else if (firstBtn) firstBtn.focus();
+    if (firstBtn) firstBtn.focus();
     else box.querySelector('#room-close').focus();
   }
 
   // Called by Game Day when it renders. Once a board is live (locked, not finished): the
-  // host's paired TVs move to it (silent for anyone who is not its owner), and the chooser
-  // opens one time per board. A finished board never pulls TVs off a live game.
-  function onGameDay(game, opener) {
-    if (game.status !== 'started') return;
-    if (lastFollowed !== game.id) {
-      lastFollowed = game.id;
-      SBS.api.followTv(game.id, { prompt: false }).catch(() => { /* not the owner, or signed out */ });
-    }
-    let seen = true;
-    try { seen = !!window.localStorage.getItem(seenKey(game.id)); } catch (e) { seen = true; }
-    if (seen) return;
-    try { window.localStorage.setItem(seenKey(game.id), '1'); } catch (e) { return; }
-    open(game, opener, { auto: true });
+  // host's paired TVs move to it (silent for anyone who is not its owner). A finished board never
+  // pulls TVs off a live game. Connect itself opens only when the host taps its button.
+  function onGameDay(game) {
+    if (game.status !== 'started' || lastFollowed === game.id) return;
+    lastFollowed = game.id;
+    SBS.api.followTv(game.id, { prompt: false }).catch(() => { /* not the owner, or signed out */ });
   }
 
   SBS.deviceChooser = { open, onGameDay };
