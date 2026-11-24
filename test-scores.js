@@ -2,7 +2,7 @@
 //
 // Adapters are checked against saved fixtures in test-fixtures/scores/. Files named
 // *.synthetic.json were built by hand (ESPN: edited from the one captured body;
-// BALLDONTLIE: no full body was ever captured, only poll summaries) and should be
+// BALLDONTLIE: from poll summaries, except bdl-in-2nd.json) and should be
 // replaced with real captures when available. completedQuarters and mergeNoBackward
 // decide when money-adjacent results are written, so they have the densest cases.
 //
@@ -69,9 +69,11 @@ function game(o) {
   const g = Object.assign(base, o);
   if (o.hs !== undefined) g.home = Object.assign({}, g.home, { score: o.hs });
   if (o.as !== undefined) g.away = Object.assign({}, g.away, { score: o.as });
-  if (o.hq) g.home = Object.assign({}, g.home, { quarters: o.hq });
-  if (o.aq) g.away = Object.assign({}, g.away, { quarters: o.aq });
-  delete g.hs; delete g.as; delete g.hq; delete g.aq;
+  const sum = q => q.reduce((t, v) => t + (v || 0), 0);
+  if (o.hq) g.home = Object.assign({}, g.home, { quarters: o.hq }, o.hs === undefined ? { score: sum(o.hq) } : {});
+  if (o.aq) g.away = Object.assign({}, g.away, { quarters: o.aq }, o.as === undefined ? { score: sum(o.aq) } : {});
+  if (o.aot !== undefined) g.away = Object.assign({}, g.away, { ot: o.aot });
+  delete g.hs; delete g.as; delete g.hq; delete g.aq; delete g.aot;
   return g;
 }
 
@@ -201,9 +203,9 @@ function game(o) {
     eq([one('bdl-end-q1.synthetic.json').state, one('bdl-end-q1.synthetic.json').period], ['break', 1]);
     eq([one('bdl-halftime.synthetic.json').state, one('bdl-halftime.synthetic.json').period], ['break', 2]);
     eq([one('bdl-end-q3.synthetic.json').state, one('bdl-end-q3.synthetic.json').period], ['break', 3]);
-    const mid = one('bdl-in-2nd.synthetic.json');
+    const mid = one('bdl-in-2nd.json');
     eq([mid.away.score, mid.home.score, mid.away.quarters, mid.home.quarters], [10, 0, [0, 10, null, null], [0, 0, null, null]]);
-    eq(mid.providerUpdatedAt, '2026-11-24T02:34:30.640Z');
+    eq(mid.providerUpdatedAt, '2026-11-24T02:35:00.506Z');
   });
   await check('bdl: final, overtime, final OT', () => {
     const one = n => bdl.normalize(fixture(n), 'nfl', ET, 'T')[0];
@@ -231,7 +233,7 @@ function game(o) {
 
   // ---- BALLDONTLIE fetchSlate --------------------------------------------
   await check('bdl fetchSlate: one request asking both UTC dates, key in header only', async () => {
-    const f = stubFetch({ bdl: fixture('bdl-in-2nd.synthetic.json') });
+    const f = stubFetch({ bdl: fixture('bdl-in-2nd.json') });
     const r = await bdl.fetchSlate('nfl', ET, { fetch: f });
     assert(r.ok && r.games.length === 1, JSON.stringify(r));
     eq(f.calls.length, 1);
@@ -279,29 +281,29 @@ function game(o) {
 
   // ---- failover -----------------------------------------------------------
   await check('failover: healthy primary with every expected game never calls the secondary', async () => {
-    const f = stubFetch({ espn: fixture('espn-in-q2.json'), bdl: fixture('bdl-in-2nd.synthetic.json') });
+    const f = stubFetch({ espn: fixture('espn-in-q2.json'), bdl: fixture('bdl-in-2nd.json') });
     const r = await scores.fetchWithFailover('nfl', ET, { env: BOTH, fetch: f, expect: EXPECT });
     eq([r.ok, r.provider, f.count('espn'), f.count('bdl')], [true, 'espn', 1, 0]);
     eq(r.missing, []);
   });
   await check('failover: primary HTTP 429 -> secondary used', async () => {
-    const f = stubFetch({ espn: { __status: 429 }, bdl: fixture('bdl-in-2nd.synthetic.json') });
+    const f = stubFetch({ espn: { __status: 429 }, bdl: fixture('bdl-in-2nd.json') });
     const r = await scores.fetchWithFailover('nfl', ET, { env: BOTH, fetch: f, expect: EXPECT });
     eq([r.ok, r.provider, f.count('bdl')], [true, 'balldontlie', 1]);
     eq(r.tried.map(t => [t.provider, t.ok]), [['espn', false], ['balldontlie', true]]);
   });
   await check('failover: primary timeout and bad JSON -> secondary used', async () => {
     const a = await scores.fetchWithFailover('nfl', ET, {
-      env: BOTH, timeoutMs: 30, fetch: stubFetch({ espn: hangUntilAbort, bdl: fixture('bdl-in-2nd.synthetic.json') })
+      env: BOTH, timeoutMs: 30, fetch: stubFetch({ espn: hangUntilAbort, bdl: fixture('bdl-in-2nd.json') })
     });
     eq([a.ok, a.provider, a.tried[0].error], [true, 'balldontlie', 'timeout']);
     const b = await scores.fetchWithFailover('nfl', ET, {
-      env: BOTH, fetch: stubFetch({ espn: { __raw: '{' }, bdl: fixture('bdl-in-2nd.synthetic.json') })
+      env: BOTH, fetch: stubFetch({ espn: { __raw: '{' }, bdl: fixture('bdl-in-2nd.json') })
     });
     eq([b.ok, b.provider, b.tried[0].error], [true, 'balldontlie', 'bad JSON']);
   });
   await check('failover: primary lacks an expected game -> secondary, if it has it', async () => {
-    const f = stubFetch({ espn: { events: [] }, bdl: fixture('bdl-in-2nd.synthetic.json') });
+    const f = stubFetch({ espn: { events: [] }, bdl: fixture('bdl-in-2nd.json') });
     const r = await scores.fetchWithFailover('nfl', ET, { env: BOTH, fetch: f, expect: EXPECT });
     eq([r.provider, r.games.length, r.missing], ['balldontlie', 1, []]);
   });
@@ -317,7 +319,7 @@ function game(o) {
     assert(/espn: HTTP 503/.test(r.error) && /balldontlie: HTTP 429/.test(r.error), r.error);
   });
   await check('failover: no secondary configured -> primary failure returned, one call', async () => {
-    const f = stubFetch({ espn: { __status: 500 }, bdl: fixture('bdl-in-2nd.synthetic.json') });
+    const f = stubFetch({ espn: { __status: 500 }, bdl: fixture('bdl-in-2nd.json') });
     const r = await scores.fetchWithFailover('nfl', ET, { env: { SCORE_PRIMARY: 'espn' }, fetch: f });
     eq([r.ok, f.calls.length], [false, 1]);
   });
@@ -327,7 +329,7 @@ function game(o) {
     eq([r.ok, f.calls.length], [false, 0]);
   });
   await check('failover: swapped roles work (balldontlie primary)', async () => {
-    const f = stubFetch({ espn: fixture('espn-in-q2.json'), bdl: fixture('bdl-in-2nd.synthetic.json') });
+    const f = stubFetch({ espn: fixture('espn-in-q2.json'), bdl: fixture('bdl-in-2nd.json') });
     const r = await scores.fetchWithFailover('nfl', ET, {
       env: { SCORE_PRIMARY: 'balldontlie', SCORE_SECONDARY: 'espn' }, fetch: f, expect: EXPECT
     });
@@ -366,7 +368,7 @@ function game(o) {
   });
   await check('completedQuarters: final with OT uses the total score, not q1-q4', () => {
     const r = scores.completedQuarters(game({
-      state: 'post', period: 5, hs: 17, as: 20, hq: [0, 7, 7, 3], aq: [3, 3, 7, 4]
+      state: 'post', period: 5, hs: 17, as: 20, hq: [0, 7, 7, 3], aq: [3, 3, 7, 4], aot: 3
     }));
     eq(r.final, { home: 17, away: 20 });
     eq(r.q3, { home: 14, away: 13 });
@@ -383,6 +385,50 @@ function game(o) {
     eq(scores.completedQuarters(game({ state: 'in', period: null, clock: null, hq: [0, 0, null, null], aq: [0, 10, null, null] })),
       { q1: { home: 0, away: 0 } });
     eq(scores.completedQuarters(game({ state: 'in', period: null, clock: null, hq: [0, null, null, null], aq: [0, null, null, null] })), {});
+  });
+  await check('completedQuarters: quarters that do not add up to the score settle nothing yet', () => {
+    // The total moved before the quarter field did: q2 here would be short by 7.
+    eq(scores.completedQuarters(game({ state: 'break', period: 2, hs: 7, as: 10, hq: [0, 0, null, null], aq: [0, 10, null, null] })), {});
+    eq(scores.completedQuarters(game({ state: 'post', period: 4, hs: 14, as: 13, hq: [0, 0, 7, 0], aq: [0, 10, 3, 0] })),
+      { final: { home: 14, away: 13 } });
+  });
+  await check('completedQuarters: a game that ended with no scores never pays a 0-0 final', () => {
+    const body = (status, st) => ({ data: [{
+      id: 1, date: '2026-11-24T01:15:00.000Z', status, status_state: st,
+      home_team: { abbreviation: 'WSH' }, visitor_team: { abbreviation: 'CIN' }, home_team_score: null, visitor_team_score: null
+    }] });
+    for (const [status, st] of [['Canceled', 'final'], ['Postponed', 'final'], ['Final', 'final']]) {
+      const g = bdl.normalize(body(status, st), 'nfl', ET, 'T')[0];
+      eq(scores.completedQuarters(g), {}, status);
+    }
+    const e = fixture('espn-final.synthetic.json');
+    e.events[0].competitions[0].competitors.forEach(c => { delete c.score; });
+    assert(!scores.completedQuarters(espn.normalize(e, 'nfl', ET, 'T')[0]).final, 'espn final without scores');
+  });
+  await check('bdl: canceled, postponed or suspended text is never post, even with scores', () => {
+    for (const text of ['Canceled', 'Cancelled', 'Postponed', 'Suspended', 'Delayed', 'Some new text']) {
+      assert(bdl.parseStatus(text, 'final', true).state !== 'post', text);
+    }
+    for (const text of ['Final', 'Final/OT', 'Final OT', 'Final/2OT', 'Final - OT']) {
+      eq(bdl.parseStatus(text, 'final', true).state, 'post', text);
+    }
+  });
+  await check('espn: canceled is never final, even if flagged completed', () => {
+    const e = fixture('espn-final.synthetic.json');
+    e.events[0].competitions[0].status.type = { name: 'STATUS_CANCELED', state: 'post', completed: true };
+    eq(scores.completedQuarters(espn.normalize(e, 'nfl', ET, 'T')[0]), {});
+  });
+  await check('bdl: a zero-filled canceled or postponed game settles nothing', () => {
+    for (const text of ['Canceled', 'Cancelled', 'Postponed']) {
+      const g = { id: 1, date: '2026-11-24T01:15:00.000Z', status: text, status_state: 'final', home_team: { abbreviation: 'WSH' }, visitor_team: { abbreviation: 'CIN' } };
+      for (const s of ['home', 'visitor']) for (const k of ['score', 'q1', 'q2', 'q3', 'q4']) g[s + '_team_' + k] = 0;
+      eq(scores.completedQuarters(bdl.normalize({ data: [g] }, 'nfl', ET, 'T')[0]), {}, text);
+    }
+  });
+  await check('merge: a failed fetch keeps the stored slate', () => {
+    const prev = { provider: 'espn', games: [game({})] };
+    eq(scores.mergeNoBackward(prev, { provider: null, games: [] }, Date.now()), prev);
+    eq(scores.mergeNoBackward(prev, null, Date.now()), prev);
   });
   await check('completedQuarters: from real normalized fixtures', () => {
     const g = bdl.normalize(fixture('bdl-end-q1.synthetic.json'), 'nfl', ET, 'T')[0];
