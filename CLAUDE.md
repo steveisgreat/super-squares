@@ -35,7 +35,7 @@ Details for env vars, deploy and rollback: `docs/runbook.md`.
 | Old migration plan, retired notes | `docs/archive/` (grep it, never read it whole) |
 | Scratch: briefs, ledgers, probe logs | `docs/working/` (git-ignored) |
 
-There is no BRD yet; roadmap items (R0…R15) stand in for requirement IDs. Intake is
+There is no BRD yet; roadmap items (R0…R17) stand in for requirement IDs. Intake is
 GitHub Issues on `steveisgreat/super-squares` (labels `bug`, `feature`, `idea`, `chore`,
 `S1`–`S3`).
 

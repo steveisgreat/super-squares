@@ -43,7 +43,7 @@ Choose library vs. the existing signed-cookie code (new dependency rule applies)
 *Done:* decision entry approved by Steve, with the schema migration and the
 endpoint access table.
 
-**R2. Host accounts build** — `Opus` — Depends on: R1.
+**R2. Host accounts build** — `Opus` — Depends on: R1, R16 (sending domain).
 Implement R1. Migration only adds (expand, then contract). Existing games get
 assigned to Steve's account.
 *Done:* tenant-isolation tests pass in CI (host A cannot list, read-for-write,
@@ -91,7 +91,7 @@ quarter-end detection with and without `period`, host-wins, and claim
 concurrency in both stores; `/code-review medium` clean; a simulated 50-board
 run makes ≤4 provider calls a minute.
 
-**R5. Payments** — `Opus` — Depends on: R2.
+**R5. Payments** — `Opus` — Depends on: R2, R16.
 Stripe Checkout for Big Game Pass and Season Pass, a signed webhook that grants
 the entitlement, free-tier limit enforced server-side, receipts by Stripe.
 Use Stripe test mode until Steve approves live keys.
@@ -105,10 +105,33 @@ lawyer.
 *Done:* pages live on preview; lawyer review booked (Steve).
 
 **R7. Accounts and plans** — `Steve` — Depends on: none.
-Vercel Pro (Hobby forbids commercial use), domain, Neon paid plan with
-autoscaling for game day, Stripe account, optional LLC, trademark check on the
-name (GleanMark connector needs `/mcp` sign-in).
-*Done:* all accounts exist and the domain points at production.
+Vercel Pro (Hobby forbids commercial use), Neon paid plan with autoscaling for
+game day, Stripe account, optional LLC. The domain moved to R16.
+*Done:* all accounts exist.
+
+**R16. Name and domain** — `Sonnet` research, `Steve` buys — Depends on: none.
+**Blocks R2** (magic-link email needs a verified sending domain), **R5** (Stripe
+needs a business website) **and R17.**
+Trademark knockout search on the name (GleanMark connector needs `/mcp` sign-in)
+and a domain shortlist with availability and prices (Vercel domain tools).
+Steve picks and buys. Then DNS: the apex for the website (R17), `app.` for the
+app, and `support@` plus the email-sending records (Resend: SPF, DKIM, DMARC).
+Production loses Vercel Authentication on the custom domain so guests can open
+board links.
+*Done:* domain bought; `app.<domain>` serves production over HTTPS without a
+Vercel sign-in; Resend shows the domain verified; runbook updated.
+
+**R17. Marketing website** — `Opus` plan, `Sonnet` build — Depends on: R16, R6.
+A second profile (**website**) beside the app. First a short decision: where it
+lives (same Vercel project as static pages vs. its own repo) and whether to use
+the RileySoft standard UI. Then the website Phase 1 (audience, message, pages,
+calls to action) and mockups of the home page for Steve's approval. Pages: home
+with the TV-view demo, how it works, pricing (decision 003), FAQ, legal (R6),
+the search pages from R12, and "Start a board" into the app. No NFL marks.
+**Live by 2027-01-04** so search engines index it before the playoffs.
+*Done:* mockups approved; site live on the apex domain; Lighthouse, link check
+and accessibility pass in every look; version in the footer and `<meta
+name="version">`; Search Console set up and pages submitted.
 
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
 
@@ -138,10 +161,8 @@ Error alerts, a status check, the rollback path, and a game-day checklist
 
 ### Milestone 3 — Go to market (2027-01-11 → 2027-02-14)
 
-**R12. Landing and search pages** — `Sonnet` — Depends on: R5, R6.
-Home page with the TV-view demo, pricing, and pages for "football squares
-generator" and "Big Game squares template". No NFL marks.
-*Done:* Lighthouse and link check pass; pages indexed.
+**R12. Landing and search pages** — merged into R17 (2026-11-23), which ships
+them earlier so they are indexed before the playoffs.
 
 **R13. Guest-to-host loop** — `Sonnet` — Depends on: R5.
 "Host your own board" on the player and TV views, with a referral code
@@ -152,7 +173,7 @@ tracked to sign-ups.
 Invite-only use starting with Wild Card weekend (mid-January 2027) as the real
 load test; feedback through GitHub Issues.
 
-**R15. Ads and short videos** — `Steve` (Sonnet drafts copy) — Depends on: R12.
+**R15. Ads and short videos** — `Steve` (Sonnet drafts copy) — Depends on: R17.
 TikTok, Reels and Shorts of the TV grid and the winner reveal; Google and Meta
 ads on generic squares terms in the last three weeks; Reddit and Facebook
 office-pool groups.
@@ -188,4 +209,5 @@ office-pool groups.
 1. Free-tier limit: 25 players, or one free board of any size with the footer?
 2. Ad budget for the final three weeks?
 3. Form an LLC before taking payments?
-4. Keep the name "Super-Squares" pending the trademark check?
+4. Keep the name "Super-Squares" pending the trademark check? (Decides the
+   domain, R16.)
