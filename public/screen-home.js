@@ -3,18 +3,23 @@
   'use strict';
 
   const SBS = window.SBS = window.SBS || {};
-  const { el, escapeHtml, topbar, statusLabel, leagueBadge, showAlert, showConfirm, teamMeta, teamLogoTag, teamBadge, resetTeamColors, fitTeamBadges, isTvBrowser, TV_ICON, PHONE_ICON, PEOPLE_ICON } = SBS.ui;
+  const { el, escapeHtml, topbar, showAlert, showConfirm, teamMeta, teamLogoTag, teamBadge, resetTeamColors, fitTeamBadges, isTvBrowser } = SBS.ui;
   const { emptyGrid } = window.GameLogic;
   const { openManagePlayersModal } = SBS.players;
 
-  const EDIT_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M4 20h4L18.5 9.5a2 2 0 0 0 0-2.8l-1.2-1.2a2 2 0 0 0-2.8 0L4 16v4Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-    <path d="M13 6l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-  </svg>`;
 
-  const X_ICON = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-  </svg>`;
+  // Tabler outline icons (MIT, 24 px, pinned 3.19.0), path data copied inline.
+  const ic = (d, size) => `<svg width="${size || 20}" height="${size || 20}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const PLUS_ICON = ic('<path d="M12 5l0 14"/><path d="M5 12l14 0"/>', 18);
+  const USER_ICON = ic('<path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855"/>', 24);
+  const DOWN_ICON = ic('<path d="M6 9l6 6l6 -6"/>', 16);
+  const DOTS_ICON = ic('<path d="M5 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M19 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/>', 22);
+  const PENCIL_ICON = ic('<path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/>');
+  const LOCK_ICON = ic('<path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/>');
+  const USERS_ICON = ic('<path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0 -3 -3.85"/>');
+  const MOBILE_ICON = ic('<path d="M6 5a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-14z"/><path d="M11 4h2"/><path d="M12 17v.01"/>');
+  const TRASH_ICON = ic('<path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/>');
+  const { MAXIMIZE_ICON, CHEVRON_ICON } = SBS.ui;
 
   function todayValue() {
     const now = new Date();
@@ -33,13 +38,17 @@
   }
   SBS.isArchivedGame = isArchived;
 
-  // "2026-02-08" -> "Feb 8, 2026", parsed as a local date so it never shifts
-  // a day off from what the host actually picked.
-  function formatGameDate(dateStr) {
+  // "2026-12-05" -> "Sat, Dec 5" ("Today" for today), parsed as a local date so
+  // it never shifts a day off from what the host actually picked. A year is
+  // added only when it is not this year.
+  function whenLabel(dateStr) {
     if (!dateStr) return '';
+    if (dateStr === todayValue()) return 'Today';
     const d = new Date(dateStr + 'T00:00:00');
     if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    const opts = { weekday: 'short', month: 'short', day: 'numeric' };
+    if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+    return d.toLocaleDateString(undefined, opts);
   }
 
   async function openGame(id) {
@@ -55,150 +64,259 @@
     }
   }
 
-  // Vibrant accent colors used to flash individual letters of the
-  // "Picking Squares" status while a game is in the picking phase.
-  const PICKING_FX_COLORS = ['#FF3366', '#00FFCC', '#FFD700', '#FF6600', '#9D00FF', '#00FF66', '#FF0055', '#00E5FF'];
-
   // The grid is routinely locked (status -> 'started') well ahead of the
   // real kickoff once squares fill up — while that's true, the card should
-  // read "Kickoff <time>", not "In Progress", since nothing is actually
-  // live yet.
+  // read "Kickoff <time>", not "Live", since nothing is actually live yet.
   function kickoffPending(g) {
     if (g.status !== 'started' || !g.kickoffTime) return false;
     const ms = Date.parse(g.kickoffTime);
     return !isNaN(ms) && ms > Date.now();
   }
 
-  function statusMarkup(g) {
-    if (kickoffPending(g)) {
-      const timeTxt = new Date(g.kickoffTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-      return `<span class="status status-kickoff-pending">Kickoff ${escapeHtml(timeTxt)}</span>`;
+  // Status chip from the fields the games list already carries.
+  function chipFor(g) {
+    if (g.status === 'finished') return { text: 'Final', cls: 'chip-final' };
+    if (g.status === 'started') {
+      if (kickoffPending(g)) {
+        const t = new Date(g.kickoffTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        return { text: 'Kickoff ' + t, cls: 'chip-soon' };
+      }
+      return { text: 'Live', cls: 'chip-live' };
     }
-    if (g.status !== 'picking') {
-      return `<span class="status status-${escapeHtml(g.status)}">${escapeHtml(statusLabel(g.status))}</span>`;
-    }
-    const letters = [...statusLabel(g.status)].map(ch => ch === ' '
-      ? `<span class="letter space"> </span>`
-      : `<span class="letter">${escapeHtml(ch)}</span>`).join('');
-    return `<span class="status status-picking status-picking-fx">${letters}</span>`;
+    return { text: 'Picking squares', cls: 'chip-pick' };
   }
 
-  // Periodically wiggles and color-fills a random letter of the "Picking
-  // Squares" status pill so an idle-looking card still reads as "in
-  // progress" from across the room.
-  function attachPickingFx(container) {
-    const letters = Array.from(container.querySelectorAll('.letter:not(.space)'));
-    if (letters.length === 0) return;
-    let lastIndex = -1;
-    function trigger() {
-      let idx;
-      do {
-        idx = Math.floor(Math.random() * letters.length);
-      } while (idx === lastIndex && letters.length > 1);
-      lastIndex = idx;
-      const box = letters[idx];
-      const color = PICKING_FX_COLORS[Math.floor(Math.random() * PICKING_FX_COLORS.length)];
-      box.classList.add('wiggling');
-      box.style.borderColor = color;
-      box.style.color = color;
-      box.style.boxShadow = `0 0 6px ${color}`;
-      setTimeout(() => {
-        box.style.backgroundColor = color;
-        box.style.color = '#0d1117';
-        box.style.boxShadow = `0 0 10px ${color}`;
-      }, 500);
-      setTimeout(() => box.classList.remove('wiggling'), 900);
-      setTimeout(() => {
-        box.style.backgroundColor = '';
-        box.style.borderColor = '';
-        box.style.color = '';
-        box.style.boxShadow = '';
-      }, 1300);
-    }
-    trigger();
-    SBS.setManagedInterval(trigger, 1800);
+  function primaryLabel(g) {
+    if (g.status === 'started') return 'Open Game Day';
+    if (g.status === 'finished') return 'See results';
+    return 'Pick squares';
   }
 
+  function matchName(g) {
+    return `${g.teamA || 'Team A'} vs ${g.teamB || 'Team B'}`;
+  }
+
+  function descLine(g) {
+    return g.description || `${g.teamA || ''} @ ${g.teamB || ''}`;
+  }
+
+  function chipHtml(g) {
+    const c = chipFor(g);
+    return `<span class="home-chip ${c.cls}"><span class="home-chip-dot" aria-hidden="true"></span>${escapeHtml(c.text)}</span>`;
+  }
+
+  // Party View opens in this tab (like Game Day): the mirror screen on a phone,
+  // the TV board elsewhere. Its Exit comes back to Home.
+  function openPartyView(g) {
+    SBS.go(SBS.ui.isPhone() ? { screen: 'mirror', id: g.id, from: 'home' } : { screen: 'tv', id: g.id, from: 'home' });
+  }
+
+  // ---------- The ⋯ menu and the account menu ----------
+  // A bottom sheet on a phone, a popover anchored under the opener on a wide
+  // screen. Same dialog behavior as Connect: focus moves in and stays in, Escape
+  // or a click outside closes, focus goes back to the opener.
+  let openMenu = null;
+
+  function useSheet() {
+    return SBS.ui.isPhone() || window.innerWidth < 600;
+  }
+
+  // items: { label, icon, sub, danger, disabled, divider, onSelect }
+  function showMenu(opener, o) {
+    if (openMenu) openMenu(true);
+    const sheet = useSheet();
+    const layer = el('div', 'connect-layer ' + (sheet ? 'connect-layer-sheet' : 'connect-layer-pop'));
+    const box = el('div', 'card connect-card home-menu ' + (sheet ? 'connect-sheet' : 'connect-pop home-menu-pop'));
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', o.label);
+    const head = (sheet && o.headerTitle) || o.alwaysHeader
+      ? `<div class="home-menu-head"><div class="home-menu-title">${escapeHtml(o.headerTitle)}</div>${o.headerSub ? `<div class="home-menu-subtitle">${escapeHtml(o.headerSub)}</div>` : ''}</div>`
+      : '';
+    box.innerHTML = (sheet ? '<div class="connect-grab" aria-hidden="true"></div>' : '') + head;
+    const list = el('div', 'home-menu-list');
+    list.setAttribute('role', 'group');
+    o.items.forEach(it => {
+      if (it.divider) { const hr = el('div', 'home-menu-sep'); hr.setAttribute('role', 'separator'); list.appendChild(hr); return; }
+      const b = el('button', 'home-menu-item' + (it.danger ? ' danger-item' : ''),
+        `${it.icon || ''}<span class="home-menu-text"><span>${escapeHtml(it.label)}</span>${it.sub ? `<span class="home-menu-sub">${escapeHtml(it.sub)}</span>` : ''}</span>`);
+      b.type = 'button';
+      if (it.disabled) b.setAttribute('aria-disabled', 'true');
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (it.disabled) return;
+        close(true);
+        it.onSelect();
+      });
+      list.appendChild(b);
+    });
+    box.appendChild(list);
+    layer.appendChild(box);
+    document.body.appendChild(layer);
+    opener.setAttribute('aria-expanded', 'true');
+
+    function place() {
+      if (sheet) return;
+      const r = opener.getBoundingClientRect();
+      const top = Math.round(r.bottom + 6);
+      box.style.top = top + 'px';
+      box.style.right = Math.max(8, Math.round(window.innerWidth - r.right)) + 'px';
+      box.style.maxHeight = `calc(100vh - ${top + 12}px)`;
+    }
+    place();
+    window.addEventListener('resize', place);
+
+    function close(leaving) {
+      document.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('resize', place);
+      layer.remove();
+      openMenu = null;
+      opener.setAttribute('aria-expanded', 'false');
+      if (leaving !== true && opener.isConnected) opener.focus();
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
+      if (e.key !== 'Tab') return;
+      const nodes = Array.from(box.querySelectorAll('button'));
+      if (!nodes.length) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (!box.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    document.addEventListener('keydown', onKey, true);
+    layer.addEventListener('mousedown', (e) => { if (e.target === layer) close(); });
+    openMenu = close;
+    SBS.onLeaveScreen(() => { if (openMenu === close) close(true); });
+    const firstEnabled = Array.from(box.querySelectorAll('button')).find(b => b.getAttribute('aria-disabled') !== 'true') || box.querySelector('button');
+    if (firstEnabled) firstEnabled.focus();
+  }
+
+  async function loadFull(id) {
+    try {
+      return await SBS.api.getGame(id);
+    } catch (err) {
+      showAlert('Failed to load game: ' + err.message);
+      return null;
+    }
+  }
+
+  function openCardMenu(g, opener) {
+    const locked = g.status === 'started' || g.status === 'finished';
+    const items = [
+      {
+        label: 'Edit game', icon: locked ? LOCK_ICON : PENCIL_ICON, disabled: locked,
+        sub: locked ? 'Locked once the numbers are drawn' : '',
+        onSelect: async () => {
+          const game = await loadFull(g.id);
+          if (game) SBS.go({ screen: 'editGame', game });
+        }
+      },
+      {
+        label: 'Players', icon: USERS_ICON,
+        onSelect: async () => {
+          const game = await loadFull(g.id);
+          if (game) openManagePlayersModal(game, null);
+        }
+      }
+    ];
+    if (g.status === 'started') {
+      items.push({
+        label: 'Score from another phone', icon: MOBILE_ICON,
+        onSelect: async () => {
+          const game = await loadFull(g.id);
+          if (game) SBS.handoff.open(game, opener);
+        }
+      });
+    }
+    items.push({ divider: true });
+    items.push({
+      label: 'Delete game…', icon: TRASH_ICON, danger: true,
+      onSelect: async () => {
+        const ok = await showConfirm(`Delete this game (${g.teamA || '?'} vs ${g.teamB || '?'})? This cannot be undone.`);
+        if (!ok) { if (opener.isConnected) opener.focus(); return; }
+        try {
+          await SBS.api.deleteGame(g.id);
+          renderHome();
+        } catch (err) {
+          showAlert('Failed to delete game: ' + err.message);
+        }
+      }
+    });
+    showMenu(opener, {
+      label: 'More for ' + matchName(g),
+      headerTitle: matchName(g),
+      headerSub: `${descLine(g)} · ${chipFor(g).text}`,
+      items
+    });
+  }
+
+  // ---------- Cards ----------
   function buildGameCard(g) {
-    const isTv = isTvBrowser();
-    const c = el('div', 'game-card');
-    const numbersPicked = g.status === 'started' || g.status === 'finished';
+    const name = matchName(g);
+    const c = el('article', 'home-card');
+    c.setAttribute('aria-label', `${name}, ${chipFor(g).text}`);
     c.innerHTML = `
-      ${isTv ? '' : `<button class="icon-btn game-card-delete" type="button" aria-label="Delete Game" title="Delete Game">${X_ICON}</button>`}
-      <span class="game-date">${escapeHtml(formatGameDate(g.gameDate))}</span>
-      <div class="game-card-meta">
-        <div class="game-card-league">${leagueBadge(g.league)}</div>
-      </div>
-      ${g.description ? `<div class="game-card-desc">${escapeHtml(g.description)}</div>`
-        : `<div class="game-card-desc">${escapeHtml(g.teamA || '')} @ ${escapeHtml(g.teamB || '')}</div>`}
-      <div class="teams">${teamBadge(g, 'A', { logoSize: 18, cls: 'team-badge-sm mode-abbr' })}<span class="vs-sep">vs</span>${teamBadge(g, 'B', { logoSize: 18, cls: 'team-badge-sm mode-abbr' })}</div>
-      <div class="game-card-kickoff">${g.kickoffTime ? `Kickoff: ${escapeHtml(SBS.ui.formatKickoffTime(g.kickoffTime))}` : ''}</div>
-      ${statusMarkup(g)}
-      ${isTv ? '' : `
-      <div class="game-card-actions">
-        <button class="icon-btn game-card-edit" type="button" aria-label="Edit Game" title="Edit Game"${numbersPicked ? ' disabled' : ''}>${EDIT_ICON}</button>
-        <button class="icon-btn game-card-tv" type="button" aria-label="Open Party View" title="Party View">${TV_ICON}</button>
-        <button class="icon-btn game-card-phone" type="button" aria-label="Open Phone Score Entry" title="Phone Score Entry">${PHONE_ICON}</button>
-        <button class="icon-btn game-card-people" type="button" aria-label="Manage Players" title="Manage Players">${PEOPLE_ICON}</button>
-      </div>`}
-    `;
-    if (g.status === 'picking') {
-      attachPickingFx(c.querySelector('.status-picking-fx'));
-    }
-    if (isTv) {
-      // On a TV browser there's nothing to manage — the panel is just a
-      // launcher straight into the grid view for that game.
-      c.addEventListener('click', () => SBS.go({ screen: 'tv', id: g.id }));
-      return c;
-    }
+      <div class="home-card-top">${chipHtml(g)}<span class="home-when">${escapeHtml(whenLabel(g.gameDate))}</span></div>
+      <button class="home-more" type="button" aria-label="${escapeHtml('More for ' + name)}" aria-haspopup="dialog" aria-expanded="false">${DOTS_ICON}</button>
+      <div class="home-match badge-fit">${teamBadge(g, 'A', { logoSize: 22, cls: 'home-badge' })}<span class="vs-sep">vs</span>${teamBadge(g, 'B', { logoSize: 22, cls: 'home-badge' })}</div>
+      <div class="home-desc">${escapeHtml(descLine(g))}</div>
+      <div class="home-actions">
+        <button class="home-primary" type="button" aria-label="${escapeHtml(primaryLabel(g) + ': ' + name)}"><span>${escapeHtml(primaryLabel(g))}</span>${CHEVRON_ICON}</button>
+        <button class="home-party" type="button" aria-label="${escapeHtml('Party View for ' + name)}" title="Party View">${MAXIMIZE_ICON}<span class="home-party-text">Party View</span></button>
+      </div>`;
+    // The card body is a mouse convenience; the primary button is the keyboard target.
     c.addEventListener('click', () => openGame(g.id));
-    c.querySelector('.game-card-edit').addEventListener('click', async (e) => {
-      e.stopPropagation();
-      if (numbersPicked) return;
-      try {
-        const game = await SBS.api.getGame(g.id);
-        SBS.go({ screen: 'editGame', game });
-      } catch (err) {
-        showAlert('Failed to load game: ' + err.message);
-      }
-    });
-    c.querySelector('.game-card-delete').addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const ok = await showConfirm(`Delete this game (${g.teamA || '?'} vs ${g.teamB || '?'})? This cannot be undone.`);
-      if (!ok) return;
-      try {
-        await SBS.api.deleteGame(g.id);
-        renderHome();
-      } catch (err) {
-        showAlert('Failed to delete game: ' + err.message);
-      }
-    });
-    c.querySelector('.game-card-tv').addEventListener('click', (e) => {
-      e.stopPropagation();
-      window.open(`${location.origin}${location.pathname}#tv-${g.id}`, '_blank');
-    });
-    c.querySelector('.game-card-phone').addEventListener('click', (e) => {
-      e.stopPropagation();
-      // Launched straight from Home rather than Game Day, so the phone
-      // screen's Back button should return here, not to the board.
-      window.open(`${location.origin}${location.pathname}#score-${g.id}-home`, '_blank');
-    });
-    c.querySelector('.game-card-people').addEventListener('click', async (e) => {
-      e.stopPropagation();
-      try {
-        const game = await SBS.api.getGame(g.id);
-        openManagePlayersModal(game, null);
-      } catch (err) {
-        showAlert('Failed to load game: ' + err.message);
-      }
-    });
+    const more = c.querySelector('.home-more');
+    more.addEventListener('click', (e) => { e.stopPropagation(); openCardMenu(g, more); });
+    c.querySelector('.home-primary').addEventListener('click', (e) => { e.stopPropagation(); openGame(g.id); });
+    c.querySelector('.home-party').addEventListener('click', (e) => { e.stopPropagation(); openPartyView(g); });
     return c;
   }
 
   function buildGameGrid(games) {
-    const grid = el('div', 'grid-cards');
+    const grid = el('div', 'home-grid');
     games.forEach(g => grid.appendChild(buildGameCard(g)));
     return grid;
+  }
+
+  // ---------- Sections and order (client side; the store sort is untouched) ----------
+  function kickoffMs(g) {
+    const ms = g.kickoffTime ? Date.parse(g.kickoffTime) : NaN;
+    return isNaN(ms) ? Infinity : ms;
+  }
+
+  // Today: live first, then by kickoff time, then the rest (store order).
+  function sortToday(list) {
+    const rank = g => (g.status === 'started' && !kickoffPending(g) ? 0 : (kickoffMs(g) !== Infinity ? 1 : 2));
+    return list.map((g, i) => ({ g, i })).sort((a, b) => {
+      const ra = rank(a.g);
+      const rb = rank(b.g);
+      if (ra !== rb) return ra - rb;
+      if (ra === 1) { const d = kickoffMs(a.g) - kickoffMs(b.g); if (d) return d; }
+      return a.i - b.i;
+    }).map(x => x.g);
+  }
+
+  function sections(games) {
+    const today = todayValue();
+    const live = games.filter(g => !isArchived(g));
+    // Unfinished boards dated in the past sort first here: they still need the host.
+    const coming = live.filter(g => g.gameDate !== today).map((g, i) => ({ g, i })).sort((a, b) => {
+      const da = a.g.gameDate || '';
+      const db = b.g.gameDate || '';
+      if (da !== db) return da < db ? -1 : 1;
+      return a.i - b.i;
+    }).map(x => x.g);
+    const past = games.filter(isArchived).sort((a, b) => ((b.gameDate || '') < (a.gameDate || '') ? -1 : (b.gameDate || '') > (a.gameDate || '') ? 1 : 0));
+    return { today: sortToday(live.filter(g => g.gameDate === today)), coming, past };
+  }
+
+  // What changes a card: status, kickoff, date, names. The day itself is included so
+  // the Today/Coming up split redraws at midnight.
+  function fingerprint(games) {
+    return todayValue() + '#' + games.map(g => [g.id, g.status, kickoffPending(g), g.gameDate, g.teamA, g.teamB, g.description].join(':')).sort().join('|');
   }
 
   // Revokes every session for this account, this device included. Another
@@ -308,30 +426,154 @@
   }
   SBS.screens.login = renderLogin;
 
+  // ---------- Home ----------
+  function section(main, title, grid) {
+    const h = el('h2', 'home-sec', escapeHtml(title));
+    main.appendChild(h);
+    main.appendChild(grid);
+    fitTeamBadges(grid);
+  }
+
+  // The account button in the top bar (only with a host session): who is signed in,
+  // Sign out, Sign out everywhere.
+  function buildAccountButton(s) {
+    const emailTxt = s.mode === 'accounts' && s.email ? s.email : '';
+    const btn = el('button', 'home-acct',
+      `${USER_ICON}${emailTxt ? `<span class="home-acct-email">${escapeHtml(emailTxt)}</span>` : ''}${DOWN_ICON}`);
+    btn.type = 'button';
+    btn.setAttribute('aria-label', emailTxt ? `Account: signed in as ${emailTxt}` : 'Account');
+    btn.setAttribute('aria-haspopup', 'dialog');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.addEventListener('click', () => {
+      const items = [{
+        label: 'Sign out',
+        onSelect: async () => {
+          try {
+            await SBS.api.signOut();
+          } catch (e) {
+            showAlert('Could not sign out: ' + e.message);
+            return;
+          }
+          SBS.go({ screen: 'home' });
+        }
+      }];
+      if (emailTxt) {
+        items.push({ label: 'Sign out everywhere', onSelect: () => signOutEverywhere(emailTxt, el('button')) });
+      }
+      showMenu(btn, {
+        label: 'Account',
+        alwaysHeader: true,
+        headerTitle: emailTxt ? `Signed in as ${emailTxt}` : 'Signed in as host',
+        items
+      });
+    });
+    return btn;
+  }
+
+  // ---------- Home on a TV browser ----------
+  // A remote can only move focus and press OK: big tiles, each one button that opens
+  // Party View. No menus, no New game, no account, no Past games.
+  function buildTvTile(g) {
+    const tile = el('button', 'tv-tile');
+    tile.type = 'button';
+    const name = matchName(g);
+    tile.setAttribute('aria-label', `Show Party View: ${name}, ${chipFor(g).text}`);
+    const when = g.gameDate === todayValue() ? '' : whenLabel(g.gameDate);
+    const desc = [g.description || `${g.teamA || ''} @ ${g.teamB || ''}`, when].filter(Boolean).join(' · ');
+    tile.innerHTML = `
+      ${chipHtml(g)}
+      <span class="home-match badge-fit">${teamBadge(g, 'A', { logoSize: 48, cls: 'home-badge' })}<span class="vs-sep">vs</span>${teamBadge(g, 'B', { logoSize: 48, cls: 'home-badge' })}</span>
+      <span class="tv-tile-desc">${escapeHtml(desc)}</span>
+      <span class="tv-tile-cta">${MAXIMIZE_ICON}<span>Show Party View</span></span>`;
+    tile.addEventListener('click', () => SBS.go({ screen: 'tv', id: g.id, from: 'home' }));
+    return tile;
+  }
+
+  // Arrow keys move focus by where the tiles sit on screen (scoped to the grid; the
+  // grid is gone when Home is left, so nothing needs removing).
+  function moveTvFocus(grid, e) {
+    const dir = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] }[e.key];
+    if (!dir) return;
+    const tiles = Array.from(grid.querySelectorAll('.tv-tile'));
+    const cur = tiles.indexOf(document.activeElement);
+    if (cur < 0) return;
+    const c = center(tiles[cur]);
+    let best = null;
+    let bestScore = Infinity;
+    tiles.forEach((t, i) => {
+      if (i === cur) return;
+      const p = center(t);
+      const dx = (p.x - c.x) * dir[0];
+      const dy = (p.y - c.y) * dir[1];
+      const along = dir[0] ? dx : dy;
+      if (along <= 5) return;
+      const across = Math.abs(dir[0] ? p.y - c.y : p.x - c.x);
+      const score = across * 4 + along;
+      if (score < bestScore) { bestScore = score; best = t; }
+    });
+    e.preventDefault();
+    if (best) best.focus();
+  }
+  function center(n) {
+    const r = n.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+
+  function renderTvHome(main, games) {
+    const sec = sections(games);
+    const shown = sec.today.concat(sec.coming).slice(0, 6);
+    main.classList.add('tv-home');
+    main.appendChild(el('h2', 'tv-home-title', 'Pick a game to show'));
+    if (shown.length === 0) {
+      main.appendChild(el('p', 'tv-home-hint', 'No games to show right now. Start one from a phone or laptop, or pair this TV with a code.'));
+      const pairBtn = el('button', 'tv-tile-pair', 'Show a pairing code');
+      pairBtn.type = 'button';
+      pairBtn.addEventListener('click', () => SBS.go({ screen: 'tv-pair' }));
+      main.appendChild(pairBtn);
+      pairBtn.focus();
+      return;
+    }
+    const grid = el('div', 'tv-grid');
+    shown.forEach(g => grid.appendChild(buildTvTile(g)));
+    main.appendChild(grid);
+    main.appendChild(el('p', 'tv-home-hint', 'Use the arrows on your remote, then press OK.'));
+    grid.addEventListener('keydown', (e) => moveTvFocus(grid, e));
+    fitTeamBadges(grid);
+    const first = grid.querySelector('.tv-tile');
+    if (first) first.focus();
+  }
+
   async function renderHome() {
     const app = SBS.appEl;
     resetTeamColors();
     app.innerHTML = '';
-    app.appendChild(topbar('<span><span class="brand-dollar">B</span>ig <span class="brand-dollar">G</span>ame <span class="brand-dollar">G</span>rids</span>', [], { hideHome: true, pill: true }));
-    const main = el('div', 'main');
+    const tv = isTvBrowser();
+    let newBtn = null;
+    const extra = [];
+    if (!tv) {
+      newBtn = el('button', 'home-new', `${PLUS_ICON}<span>New game</span>`);
+      newBtn.type = 'button';
+      newBtn.addEventListener('click', () => SBS.go({ screen: 'setup' }));
+      extra.push(newBtn);
+    }
+    const bar = topbar('<span><span class="brand-dollar">B</span>ig <span class="brand-dollar">G</span>ame <span class="brand-dollar">G</span>rids</span>', extra, { hideHome: true });
+    bar.classList.add('home-topbar');
+    if (tv) bar.classList.add('tv-topbar');
+    app.appendChild(bar);
+    const main = el('div', 'main home-main');
     app.appendChild(main);
-
-    main.appendChild(el('h2', '', 'Saved Games'));
-    const card = el('div', 'card');
-    main.appendChild(card);
 
     let games = [];
     let needsSignIn = false;
     try {
-      // A TV browser has no keyboard worth the name, so it never gets the
-      // sign-in prompt — it falls through to the read-only state below and
-      // is opened at a game with a #tv-<id> link instead.
-      games = await SBS.api.getGames(isTvBrowser() ? { prompt: false } : undefined);
+      // A TV browser has no keyboard worth the name, so it never gets the sign-in
+      // prompt: with no host session it goes to the pairing code screen below.
+      games = await SBS.api.getGames(tv ? { prompt: false } : undefined);
     } catch (e) {
       if (e.authRequired) {
         needsSignIn = true;
       } else {
-        card.appendChild(el('div', 'error-msg', 'Could not load saved games: ' + escapeHtml(e.message)));
+        main.appendChild(el('div', 'error-msg', 'Could not load saved games: ' + escapeHtml(e.message)));
       }
     }
 
@@ -339,6 +581,10 @@
     // every game anyone had ever created). Anyone who isn't signed in still
     // reaches their own game through the link or QR code they were given.
     if (needsSignIn) {
+      if (tv) { SBS.go({ screen: 'tv-pair' }); return; }
+      if (newBtn) newBtn.remove();
+      const card = el('div', 'card');
+      main.appendChild(card);
       card.appendChild(el('p', '', 'Sign in as the host to see and manage saved games. If you were sent a link or scanned a QR code, open that instead — it needs no sign-in.'));
       const signInActions = el('div', 'actions');
       const signInBtn = el('button', '', 'Host sign-in');
@@ -351,90 +597,58 @@
       return;
     }
 
-    const active = games.filter(g => !isArchived(g));
-    const archived = games.filter(isArchived);
-
-    if (games.length === 0) {
-      card.appendChild(el('p', '', 'No games yet. Start a new one below!'));
-    } else if (active.length === 0) {
-      card.appendChild(el('p', '', 'No active games right now — see the Game Archive below.'));
+    if (tv) {
+      renderTvHome(main, games);
     } else {
-      const grid = buildGameGrid(active);
-      card.appendChild(grid);
-      fitTeamBadges(grid);
+      const sec = sections(games);
+      if (games.length === 0) {
+        main.appendChild(el('p', 'home-empty', 'No games yet. Tap New game to start one.'));
+      } else if (sec.today.length + sec.coming.length === 0) {
+        main.appendChild(el('p', 'home-empty', 'No active games right now. Tap New game to start one, or look in Past games below.'));
+      }
+      if (sec.today.length) section(main, 'Today', buildGameGrid(sec.today));
+      if (sec.coming.length) section(main, 'Coming up', buildGameGrid(sec.coming));
+      if (sec.past.length) {
+        const wrap = el('div', 'archive-wrap');
+        const toggle = el('button', 'archive-toggle', `<span class="archive-arrow">&#9656;</span> Past games (${sec.past.length})`);
+        toggle.type = 'button';
+        toggle.setAttribute('aria-expanded', 'false');
+        const pastGrid = buildGameGrid(sec.past);
+        pastGrid.classList.add('home-past', 'collapsed');
+        toggle.addEventListener('click', () => {
+          const collapsed = pastGrid.classList.toggle('collapsed');
+          toggle.classList.toggle('open', !collapsed);
+          toggle.setAttribute('aria-expanded', String(!collapsed));
+          if (!collapsed) fitTeamBadges(pastGrid);
+        });
+        wrap.appendChild(toggle);
+        wrap.appendChild(pastGrid);
+        main.appendChild(wrap);
+      }
     }
 
-    if (archived.length > 0) {
-      const archiveWrap = el('div', 'archive-wrap');
-      const toggle = el('button', 'archive-toggle', `<span class="archive-arrow">&#9656;</span> Game Archive (${archived.length})`);
-      toggle.type = 'button';
-      const archiveCard = el('div', 'card archive-panel collapsed');
-      const archiveGrid = buildGameGrid(archived);
-      archiveCard.appendChild(archiveGrid);
-      toggle.addEventListener('click', () => {
-        const collapsed = archiveCard.classList.toggle('collapsed');
-        toggle.classList.toggle('open', !collapsed);
-        if (!collapsed) fitTeamBadges(archiveGrid);
-      });
-      archiveWrap.appendChild(toggle);
-      archiveWrap.appendChild(archiveCard);
-      main.appendChild(archiveWrap);
-    }
-
-    const actions = el('div', 'actions');
-    const newBtn = el('button', '', '+ New Game');
-    newBtn.addEventListener('click', () => SBS.go({ screen: 'setup' }));
-    actions.appendChild(newBtn);
-    main.appendChild(actions);
-
-    // Build version and the account line, from one session call that Home never
-    // waits on (the shell above is already drawn). Sign-out lives here and only
-    // here: Home is the host console, and it's the one screen a host is on when
-    // they want to hand the laptop over. Absent entirely on the LAN, where
-    // there is no sign-in to undo.
+    // Build version and the account button, from one session call that Home never
+    // waits on (the shell above is already drawn). Absent entirely when there is no
+    // host session (auth off locally, or a LAN-style setup): New game stands alone.
     const versionNote = el('div', 'footer-note');
     versionNote.id = 'app-version';
-    const accountLine = el('div', 'footer-note account-line hidden');
-    accountLine.style.cssText = 'margin-top:12px; overflow-wrap:anywhere; display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; justify-content:center;';
     main.appendChild(versionNote);
-    main.appendChild(accountLine);
     main.appendChild(SBS.ui.legalLinks());
-    const nav = app.querySelector('.topbar .nav');
+    const nav = bar.querySelector('.nav');
     SBS.api.getSession().then(s => {
       // The answer can arrive after the host left, or after Home was drawn
       // again: then these nodes are detached and there is nothing to update.
       if (!s || !main.isConnected || SBS.currentScreen() !== 'home') return;
       if (s.version) versionNote.textContent = 'Super Squares v' + s.version;
-      if (!(s.authRequired && s.host)) return;
-      const outBtn = el('button', 'ghost', 'Sign out');
-      outBtn.type = 'button';
-      outBtn.addEventListener('click', async () => {
-        outBtn.disabled = true;
-        try {
-          await SBS.api.signOut();
-        } catch (e) {
-          outBtn.disabled = false;
-          showAlert('Could not sign out: ' + e.message);
-          return;
-        }
-        SBS.go({ screen: 'home' });
-      });
-      nav.appendChild(outBtn);
-      if (s.mode === 'accounts' && s.email) {
-        accountLine.appendChild(document.createTextNode('Signed in as ' + s.email + ' '));
-        const allBtn = el('button', 'ghost small', 'Sign out everywhere');
-        allBtn.type = 'button';
-        allBtn.addEventListener('click', () => signOutEverywhere(s.email, allBtn));
-        accountLine.appendChild(allBtn);
-        accountLine.classList.remove('hidden');
-      }
+      if (tv || !(s.authRequired && s.host)) return;
+      nav.appendChild(buildAccountButton(s));
     }).catch(() => { /* never block Home on the session probe */ });
 
     // Games are created/edited/deleted from other devices in the room (a
     // phone setting up a new pool while the TV sits on Home), and there's no
     // push channel — so poll and re-render Home if the saved-games list has
     // changed since we last drew it.
-    const fingerprint = games.map(g => g.id + ':' + g.status + ':' + kickoffPending(g)).sort().join('|');
+    const before = fingerprint(games);
     SBS.setManagedInterval(async () => {
       let latest;
       try {
@@ -444,8 +658,7 @@
       } catch (e) {
         return;
       }
-      const latestFingerprint = latest.map(g => g.id + ':' + g.status + ':' + kickoffPending(g)).sort().join('|');
-      if (latestFingerprint !== fingerprint && SBS.currentScreen() === 'home') {
+      if (fingerprint(latest) !== before && SBS.currentScreen() === 'home') {
         SBS.go({ screen: 'home' });
       }
     }, 8000);

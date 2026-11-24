@@ -900,7 +900,7 @@
     const FROM_KEY = 'sbs.tvfrom';
     try {
       if (from === 'board') window.sessionStorage.setItem(FROM_KEY, id);
-      else if (!paired && window.sessionStorage.getItem(FROM_KEY) === id) from = 'board';
+      else if (from !== 'home' && !paired && window.sessionStorage.getItem(FROM_KEY) === id) from = 'board';
       else window.sessionStorage.removeItem(FROM_KEY);
     } catch (e) { /* Exit goes Home after a reload */ }
     const app = SBS.appEl;

@@ -228,7 +228,7 @@
     if (route.screen === 'picking') return s.picking(route.game);
     if (route.screen === 'board') return s.board(route.game);
     if (route.screen === 'tv') return s.tv(route.id, route.paired, route.from);
-    if (route.screen === 'mirror') return s.mirror(route.id);
+    if (route.screen === 'mirror') return s.mirror(route.id, route.from);
     if (route.screen === 'tv-pair') return s.tvPair();
     if (route.screen === 'phone') return s.phone(route.id, route.back);
     if (route.screen === 'player') return s.player(route.id);

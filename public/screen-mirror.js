@@ -33,7 +33,7 @@
     return Array.prototype.some.call(document.body.children, n => n.tagName === 'DIV' && n.id !== 'app' && n.style.position === 'fixed');
   }
 
-  function renderMirror(id) {
+  function renderMirror(id, from) {
     const app = SBS.appEl;
     app.innerHTML = '';
     try { window.history.replaceState(null, '', `${location.pathname}${location.search}#mirror-${id}`); } catch (e) { /* the hash is only for reloads */ }
@@ -63,7 +63,8 @@
     function leave() {
       closed = true;
       try { window.history.replaceState(null, '', `${location.pathname}${location.search}`); } catch (e) { /* nothing to undo */ }
-      if (game && game.squares) SBS.go({ screen: 'board', game });
+      // Opened from Home: Exit goes back to Home. Otherwise to the board once it has loaded.
+      if (from !== 'home' && game && game.squares) SBS.go({ screen: 'board', game });
       else SBS.go({ screen: 'home' });
     }
 

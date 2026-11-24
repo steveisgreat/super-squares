@@ -284,6 +284,20 @@ Day; on a phone it is the mirror screen with a new portrait layout. A touch devi
 keep the screen awake gets a one-time Auto-Lock tip. Hashes `#tv-<id>` and `#mirror-<id>` are
 unchanged. Not tried: real printing, real AirPlay, a real iPhone wake lock.
 
+**R30. Home redesign: compact cards, one clear button, TV tiles** — `Sonnet` build, `Opus` design
+and review — ✅ built 2026-11-24 (Steve approved the mockups; no squares count or score on cards,
+no store change). Home's top bar holds New game and an account menu (Sign out, Sign out
+everywhere). Boards sit in Today (live first, then by kickoff), Coming up (soonest first; unfinished
+past-dated boards on top) and a collapsed Past games, with no panel around them. Each card has a
+status chip (Live, Kickoff, Picking squares, Final), one-line matchup, a primary button (Pick
+squares, Open Game Day, See results), Party View in the same tab with Exit back to Home, and a ⋯
+menu (Edit, Players, Score from another phone, Delete) as a sheet on a phone or a popover on wide
+screens. A TV browser gets up to six focusable tiles driven by the remote's arrows, or the pairing
+screen when there is no host session. The Home brand drops its glowing pill so the top bar fits a
+phone. Not tried: a real TV remote and TV browser; a remote's Back key does not leave Party View
+(only the on-screen Exit). Follow-up: remove the now-unused `TV_ICON`, `PHONE_ICON` and
+`PEOPLE_ICON` from `ui.js`.
+
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
 
 **R8. Cache board reads at the edge** — `Opus` — Depends on: R3, R4a.
