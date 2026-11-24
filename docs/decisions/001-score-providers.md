@@ -107,7 +107,11 @@ In order of trust:
    Quarter fields fill in *during* the quarter, so "quarter n+1 has a value"
    is only a fallback (about 80 s slower than the status text). Details:
    `docs/research/2026-11-23-score-feed-probe.md`.
-3. **The host always wins.** A quarter result entered or edited by the host is
+3. **Only clear signals settle a result.** A quarter settles only when its side's quarter
+   and overtime fields add up to the total (a feed can move one before the other). Only a
+   "Final" status with both scores present settles the final; canceled, postponed or unknown
+   text never does, and the host can still end the game.
+4. **The host always wins.** A quarter result entered or edited by the host is
    stamped `source: 'host'` and is never overwritten by a feed. That
    generalizes today's "never touch a quarter that already has a score".
 

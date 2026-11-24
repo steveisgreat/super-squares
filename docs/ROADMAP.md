@@ -88,7 +88,8 @@ badge.
 *Done:* no request to any logo CDN during a full game; browser check of TV,
 grid and setup.
 
-**R4a. Score provider layer and shared cache** — `Sonnet` (design done in
+**R4a. Score provider layer and shared cache** (part 1, adapters and failover in
+`lib/scores/`, done 2026-11-23; part 2, the table, API and screens, waits for R2) — `Sonnet` (design done in
 [decision 001](decisions/001-score-providers.md)) — Depends on: R3 ✅ (the
 `scoring` field, `GameLogic.scoringMode`), probe fixtures.
 Adapters for ESPN (primary) and BALLDONTLIE (secondary) behind one `LiveGame` shape;
