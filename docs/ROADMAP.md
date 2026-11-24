@@ -35,7 +35,7 @@ decisions 002–005 for the other standing decisions above (001 exists), `ARCHIT
 into decisions and archive.
 *Done:* CLAUDE.md under 15 KB, decisions 002–005 written, version shows in the app.
 
-**R1. Host accounts design** — `Opus` — Depends on: R0.
+**R1. Host accounts design** — `Opus` — ✅ approved 2026-11-23 ([decision 012](decisions/012-host-accounts.md)).
 Replace the single `HOST_PASSWORD` with one account per host: magic-link email
 sign-in (Resend), `games.owner_id`, `GET /api/games` scoped to the owner,
 every write checked against the owner. Keep the LAN build working with auth off.
@@ -43,9 +43,13 @@ Choose library vs. the existing signed-cookie code (new dependency rule applies)
 *Done:* decision entry approved by Steve, with the schema migration and the
 endpoint access table.
 
-**R2. Host accounts build** — `Opus` — Depends on: R1, R16 (sending domain).
-Implement R1. Migration only adds (expand, then contract). Existing games get
-assigned to Steve's account.
+**R2. Host accounts build** — `Opus` — Depends on: R1 ✅, R16 (sending domain; code
+can start before it, going live can't).
+Implement [decision 012](decisions/012-host-accounts.md) in its order of work: emailed
+link and 8-digit code, `games.owner_id`, fail closed on Vercel. Includes the
+output-escaping audit and Content-Security-Policy (strangers become hosts), a GitHub
+Actions workflow (the repo has no CI), and R10's firewall rule. Existing games get
+assigned to Steve's account by script. Large: plan 2–3 sessions.
 *Done:* tenant-isolation tests pass in CI (host A cannot list, read-for-write,
 edit or delete host B's games); `/code-review high` clean.
 
@@ -107,10 +111,14 @@ lawyer.
 
 **R7. Accounts and plans** — `Steve` — Depends on: none.
 Vercel Pro (Hobby forbids commercial use), Neon paid plan with autoscaling for
-game day, Stripe account, optional LLC. The domain moved to R16.
+game day, Resend paid plan (the free one sends 100 emails a day), Stripe account,
+optional LLC. The domain moved to R16.
 *Done:* all accounts exist.
 
 **R16. Name and domain** — `Sonnet` research, `Steve` buys — Depends on: none.
+Research notes are private (git-ignored):
+`docs/working/research/2026-11-23-name-and-trademark.md`. Don't copy them into this
+public repo.
 **Blocks R2** (magic-link email needs a verified sending domain), **R5** (Stripe
 needs a business website) **and R17.**
 Trademark knockout search on the name (GleanMark connector needs `/mcp` sign-in)
@@ -151,8 +159,8 @@ A dependency-free Node script simulating 25,000 screens across 3,000 boards
 *Done:* p95 under 500 ms and error rate under 0.5% at target; results and cost
 estimate recorded in the runbook.
 
-**R10. Sign-in rate limit** — `Sonnet` — Depends on: R2.
-Vercel Firewall rule on the sign-in and magic-link endpoints.
+**R10. Sign-in rate limit** — `Sonnet` — Ships with R2 (decision 012).
+Vercel Firewall rule on `/api/login` and `/api/login/verify`.
 *Done:* rule live; documented in the runbook.
 
 **R11. Monitoring and game-day runbook** — `Sonnet` — Depends on: R9.
@@ -185,12 +193,17 @@ office-pool groups.
 
 - Phone app wrappers (Capacitor) for App Store and Google Play discovery —
   check Apple's real-money gaming guideline first.
+- Per-board scorekeeper links that can only enter scores (not in R2, decision 012).
+- Account upkeep: change email, self-service deletion, co-hosts (decision 012).
 - Spring basketball tournament push (NBA/Other already supported).
 - Unlimited squares after a grid sells out (open questions in memory notes).
 - Apple TV: not planned — AirPlay and smart-TV browsers cover it.
 
 ## Recently shipped
 
+- R1: host accounts designed and approved, decision 012 (2026-11-23)
+- Issue #2: the phone keypad keeps the drawn final winner; the TV reveal ignores a stale
+  draw (2026-11-23)
 - R4: NFL and NBA team and league logos removed (ESPN logo CDN gone); badges show
   names and abbreviations in team colors (2026-11-23)
 - R3: manual current score: Manual/Live/Simulation per game, score panel on phone and
@@ -210,5 +223,4 @@ office-pool groups.
 1. Free-tier limit: 25 players, or one free board of any size with the footer?
 2. Ad budget for the final three weeks?
 3. Form an LLC before taking payments?
-4. Keep the name "Super-Squares" pending the trademark check? (Decides the
-   domain, R16.)
+4. Product name (R16): pick the public name. Decides the domain.

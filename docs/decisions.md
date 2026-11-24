@@ -12,6 +12,7 @@ One line per decision. Detail lives in `docs/decisions/`.
 | [006](decisions/006-one-codebase-two-targets.md) | 2026-08 | One codebase for the LAN and Vercel builds; storage behind `lib/store.js` with fs and Postgres backends. |
 | [007](decisions/007-live-scores-on-read.md) | 2026-08 | Live scores refresh on read with a claimed, throttled slot, never on a timer. |
 | [008](decisions/008-atomic-concurrency.md) | 2026-08 | `updateGame` is one atomic check-and-write; a stale `updatedAt` returns a conflict. |
-| [009](decisions/009-host-password-access.md) | 2026-08 | One site-wide host password; a game id is a read capability only (to be replaced by R1/R2). |
+| [009](decisions/009-host-password-access.md) | 2026-08 | One site-wide host password; a game id is a read capability only (to be replaced by 012). |
 | [010](decisions/010-ported-to-rileysoft-model.md) | 2026-11-23 | Ported to the RileySoft model as a hosted app; code stays at the repo root for now. |
 | [011](decisions/011-manual-scoring.md) | 2026-11-23 | Manual scoring is a per-game mode (default for new games); taps are operations on `PATCH /api/game/:id/score` applied by pure `GameLogic.applyScoreOp`; a drawn winner survives edit and undo. |
+| [012](decisions/012-host-accounts.md) | 2026-11-23 | Host accounts: emailed link plus 8-digit code, signed cookie with a revocable version, `games.owner_id` column, owner-only writes, fail closed on Vercel; our own code, no auth library (built in R2, replaces 009). |

@@ -31,6 +31,7 @@ Details for env vars, deploy and rollback: `docs/runbook.md`.
 | What shape is the system? | `ARCHITECTURE.md` |
 | How do I deploy, configure, roll back? | `docs/runbook.md`, `.env.example` |
 | Live-score provider design | `docs/decisions/001-score-providers.md` |
+| Research notes (score-feed probe) | `docs/research/` |
 | How do I run the LAN version as a player or host? | `README.md` |
 | Old migration plan, retired notes | `docs/archive/` (grep it, never read it whole) |
 | Scratch: briefs, ledgers, probe logs | `docs/working/` (git-ignored) |

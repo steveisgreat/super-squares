@@ -1,7 +1,7 @@
 # 009 — Access model: one site-wide host session; the game id is a read capability
 
 **Date:** 2026-08 (recorded 2026-11-23) · **Status:** accepted; **to be replaced** by
-host accounts (roadmap R1/R2) · **Source:** migration plan Phase 4
+[012](012-host-accounts.md) when R2 ships · **Source:** migration plan Phase 4
 
 ## Context
 On the LAN the network was the boundary. In the cloud the game UUID is not secret: it is
