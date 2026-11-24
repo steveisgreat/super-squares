@@ -991,7 +991,7 @@
     const sign = el('div', 'print-sign');
     sign.setAttribute('aria-hidden', 'true');
     sign.innerHTML = `
-      <div class="ps-brand">Super Squares</div>
+      <div class="ps-brand">Big Game Grids</div>
       <h1 class="ps-title">Scan to see your squares</h1>
       <div class="ps-match">${escapeHtml(matchup)}${date ? ' &middot; ' + escapeHtml(date) : ''}</div>
       <div class="ps-qr">${qr}</div>

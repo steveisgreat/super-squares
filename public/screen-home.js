@@ -231,7 +231,7 @@
     try {
       history.replaceState(null, '', location.pathname + location.search);
     } catch (e) { /* address bar left as is */ }
-    app.appendChild(topbar('<span><span class="brand-dollar">S</span>uper <span class="brand-dollar">S</span>quares</span>', [], { hideHome: true, pill: true }));
+    app.appendChild(topbar('<span><span class="brand-dollar">B</span>ig <span class="brand-dollar">G</span>ame <span class="brand-dollar">G</span>rids</span>', [], { hideHome: true, pill: true }));
     const main = el('div', 'main');
     app.appendChild(main);
     const card = el('div', 'card');
@@ -312,7 +312,7 @@
     const app = SBS.appEl;
     resetTeamColors();
     app.innerHTML = '';
-    app.appendChild(topbar('<span><span class="brand-dollar">S</span>uper <span class="brand-dollar">S</span>quares</span>', [], { hideHome: true, pill: true }));
+    app.appendChild(topbar('<span><span class="brand-dollar">B</span>ig <span class="brand-dollar">G</span>ame <span class="brand-dollar">G</span>rids</span>', [], { hideHome: true, pill: true }));
     const main = el('div', 'main');
     app.appendChild(main);
 
