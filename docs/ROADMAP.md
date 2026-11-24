@@ -196,7 +196,8 @@ pay" list; correcting a quarter that was already paid out warns and marks it
 `/code-review high` clean.
 
 **R22. Join codes and guest view** — `Sonnet` build, `Opus` review (new column,
-migration) — Depends on: none.
+migration) — Depends on: none. — ✅ shipped 2026-11-24 ([decision 016](decisions/016-join-codes.md),
+migration 004: apply before the push).
 A short join code per board (`/<code>`), a share button (system share sheet, iPhone and
 Android), guest link available before lock, the TV view shows the board filling with a
 big join QR before lock, and the guest view gets a small grid with my squares, "Not yet"

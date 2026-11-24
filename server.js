@@ -6,6 +6,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { handleApi, sendJSON } = require('./lib/api.js');
+const JoinCode = require('./lib/joincode.js');
 // The Content-Security-Policy lives in vercel.json and nowhere else, so both
 // the local server and production send the same one.
 const SECURITY_HEADERS = require('./vercel.json').headers[0].headers;
@@ -26,7 +27,9 @@ const MIME = {
 };
 
 function serveStatic(req, res, pathname) {
-  let requested = pathname === '/' ? '/index.html' : pathname;
+  // /<join code> is the guest link: the same page, which resolves the code itself
+  // (vercel.json has the matching rewrite).
+  let requested = pathname === '/' || JoinCode.PATH_RE.test(pathname) ? '/index.html' : pathname;
   try {
     requested = decodeURIComponent(requested);
   } catch (e) {

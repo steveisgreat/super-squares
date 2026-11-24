@@ -48,6 +48,8 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `GET /api/todays-games` | host only; the setup screen's schedule, read from the shared slate (no provider call of its own) |
 | `POST /api/game`, `PUT /api/game/:id`, `DELETE /api/game/:id` | host only |
 | `PATCH /api/game/:id/score` | host only; one manual-score operation (decision 011) |
+| `GET /api/join/:code` | public; a join code resolves to `{ id }` (decision 016); 400 malformed, 404 unknown |
+| `GET /<code>` (6 characters) | static; serves `index.html`, which resolves the code and opens the guest view |
 | `PATCH /api/game/:id/payout` | host only; mark a quarter paid out, undo, or settle (decision 015); a record only, no money moves |
 
 "Host only" means the board's owner in accounts mode: another account gets 403, and the

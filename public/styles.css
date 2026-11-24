@@ -2340,3 +2340,45 @@ button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color:
 .gd-phone .cell .badge { font-size: 0.45rem; padding: 0 2px; }
 .gd-phone .cell .badges { top: 0; right: 1px; }
 .gd-phone .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* ---- Join code card, share button, guest mini grid (R22) ---- */
+.join-card { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 14px 16px; margin-bottom: 12px; }
+.join-card-label { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+.join-code { font-size: clamp(2rem, 11vw, 3rem); font-weight: 800; letter-spacing: 0.18em; padding-left: 0.18em; color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.join-url { font-size: 0.85rem; color: var(--muted); overflow-wrap: anywhere; }
+.join-actions { margin-top: 4px; }
+.join-share-btn { min-height: 44px; min-width: 140px; }
+.join-note { min-height: 1.2em; font-size: 0.9rem; color: var(--good); overflow-wrap: anywhere; }
+
+.mini-grid { display: grid; grid-template-columns: 1.4em repeat(10, minmax(0, 1fr)); gap: 2px; max-width: 360px; margin: 10px auto 0; }
+.mg-axis { font-size: 0.7rem; text-align: center; color: var(--accent); line-height: 1.6; min-height: 1.4em; }
+.mg-cell { aspect-ratio: 1; border-radius: 3px; background: transparent; border: 1px solid var(--border); box-sizing: border-box; }
+.mg-cell.is-filled { background: var(--panel3); border-color: var(--border-strong); }
+.mg-cell.is-mine { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft, rgba(0, 229, 255, 0.35)); }
+.player-scored-by { font-size: 0.85rem; font-weight: 500; color: var(--muted); }
+
+/* TV, before the lock: the join QR panel beside the filling board, and the code in the pill. */
+.tv-join-code { letter-spacing: 0.14em; }
+.tv-join-panel {
+  flex: 0 0 auto;
+  width: clamp(220px, 19vw, 400px);
+  margin-left: 22px;
+  box-sizing: border-box;
+  padding: 18px 16px;
+  background: var(--panel);
+  border: 1px solid rgba(0,229,255,0.3);
+  border-radius: var(--radius);
+  box-shadow: 0 0 18px rgba(0,229,255,0.35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+}
+.tv-join-panel[hidden] { display: none; }
+.tv-join-panel svg { width: 100%; height: auto; display: block; border-radius: 4px; }
+.tv-join-title { font-size: clamp(1.1rem, 1.6vw, 2rem); font-weight: 700; color: #00e5ff; }
+.tv-join-or { font-size: clamp(0.8rem, 1vw, 1.2rem); color: var(--muted); }
+.tv-join-url { font-size: clamp(1rem, 1.3vw, 1.6rem); font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
+.tv-join-code-big { font-size: clamp(2rem, 3.2vw, 4.2rem); font-weight: 800; letter-spacing: 0.14em; padding-left: 0.14em; color: #fff; line-height: 1.1; }

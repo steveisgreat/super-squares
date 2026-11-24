@@ -211,7 +211,9 @@
           else if (liveHighlight.nearKeys.has(key)) cls += ' live-near';
         }
 
-        const owing = sq && isUnpaid(sq.name);
+        // The TV never shows who hasn't paid (R22 design rule); the host's own
+        // board keeps the flag.
+        const owing = sq && !document.body.classList.contains('tv-mode') && isUnpaid(sq.name);
         if (owing) cls += ' is-unpaid';
 
         const inner = sq ? nameTxt(game, sq.name) : (hasPush ? '<div class="name-txt">PUSH</div>' : '');

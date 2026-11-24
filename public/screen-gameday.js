@@ -226,8 +226,8 @@
     // Players scan this to open the read-only companion view (their squares,
     // quarter winners, live status) — separate from the host's own score-entry
     // link above, and safe to hand out to anyone in the room.
-    const playerBtn = actionBtn(QR_ICON, 'Share', 'Player View QR', 'Share player view QR');
-    playerBtn.addEventListener('click', () => SBS.playerView.showPlayerLink(game.id));
+    const playerBtn = actionBtn(QR_ICON, 'QR code', 'Player View QR', 'Show player view QR code');
+    playerBtn.addEventListener('click', () => SBS.playerView.showPlayerLink(game.id, game.joinCode));
     const headerMeta = [SBS.ui.leagueBadge(game.league), escapeHtml(game.description || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
     const actionBtns = [manageBtn, tvBtn, phoneBtn, playerBtn];
     // The topbar keeps the four desktop buttons; on a phone they sit in a labeled row below it.
@@ -241,6 +241,8 @@
     }
 
     main.appendChild(el('h2', 'gameday-heading', headerMeta));
+    const joinCard = SBS.playerView.joinCard(game);
+    if (joinCard) main.appendChild(joinCard);
 
     const computed = computeGame(game);
 
@@ -853,7 +855,6 @@
     // positionCornerQrBig below, not its content.
     const cornerQrBig = el('div', 'tv-corner-qr-big');
     boardOuter.appendChild(cornerQrBig);
-    loadCornerQr(id);
 
     // Controls fade out so the television shows nothing but the grid; any tap
     // or mouse move brings them back.
@@ -995,15 +996,44 @@
       SBS.board.syncCornerInsets(boardWrap);
       positionCornerQrBig();
     }
-    async function loadCornerQr(gameId) {
+    function setCornerQr(game) {
+      // Before the lock the join panel (below) has the QR; hide this one so the
+      // screen never shows two codes that mean different things.
+      cornerQrBig.style.display = joiningNow(game) ? 'none' : '';
+      const url = `${location.origin}${location.pathname}#player-${id}`;
+      if (url === cornerQrKey) return;
       try {
-        const url = `${location.origin}${location.pathname}#player-${gameId}`;
         cornerQrBig.innerHTML = window.QRCode.toSvg(url, 200)
           + '<div class="tv-corner-qr-label"><span>Scan to view your squares</span></div>';
+        cornerQrKey = url;
         cornerQrReady = true;
         positionCornerQrBig();
       } catch (e) {
         // Best-effort — the corner just stays blank if this fails.
+      }
+    }
+    let cornerQrKey = null;
+
+    // Pre-lock join panel (R22): a big QR for /<code> and the code in text,
+    // beside the filling board. Gone once the board locks.
+    const joinPanel = el('div', 'tv-join-panel');
+    joinPanel.hidden = true;
+    boardOuter.insertBefore(joinPanel, boardWrap.nextSibling);
+    let joinPanelKey = null;
+    function joiningNow(game) { return game.status === 'picking' && !!game.joinCode; }
+    function syncJoinPanel(game) {
+      const on = joiningNow(game);
+      joinPanel.hidden = !on;
+      if (!on) { joinPanelKey = null; return; }
+      if (joinPanelKey === game.joinCode) return;
+      try {
+        const url = `${location.origin}/${game.joinCode}`;
+        joinPanel.innerHTML = `<div class="tv-join-title">Scan to join</div>${window.QRCode.toSvg(url, 300)}`
+          + `<div class="tv-join-or">or go to</div><div class="tv-join-url">${escapeHtml(location.host)}</div>`
+          + `<div class="tv-join-or">and enter</div><div class="tv-join-code-big">${escapeHtml(game.joinCode)}</div>`;
+        joinPanelKey = game.joinCode;
+      } catch (e) {
+        joinPanel.hidden = true; // best-effort, like the corner QR
       }
     }
     window.addEventListener('resize', syncCornerLayout);
@@ -1418,6 +1448,8 @@
         const game = await SBS.api.getGame(id);
         lastGame = game;
         applyTeamColors(game);
+        syncJoinPanel(game);
+        setCornerQr(game);
 
         // Numbers haven't been drawn yet, so there are no quarter results or
         // winners to show — but the grid itself is exactly what the room
@@ -1429,13 +1461,15 @@
           tvQuarters.innerHTML = '';
           const filled = game.squares.filter(s => s).length;
           const computed = computeGame(game);
-          const unpaidNow = unpaidTotal(game);
+          // No paid or unpaid figures here: the TV never shows who owes.
           const info = el('div', 'tv-picking-info');
+          const joinPart = game.joinCode
+            ? `<span>Join Code: <span class="tv-picking-val tv-join-code">${escapeHtml(game.joinCode)}</span></span>` : '';
           info.innerHTML = `
             <div class="tv-picking-line tv-picking-pill">
               <span>Squares Available: <span class="tv-picking-val">${100 - filled}</span></span>
               <span>Total Pot: <span class="tv-picking-val">${money(computed.pot)}</span></span>
-              <span>Unpaid Total: <span class="tv-picking-val ${unpaidNow > 0 ? 'tv-picking-val-warn' : ''}">${money(unpaidNow)}</span></span>
+              ${joinPart}
             </div>
           `;
           header.appendChild(info);

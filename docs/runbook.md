@@ -102,6 +102,10 @@ needs a change there. On previews it blocks the Vercel toolbar, which is expecte
   preset "Other", no build command, output directory `public` (`vercel.json`).
 - **Production tracks `master`: pushing `master` deploys production.** Only Steve pushes.
   Other branches (for example `cloud`) get preview URLs.
+- **Before the push that ships R22:** apply `migrations/004_join_codes.sql` to production
+  (decision 016). Every game read selects `join_code`, so without it every board fails to
+  load. It only adds a nullable column and a unique index, so applying it early is safe.
+  Then check `/<code>` on the preview: the rewrite is tested only locally.
 - **Before the first push that ships R4a part 2:** apply `migrations/003_live_slates.sql`
   and set `SCORE_PRIMARY=espn` (plus `SCORE_SECONDARY` and `BALLDONTLIE_API_KEY` if
   wanted) in Vercel production. On Vercel, unset means no provider (decision 001), so

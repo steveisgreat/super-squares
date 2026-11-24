@@ -116,6 +116,7 @@
     verifyLogin: (body) => rawRequest('/api/login/verify', json('POST', body)),
     revokeAllSessions: () => rawRequest('/api/session/revoke-all', { method: 'POST' }),
     getGame: (id) => request(`/api/game/${id}`),
+    getJoin: (code) => rawRequest(`/api/join/${encodeURIComponent(code)}`),
     createGame: (game) => request('/api/game', json('POST', game)),
     saveGame: (game) => request(`/api/game/${game.id}`, json('PUT', game)),
     patchScore: (id, op) => request(`/api/game/${id}/score`, json('PATCH', op)),
@@ -180,6 +181,7 @@
     if (route.screen === 'tv') return s.tv(route.id);
     if (route.screen === 'phone') return s.phone(route.id, route.back);
     if (route.screen === 'player') return s.player(route.id);
+    if (route.screen === 'join') return s.join(route.code);
     if (route.screen === 'login') return s.login(route.token);
   };
 
@@ -195,6 +197,10 @@
   const ID_RE = '[0-9a-f-]{36}';
   SBS.parseInitialRoute = function () {
     const hash = window.location.hash || '';
+    // /<join code>: the guest link (R22). The server serves this same page for
+    // it; the code is resolved to a board id, then the player view opens.
+    const joinPath = window.location.pathname.match(/^\/([2-9A-HJKMNP-Za-hjkmnp-z]{6})\/?$/);
+    if (joinPath && !hash) return { screen: 'join', code: joinPath[1].toUpperCase() };
     const tv = hash.match(new RegExp(`^#tv-(${ID_RE})$`, 'i'));
     if (tv) return { screen: 'tv', id: tv[1] };
     const phone = hash.match(new RegExp(`^#score-(${ID_RE})(?:-(home|board))?$`, 'i'));

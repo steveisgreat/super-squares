@@ -30,6 +30,8 @@
     app.appendChild(main);
 
     main.appendChild(el('h2', '', 'Pick Your Squares'));
+    const joinCard = SBS.playerView.joinCard(game);
+    if (joinCard) main.appendChild(joinCard);
 
     const filled = game.squares.filter(s => s).length;
     const unpaid = unpaidTotal(game);

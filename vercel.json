@@ -1,7 +1,8 @@
 {
   "outputDirectory": "public",
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/[...path]" }
+    { "source": "/api/:path*", "destination": "/api/[...path]" },
+    { "source": "/:code([2-9A-HJKMNP-Za-hjkmnp-z]{6})", "destination": "/index.html" }
   ],
   "headers": [
     {

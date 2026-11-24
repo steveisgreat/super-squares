@@ -92,6 +92,113 @@
     }, 0);
   }
 
+  // ---------- Join code: link, share, mini grid (R22, decision 016) ----------
+
+  function joinUrl(game) {
+    return `${location.origin}/${game.joinCode}`;
+  }
+
+  // Native share sheet where there is one, otherwise copy the link. `note` is a
+  // role=status element that says "Link copied".
+  async function shareBoard(game, note) {
+    const url = joinUrl(game);
+    const title = `${game.teamA || 'Team A'} vs ${game.teamB || 'Team B'} squares`;
+    const text = `Join the squares pool. Code ${game.joinCode}.`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text, url });
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return; // closed the sheet: nothing to do
+        // Anything else: fall through to copying.
+      }
+    }
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(url);
+      copied = true;
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed; top:0; left:0; opacity:0;';
+      document.body.appendChild(ta);
+      ta.select();
+      try { copied = document.execCommand('copy'); } catch (err) { copied = false; }
+      ta.remove();
+    }
+    if (note) {
+      note.textContent = copied ? 'Link copied' : `Copy this link: ${url}`;
+      clearTimeout(note._t);
+      note._t = setTimeout(() => { note.textContent = ''; }, 6000);
+    }
+  }
+
+  // The code in large type (so it can be read aloud) and the Share button.
+  // Null when the board has no code (older board not yet read by its owner).
+  function joinCard(game) {
+    if (!game || !game.joinCode) return null;
+    const card = el('div', 'card join-card');
+    const spoken = game.joinCode.split('').join(' ');
+    card.innerHTML = `
+      <div class="join-card-label">Join code</div>
+      <div class="join-code" aria-label="Join code ${escapeHtml(spoken)}">${escapeHtml(game.joinCode)}</div>
+      <div class="join-url">${escapeHtml(joinUrl(game).replace(/^https?:\/\//, ''))}</div>`;
+    const row = el('div', 'join-actions');
+    const btn = el('button', 'join-share-btn', 'Share link');
+    btn.type = 'button';
+    const note = el('div', 'join-note');
+    note.setAttribute('role', 'status');
+    note.setAttribute('aria-live', 'polite');
+    btn.addEventListener('click', () => shareBoard(game, note));
+    row.appendChild(btn);
+    card.appendChild(row);
+    card.appendChild(note);
+    return card;
+  }
+
+  // A small 10x10 of the board: claimed squares shaded, the viewer's own
+  // highlighted. Never says who has or hasn't paid.
+  function miniGrid(game, mine) {
+    const wrap = el('div', 'mini-grid');
+    const claimed = game.squares.filter(Boolean).length;
+    const own = mine ? game.squares.filter(sq => sq && sq.name === mine).length : 0;
+    wrap.setAttribute('role', 'img');
+    wrap.setAttribute('aria-label', `Board: ${claimed} of 100 squares claimed` + (mine ? `, ${own} of them yours` : ''));
+    let html = '<div class="mg-corner"></div>';
+    for (let c = 0; c < 10; c++) html += `<div class="mg-axis">${game.axisX ? escapeHtml(String(game.axisX[c])) : ''}</div>`;
+    for (let r = 0; r < 10; r++) {
+      html += `<div class="mg-axis">${game.axisY ? escapeHtml(String(game.axisY[r])) : ''}</div>`;
+      for (let c = 0; c < 10; c++) {
+        const sq = game.squares[r * 10 + c];
+        const cls = 'mg-cell' + (sq ? ' is-filled' : '') + (sq && mine && sq.name === mine ? ' is-mine' : '');
+        html += `<div class="${cls}"></div>`;
+      }
+    }
+    wrap.innerHTML = html;
+    return wrap;
+  }
+
+  // /<code>: resolve the code, then show the guest view. The address becomes the
+  // ordinary deep link so a reload does not need the lookup again.
+  function renderJoin(code) {
+    const app = SBS.appEl;
+    app.innerHTML = '';
+    const wrap = el('div', 'player-screen');
+    const msg = el('div', 'card player-card', '<p class="player-muted">Opening the board…</p>');
+    wrap.appendChild(msg);
+    app.appendChild(wrap);
+    SBS.api.getJoin(code).then(res => {
+      try { history.replaceState(null, '', `/#player-${res.id}`); } catch (e) { /* keep the path */ }
+      SBS.go({ screen: 'player', id: res.id });
+    }).catch(e => {
+      const notFound = e && (e.status === 404 || e.status === 400);
+      msg.innerHTML = `<p class="${notFound ? 'player-muted' : 'error-msg'}">${notFound
+        ? `No board has the code ${escapeHtml(String(code).toUpperCase())}. Check it with the host and try again.`
+        : `Could not open that board: ${escapeHtml(e.message)}`}</p>`;
+    });
+  }
+
   function renderPlayer(id) {
     const app = SBS.appEl;
     app.innerHTML = '';
@@ -178,7 +285,7 @@
       qrBtn.type = 'button';
       qrBtn.setAttribute('aria-label', 'Show QR code for this screen');
       qrBtn.title = 'Show QR code so others can join';
-      qrBtn.addEventListener('click', () => showPlayerLink(id));
+      qrBtn.addEventListener('click', () => showPlayerLink(id, game.joinCode));
       header.querySelector('.player-title-row').prepend(qrBtn);
       fitTeamBadges(header);
     }
@@ -217,8 +324,11 @@
       body.innerHTML = '';
 
       if (game.status === 'setup' || game.status === 'picking') {
+        const claimed = game.squares.filter(Boolean).length;
         const card = el('div', 'card player-card');
-        card.innerHTML = `<p class="player-muted">This board is still filling up. Come back once the host locks it in and the numbers are drawn.</p>`;
+        card.innerHTML = `<div class="player-card-head"><span class="player-card-title">Board filling up</span><span class="player-card-sub">${claimed} of 100 claimed</span></div>
+          <p class="player-muted">The numbers are drawn when the host locks the board. Come back then to see how your squares are doing.</p>`;
+        card.appendChild(miniGrid(game, selectedPlayer));
         body.appendChild(card);
         return;
       }
@@ -286,9 +396,17 @@
         body.appendChild(pillCard);
       }
 
+      // ---- The board, with my squares highlighted ----
+      const gridCard = el('div', 'card player-card');
+      gridCard.innerHTML = `<div class="player-card-head"><span class="player-card-title">The Board</span></div>`;
+      gridCard.appendChild(miniGrid(game, selectedPlayer));
+      body.appendChild(gridCard);
+
       // ---- Game Winners ----
       const archiveCard = el('div', 'card player-card');
-      archiveCard.innerHTML = `<div class="player-card-head"><span class="player-card-title">Game Winners</span></div>`;
+      const scoredByHost = window.GameLogic.scoringMode(game) === 'manual'
+        ? '<span class="player-card-sub player-scored-by">scored by host</span>' : '';
+      archiveCard.innerHTML = `<div class="player-card-head"><span class="player-card-title">Game Winners</span>${scoredByHost}</div>`;
       const rows = el('div', 'player-history');
       QUARTERS.forEach(q => {
         const res = computed.results[q];
@@ -297,7 +415,7 @@
         if (res.a !== null && res.b !== null) scoreTxt = `${res.a} - ${res.b}`;
         let winnerTxt, winnerCls = '';
         if (res.a === null || res.b === null) {
-          winnerTxt = 'Locked'; winnerCls = 'ph-pending';
+          winnerTxt = 'Not yet'; winnerCls = 'ph-pending';
         } else if (res.resolved && res.pushed) {
           winnerTxt = 'Push (rolled over)'; winnerCls = 'ph-pending';
         } else if (res.resolved && res.winnerName) {
@@ -386,7 +504,9 @@
   // Shows a QR code (and the raw address) linking straight back to this same
   // read-only player screen, so the host — or another player who already has
   // it open — can let someone else scan in without touching the TV/iPad.
-  function showPlayerLink(id) {
+  // `code` (R22): when the board has a join code, the QR and link use the short
+  // /<code> form, the same link the host shares and the TV shows.
+  function showPlayerLink(id, code) {
     const overlay = SBS.ui.overlayEl('0.65');
     const box = el('div', 'card');
     box.style.cssText = 'max-width:520px; width:100%; box-shadow: var(--shadow-pop);';
@@ -397,7 +517,7 @@
     document.body.appendChild(overlay);
 
     const list = box.querySelector('.phone-link-list');
-    const url = `${location.origin}${location.pathname}#player-${id}`;
+    const url = code ? `${location.origin}/${code}` : `${location.origin}${location.pathname}#player-${id}`;
     let qr = '';
     try {
       qr = window.QRCode.toSvg(url, 150);
@@ -422,5 +542,6 @@
   }
 
   SBS.screens.player = renderPlayer;
-  SBS.playerView = { showPlayerLink };
+  SBS.screens.join = renderJoin;
+  SBS.playerView = { showPlayerLink, joinCard, shareBoard, joinUrl };
 })();
