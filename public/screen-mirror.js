@@ -117,6 +117,7 @@
     function hideStrip() {
       clearStripTimer();
       strip.hidden = true;
+      screenEl.classList.remove('strip-open');
     }
     // One timeout at a time: every touch in the strip replaces it. While a dialog is open the
     // strip stays, and is looked at again after another 3 s.
@@ -132,6 +133,7 @@
     function showStrip() {
       if (closed || !scorePanel || scorePanel.el.hidden) return;
       strip.hidden = false;
+      screenEl.classList.add('strip-open');
       armStrip();
     }
     ['pointerdown', 'touchstart', 'input', 'click'].forEach(ev => {
@@ -139,7 +141,7 @@
     });
     // A tap anywhere else brings the strip up. Taps in the strip, Exit and the tip do not.
     screenEl.addEventListener('click', (e) => {
-      if (strip.contains(e.target) || e.target.closest('.mirror-exit, .mirror-tip')) return;
+      if (strip.contains(e.target) || e.target.closest('.mirror-exit, .mirror-tip, .sleep-tip')) return;
       showStrip();
     });
 

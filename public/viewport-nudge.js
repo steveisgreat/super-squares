@@ -4,12 +4,13 @@
   function nudgeScroll() {
     if (window.scrollY !== 0) return;
     var docEl = document.documentElement;
-    var originalHeight = docEl.style.height;
     docEl.style.height = (window.innerHeight + 100) + 'px';
     window.scrollTo(0, 50);
     setTimeout(function () {
       window.scrollTo(0, 0);
-      docEl.style.height = originalHeight;
+      // Always back to the stylesheet's height. load and pageshow both run this, and remembering
+      // "the height before" could remember the other one's extra 100 px and leave it for good.
+      docEl.style.height = '';
     }, 0);
   }
   window.addEventListener('load', nudgeScroll);

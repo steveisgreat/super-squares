@@ -31,10 +31,10 @@
     return '$' + Math.round(n).toLocaleString();
   }
 
-  const OVERLAY_CSS = 'position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:1000; padding:20px;';
+  const OVERLAY_CSS = 'position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:flex-start; justify-content:center; overflow-y:auto; z-index:1000; padding:calc(20px + var(--sat)) calc(20px + var(--sar)) calc(20px + var(--sab)) calc(20px + var(--sal));';
 
   function overlayEl(opacity) {
-    const overlay = el('div', '');
+    const overlay = el('div', 'sbs-overlay');
     overlay.style.cssText = opacity ? OVERLAY_CSS.replace('0.6', opacity) : OVERLAY_CSS;
     return overlay;
   }

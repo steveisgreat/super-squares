@@ -738,12 +738,11 @@
         if (!fresh.updatedAt || fresh.updatedAt === game.updatedAt) return;
         if (fresh.status === 'started' || fresh.status === 'finished' || (!manualSelecting && !hostIsTyping())) {
           const locked = fresh.status === 'started' || fresh.status === 'finished';
-          // The page scrolls in <body> here (html and body are both 100% high), the panel is tall
-          // on a wide screen, and guests pick often: keep the place instead of jumping to the top.
+          // The panel is tall on a wide screen and guests pick often: keep the place instead of
+          // jumping to the top.
           const y = window.scrollY;
-          const by = document.body.scrollTop;
           SBS.go({ screen: locked ? 'board' : 'picking', game: fresh });
-          if (!locked) { window.scrollTo(0, y); document.body.scrollTop = by; }
+          if (!locked) window.scrollTo(0, y);
           return;
         }
         replaceGame(game, fresh);
