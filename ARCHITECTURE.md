@@ -43,6 +43,7 @@ LAN-only.
 | `GET /api/games` | host only; list summaries |
 | `GET /api/todays-games` | host only; ESPN schedule for the setup screen |
 | `POST /api/game`, `PUT /api/game/:id`, `DELETE /api/game/:id` | host only |
+| `PATCH /api/game/:id/score` | host only; one manual-score operation (decision 011) |
 
 `PUT` sends the whole document with `updatedAt`; a stale `updatedAt` returns 409 with the
 current document.
@@ -57,9 +58,9 @@ The store stamps `createdAt` and `updatedAt`.
 ## Client (`public/`, vanilla JS, no build step)
 
 `index.html` loads plain scripts in order: `compute.js` (payout math, validation,
-cutoff rules, shared with the server and unit-tested), `teams.js` (NFL/NBA colors, ESPN
-logo URLs), `qrcode.js`, `core.js` (API client, routing, 401 sign-in replay), `ui.js`,
-`players.js`, `board.js`, then screens: `screen-home` (saved games, setup, version
+cutoff rules, shared with the server and unit-tested), `teams.js` (NFL/NBA names
+and colors, no logos), `qrcode.js`, `core.js` (API client, routing, 401 sign-in replay), `ui.js`,
+`players.js`, `board.js`, `score-panel.js` (manual score), then screens: `screen-home` (saved games, setup, version
 footer), `screen-picking`, `screen-gameday`, `screen-phone` (score entry),
 `screen-player` (read-only My Squares), and `app.js` (hash router: `#tv-<id>`,
 `#score-<id>`, `#player-<id>`). Every polling screen refetches its game about every 8 s.
@@ -67,11 +68,11 @@ It is also a PWA (`manifest.webmanifest`, icons).
 
 ## External dependencies
 
-- ESPN's unofficial scoreboard API (scores and schedule) and its logo CDN (until R4).
+- ESPN's unofficial scoreboard API (scores and schedule).
 - Neon Postgres (cloud only). Runtime packages: `@neondatabase/serverless`, `selfsigned`.
 - Node 24.x (`engines`).
 
 ## Known gaps
 
 No BRD, no CI, no end-to-end smoke test. Tests cover compute, both stores (Postgres
-only when `DATABASE_URL` is set), auth and live score (`npm test`).
+only when `DATABASE_URL` is set), auth, manual score and live score (`npm test`).
