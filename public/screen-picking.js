@@ -5,7 +5,7 @@
   const SBS = window.SBS = window.SBS || {};
   const { el, escapeHtml, money, topbar, showConfirm, showAlert, applyTeamColors, teamBadge, fitTeamBadges } = SBS.ui;
   const { unpaidTotal, openManagePlayersModal, resolveNameForPick, markPlayerPaid, ensurePlayerColor } = SBS.players;
-  const { shuffle, lockGame } = window.GameLogic;
+  const { shuffle, lockGame, isPlayerName } = window.GameLogic;
 
   // Guards the one irreversible action in the app (drawing the axis numbers).
   // Module-level so a re-render can't reset it mid-save.
@@ -17,7 +17,7 @@
     app.innerHTML = '';
     const reopen = () => SBS.go({ screen: 'picking', game });
 
-    const headerMeta = [SBS.ui.leagueBadge(game.league), game.description ? escapeHtml(game.description) : (game.gameDate || ''), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
+    const headerMeta = [SBS.ui.leagueBadge(game.league), escapeHtml(game.description || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
     const bar = topbar(`${teamBadge(game, 'A', { cls: 'team-badge-sm' })}<span class="vs-sep">vs</span>${teamBadge(game, 'B', { cls: 'team-badge-sm' })}<span class="header-year">${headerMeta}</span>`);
     const nav = bar.querySelector('.nav');
     const manageBtn = el('button', 'secondary', 'Manage Players');
@@ -135,6 +135,7 @@
       const count = parseInt(formWrap.querySelector('#p-count').value, 10);
       const paidChecked = formWrap.querySelector('#p-paid').checked;
       if (!rawName) return showErr('Please enter a player name.');
+      if (!isPlayerName(rawName)) return showErr('That name is not allowed. Choose a different name.');
       if (!count || count < 1) return showErr('Please enter a valid number of squares.');
       const emptyIdx = game.squares.map((s, i) => s ? -1 : i).filter(i => i >= 0);
       if (count > emptyIdx.length) return showErr(`Only ${emptyIdx.length} squares remain.`);

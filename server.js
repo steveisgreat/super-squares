@@ -6,6 +6,9 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { handleApi, sendJSON } = require('./lib/api.js');
+// The Content-Security-Policy lives in vercel.json and nowhere else, so both
+// builds send the same one.
+const SECURITY_HEADERS = require('./vercel.json').headers[0].headers;
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -67,6 +70,7 @@ function serveStatic(req, res, pathname) {
 function requestListener(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const pathname = url.pathname;
+  SECURITY_HEADERS.forEach(h => res.setHeader(h.key, h.value));
 
   if (pathname.startsWith('/api/')) {
     handleApi(req, res, pathname, url.searchParams, getHostInfo).catch(e => {

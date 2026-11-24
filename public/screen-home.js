@@ -93,7 +93,7 @@
       return `<span class="status status-kickoff-pending">Kickoff ${escapeHtml(timeTxt)}</span>`;
     }
     if (g.status !== 'picking') {
-      return `<span class="status status-${g.status}">${statusLabel(g.status)}</span>`;
+      return `<span class="status status-${escapeHtml(g.status)}">${escapeHtml(statusLabel(g.status))}</span>`;
     }
     const letters = [...statusLabel(g.status)].map(ch => ch === ' '
       ? `<span class="letter space"> </span>`
@@ -143,7 +143,7 @@
     const numbersPicked = g.status === 'started' || g.status === 'finished';
     c.innerHTML = `
       ${isTv ? '' : `<button class="icon-btn game-card-delete" type="button" aria-label="Delete Game" title="Delete Game">${X_ICON}</button>`}
-      <span class="game-date">${formatGameDate(g.gameDate)}</span>
+      <span class="game-date">${escapeHtml(formatGameDate(g.gameDate))}</span>
       <div class="game-card-meta">
         <div class="game-card-league">${leagueBadge(g.league)}</div>
       </div>
@@ -182,7 +182,7 @@
     });
     c.querySelector('.game-card-delete').addEventListener('click', async (e) => {
       e.stopPropagation();
-      const ok = await showConfirm(`Delete this game (${escapeHtml(g.teamA || '?')} vs ${escapeHtml(g.teamB || '?')})? This cannot be undone.`);
+      const ok = await showConfirm(`Delete this game (${g.teamA || '?'} vs ${g.teamB || '?'})? This cannot be undone.`);
       if (!ok) return;
       try {
         await SBS.api.deleteGame(g.id);
@@ -222,7 +222,7 @@
   // Revokes every session for this account, this device included. Another
   // device (a scorekeeper's phone) needs a new code afterward.
   async function signOutEverywhere(email, btn) {
-    const ok = await showConfirm(`Sign out everywhere for ${escapeHtml(email)}? This includes this device. Any other device, such as a scorekeeper's phone, will need a new code to sign in again.`);
+    const ok = await showConfirm(`Sign out everywhere for ${email}? This includes this device. Any other device, such as a scorekeeper's phone, will need a new code to sign in again.`);
     if (!ok) return;
     btn.disabled = true;
     try {
@@ -231,7 +231,7 @@
       // 401: already signed out, which is what was asked for.
       if (e.status !== 401) {
         btn.disabled = false;
-        showAlert('Could not sign out everywhere: ' + escapeHtml(e.message));
+        showAlert('Could not sign out everywhere: ' + e.message);
         return;
       }
     }
@@ -349,7 +349,7 @@
       if (e.authRequired) {
         needsSignIn = true;
       } else {
-        card.appendChild(el('div', 'error-msg', 'Could not load saved games: ' + e.message));
+        card.appendChild(el('div', 'error-msg', 'Could not load saved games: ' + escapeHtml(e.message)));
       }
     }
 
@@ -432,7 +432,7 @@
           await SBS.api.signOut();
         } catch (e) {
           outBtn.disabled = false;
-          showAlert('Could not sign out: ' + escapeHtml(e.message));
+          showAlert('Could not sign out: ' + e.message);
           return;
         }
         SBS.go({ screen: 'home' });
@@ -519,11 +519,11 @@
       <div class="row">
         <div>
           <label>Square Price ($)</label>
-          <input type="number" id="f-price" value="${editGame ? editGame.squarePrice : 10}" min="0" step="0.01">
+          <input type="number" id="f-price" value="${editGame ? escapeHtml(editGame.squarePrice) : 10}" min="0" step="0.01">
         </div>
         <div>
           <label>Game Date</label>
-          <input type="date" id="f-gamedate" value="${editGame && editGame.gameDate ? editGame.gameDate : todayValue()}">
+          <input type="date" id="f-gamedate" value="${editGame && editGame.gameDate ? escapeHtml(editGame.gameDate) : todayValue()}">
         </div>
       </div>
 
@@ -546,20 +546,20 @@
       <div class="row hidden" id="other-color-row">
         <div>
           <label>Team A Color</label>
-          <input type="color" id="f-teamA-color" value="${editGame && editGame.teamAColor ? editGame.teamAColor : DEFAULT_OTHER_COLORS.A}">
+          <input type="color" id="f-teamA-color" value="${editGame && editGame.teamAColor ? escapeHtml(editGame.teamAColor) : DEFAULT_OTHER_COLORS.A}">
         </div>
         <div>
           <label>Team B Color</label>
-          <input type="color" id="f-teamB-color" value="${editGame && editGame.teamBColor ? editGame.teamBColor : DEFAULT_OTHER_COLORS.B}">
+          <input type="color" id="f-teamB-color" value="${editGame && editGame.teamBColor ? escapeHtml(editGame.teamBColor) : DEFAULT_OTHER_COLORS.B}">
         </div>
       </div>
 
       <label>Quarterly Payout — % of Pot</label>
       <div class="row">
-        <div><label style="margin-top:0">Q1</label><input type="number" id="f-pq1" value="${editGame ? editGame.payouts.q1 : 20}" min="0" max="100"></div>
-        <div><label style="margin-top:0">Q2</label><input type="number" id="f-pq2" value="${editGame ? editGame.payouts.q2 : 20}" min="0" max="100"></div>
-        <div><label style="margin-top:0">Q3</label><input type="number" id="f-pq3" value="${editGame ? editGame.payouts.q3 : 20}" min="0" max="100"></div>
-        <div><label style="margin-top:0">Final</label><input type="number" id="f-pfinal" value="${editGame ? editGame.payouts.final : 40}" min="0" max="100"></div>
+        <div><label style="margin-top:0">Q1</label><input type="number" id="f-pq1" value="${editGame ? escapeHtml(editGame.payouts.q1) : 20}" min="0" max="100"></div>
+        <div><label style="margin-top:0">Q2</label><input type="number" id="f-pq2" value="${editGame ? escapeHtml(editGame.payouts.q2) : 20}" min="0" max="100"></div>
+        <div><label style="margin-top:0">Q3</label><input type="number" id="f-pq3" value="${editGame ? escapeHtml(editGame.payouts.q3) : 20}" min="0" max="100"></div>
+        <div><label style="margin-top:0">Final</label><input type="number" id="f-pfinal" value="${editGame ? escapeHtml(editGame.payouts.final) : 40}" min="0" max="100"></div>
       </div>
       <div id="pct-total" class="pct-total"></div>
 
@@ -577,7 +577,7 @@
       </div>
       <div id="cutoff-time-wrap" class="${editGame && editGame.autoCutoffEnabled ? '' : 'hidden'}">
         <label>Cutoff Date &amp; Time</label>
-        <input type="datetime-local" id="f-cutoff" step="60" value="${editGame && editGame.autoCutoffTime ? editGame.autoCutoffTime.slice(0, 16) : defaultCutoffValue()}">
+        <input type="datetime-local" id="f-cutoff" step="60" value="${editGame && editGame.autoCutoffTime ? escapeHtml(String(editGame.autoCutoffTime).slice(0, 16)) : defaultCutoffValue()}">
         <p style="color:var(--muted); font-size:0.9rem;">At this time, the app will automatically lock square picking and generate the grid numbers.</p>
       </div>
 
@@ -590,7 +590,7 @@
       <p style="color:var(--muted); font-size:0.9rem;">Manual: you enter the score yourself on the phone or Game Day screen, and the app never contacts ESPN. Live: the score is pulled from ESPN while the game is on. Simulation: for testing or demos, the app invents a random game and plays it out (2-minute quarters) starting the moment you generate the grid numbers.</p>
     `;
 
-    let league = editGame ? (editGame.league || 'nfl') : 'nfl';
+    let league = editGame && window.GameLogic.LEAGUES.includes(editGame.league) ? editGame.league : 'nfl';
     let selectedKickoff = editGame ? (editGame.kickoffTime || null) : null;
 
     function currentPreviewGame() {

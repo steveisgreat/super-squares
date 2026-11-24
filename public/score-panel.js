@@ -6,7 +6,7 @@
   'use strict';
 
   const SBS = window.SBS = window.SBS || {};
-  const { el, escapeHtml, showAlert, showConfirm, teamBadge, fitTeamBadges } = SBS.ui;
+  const { el, textEl, escapeHtml, showAlert, showConfirm, teamBadge, fitTeamBadges } = SBS.ui;
   const GL = window.GameLogic;
 
   const QUICK = {
@@ -160,7 +160,7 @@
       const finished = g.status === 'finished';
 
       const head = el('div', 'sp-title');
-      head.innerHTML = `<h3>Current score</h3><span class="sp-period">${finished ? 'FINAL' : periodLabel(cur.period)}</span>`;
+      head.innerHTML = `<h3>Current score</h3><span class="sp-period">${finished ? 'FINAL' : escapeHtml(periodLabel(cur.period))}</span>`;
       root.appendChild(head);
 
       root.appendChild(scoreRow(g, 'a', cur, finished));
@@ -168,7 +168,7 @@
 
       const actions = el('div', 'sp-actions');
       if (!finished) {
-        const end = el('button', 'sp-btn sp-primary', endLabel(cur.period));
+        const end = textEl('button', 'sp-btn sp-primary', endLabel(cur.period));
         end.type = 'button';
         end.setAttribute('data-spkey', 'end');
         end.addEventListener('click', () => endPeriod(cur.period));

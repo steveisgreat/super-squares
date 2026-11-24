@@ -227,6 +227,29 @@ async function run() {
     eq(espnCalls - before, 0, 'a fresh instance must be throttled after a failed look-up');
   });
 
+  // Found in review: the host's next save carries liveScore back, so a value
+  // validateGame refuses would lock the host out of their own board.
+  await check('odd values from the feed are stored in a shape the host can still save', async () => {
+    const G = require('./public/compute.js');
+    const was = global.fetch;
+    const side = (abbr, score) => ({ team: { abbreviation: abbr }, score, linescores: [{ period: 1, value: -2.5 }] });
+    global.fetch = async () => ({ ok: true, json: async () => ({ events: [{ competitions: [{
+      competitors: [side('SEA', '-3'), side('NYG', 7.5)],
+      status: { period: -1, displayClock: { odd: true }, type: { state: 5, name: 'x'.repeat(99), completed: true } }
+    }] }] }) });
+    const game = startedGame({
+      gameDate: '2026-02-08', squarePrice: 10, payouts: { q1: 25, q2: 25, q3: 25, final: 25 },
+      squares: G.emptyGrid(), axisX: G.shuffledDigits(), axisY: G.shuffledDigits(), players: {}, results: {}
+    });
+    try {
+      assert(await freshInstance().refreshLiveScore(game, async () => true), 'the odd score was not applied');
+    } finally {
+      global.fetch = was;
+    }
+    eq([game.liveScore.a, game.liveScore.b, game.liveScore.period, game.results.q1], [0, 7, 0, { a: 0, b: 0 }]);
+    eq(G.validateGame(game), null, 'validation error');
+  });
+
   // ---------- report ----------
 
   console.log('');

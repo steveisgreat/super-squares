@@ -18,23 +18,7 @@
      triggered the reconciliation on exactly the pages that needed it. So
      it forces a sliver of extra height first, scrolls into that, then
      restores the real height. -->
-<script>
-(function () {
-  function nudgeScroll() {
-    if (window.scrollY !== 0) return;
-    var docEl = document.documentElement;
-    var originalHeight = docEl.style.height;
-    docEl.style.height = (window.innerHeight + 100) + 'px';
-    window.scrollTo(0, 50);
-    setTimeout(function () {
-      window.scrollTo(0, 0);
-      docEl.style.height = originalHeight;
-    }, 0);
-  }
-  window.addEventListener('load', nudgeScroll);
-  window.addEventListener('pageshow', nudgeScroll);
-})();
-</script>
+<script src="viewport-nudge.js"></script>
 <!-- Added to the Home Screen, the app launches without Safari's toolbars —
      the most reliable way to get a chrome-free grid on an AirPlayed iPad. -->
 <meta name="apple-mobile-web-app-capable" content="yes">

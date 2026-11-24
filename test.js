@@ -304,6 +304,133 @@ check('validation rejects an unnamed claimed square', () => {
   assert(G.validateGame(g), 'expected an error for a blank name');
 });
 
+// Fields that reach markup. A stranger can PUT any JSON, so each one is held to
+// the type the screens expect (decision 012, part 3).
+const HOSTILE = '"><img src=x onerror=alert(1)>';
+const show = v => String(JSON.stringify(v)).slice(0, 40);
+
+function rejects(label, change) {
+  check('validation rejects ' + label, () => {
+    const g = fullGame();
+    change(g);
+    const msg = G.validateGame(g);
+    assert(typeof msg === 'string' && msg, 'expected an error');
+    assert(!/[<>]/.test(msg), 'the error must not repeat the hostile value: ' + msg);
+  });
+}
+function accepts(label, change) {
+  check('validation accepts ' + label, () => {
+    const g = fullGame();
+    change(g);
+    eq(G.validateGame(g), null, 'validation error');
+  });
+}
+
+[HOSTILE, 20260208, ['2026-02-08'], '2026-2-8', '2026-02-08' + HOSTILE, '2026-02-08\n'].forEach(v =>
+  rejects('a game date of ' + show(v), g => { g.gameDate = v; }));
+['teamA', 'teamB', 'description'].forEach(key => {
+  rejects(key + ' that is an object', g => { g[key] = { a: 'x' }; });
+  rejects(key + ' that is an array', g => { g[key] = [HOSTILE]; });
+  rejects('a very long ' + key, g => { g[key] = 'x'.repeat(201); });
+  accepts(key + ' with markup characters (escaped on screen)', g => { g[key] = 'A & B <3'; });
+});
+rejects('a league sent as an array', g => { g.league = ['nfl']; });
+rejects('a custom color on an NFL game that is not a color', g => { g.teamAColor = HOSTILE; });
+rejects('a custom color sent as an array', g => { g.league = 'other'; g.teamBColor = ['#336699']; });
+accepts('cleared custom colors', g => { g.teamAColor = null; g.teamBColor = null; });
+
+[HOSTILE, '10', [10], true, -1, null, 1e9].forEach(v =>
+  rejects('a square price of ' + show(v), g => { g.squarePrice = v; }));
+accepts('a price in cents', g => { g.squarePrice = 0.5; });
+['25', [25], true].forEach(v =>
+  rejects('a payout of ' + show(v), g => { g.payouts.q1 = v; }));
+rejects('payouts sent as an array', g => { g.payouts = [25, 25, 25, 25]; });
+['100', [100], true, '', 1e12].forEach(v =>
+  rejects('a pot override of ' + show(v), g => { g.potOverride = v; }));
+accepts('a pot override of 0', g => { g.potOverride = 0; });
+
+rejects('an unknown pick mode', g => { g.pickMode = HOSTILE; });
+['manual', 'auto', 'both'].forEach(v => accepts('pick mode ' + v, g => { g.pickMode = v; }));
+rejects('a status sent as an array', g => { g.status = ['started']; });
+rejects('a scoring mode sent as an array', g => { g.scoring = ['live']; });
+[HOSTILE, 5, {}, 'tomorrow', '2026-02-08T18:45' + HOSTILE].forEach(v => {
+  rejects('a cutoff time of ' + show(v), g => { g.autoCutoffTime = v; });
+  rejects('a kickoff time of ' + show(v), g => { g.kickoffTime = v; });
+});
+accepts('a cutoff and a kickoff time', g => { g.autoCutoffTime = '2026-02-08T18:45'; g.kickoffTime = '2026-01-26T18:00Z'; });
+accepts('a full ISO kickoff time', g => { g.kickoffTime = '2026-01-26T18:00:00.000+05:00'; });
+accepts('no cutoff and no kickoff', g => { g.autoCutoffTime = null; g.kickoffTime = null; });
+
+rejects('a name that is too long', g => { g.squares[0] = { name: 'x'.repeat(41) }; });
+rejects('a square sent as text', g => { g.squares[0] = HOSTILE; });
+['__proto__', 'constructor', 'toString', 'hasOwnProperty'].forEach(n => {
+  rejects('the name ' + n + ', which every object already has', g => { g.squares[0] = { name: n }; });
+  rejects('a player record named ' + n, g => { g.players = JSON.parse('{"' + n + '":{"paid":true}}'); });
+  check('isPlayerName refuses ' + n, () => eq(G.isPlayerName(n), false));
+});
+accepts('a subscripted and an accented name', g => { g.squares[0] = { name: "Zoë O'Neil₁₂" }; });
+
+[HOSTILE, 'red', '#fff', '#12345', 123456, ['#336699'], '#336699;background:url(//x)', '#336699\n'].forEach(v =>
+  rejects('a player color of ' + show(v), g => { g.players = { Ann: { paid: false, color: v } }; }));
+rejects('a player that is text', g => { g.players = { Ann: HOSTILE }; });
+rejects('a player that is null', g => { g.players = { Ann: null }; });
+rejects('a paid flag that is not a boolean', g => { g.players = { Ann: { paid: HOSTILE } }; });
+rejects('too many player records', g => { for (let i = 0; i < 501; i++) g.players['p' + i] = { paid: false }; });
+accepts('a player with no color yet', g => { g.players = { Ann: { paid: true }, Bob: { paid: false, color: '#Feca57' } }; });
+
+[HOSTILE, '7', [7], {}, true, -1, 7.5, 10000].forEach(v => {
+  rejects('a quarter score of ' + show(v), g => { g.results = { q1: { a: v, b: 0 } }; });
+  rejects('a live score of ' + show(v), g => { g.liveScore = { a: 0, b: v }; });
+});
+rejects('a result that is not an object', g => { g.results = { q1: HOSTILE }; });
+accepts('a blank, half-entered and cleared result', g => { g.results = { q1: { a: 7 }, q2: { a: '', b: null }, q3: {}, final: { a: 999, b: 0 } }; });
+
+const draw = { key: '5-6', row: 4, col: 7, drawnAt: 1787441568511 };
+accepts('a stored draw', g => { g.results = { final: { a: 1, b: 1, autoResolve: draw } }; });
+[['row', '4'], ['row', 10], ['row', -1], ['col', HOSTILE], ['col', 1.5], ['key', HOSTILE], ['key', ['5-6']], ['drawnAt', HOSTILE]].forEach(([k, v]) =>
+  rejects('a draw with ' + k + ' ' + show(v), g => { g.results = { final: { a: 1, b: 1, autoResolve: Object.assign({}, draw, { [k]: v }) } }; }));
+rejects('a draw that is an array', g => { g.results = { final: { a: 1, b: 1, autoResolve: [] } }; });
+
+accepts('a live score', g => { g.liveScore = { a: 7, b: 3, period: 2, clock: '8:41', state: 'in', statusName: 'STATUS_IN_PROGRESS', completed: false, updatedAt: '2026-10-11T20:05:00.000Z' }; });
+accepts('no live score', g => { g.liveScore = null; });
+[['period', HOSTILE], ['period', '2'], ['clock', [HOSTILE]], ['clock', 5], ['clock', 'x'.repeat(41)], ['state', {}], ['statusName', 4], ['updatedAt', 5], ['updatedAt', 'x'.repeat(41)]].forEach(([k, v]) =>
+  rejects('a live score with ' + k + ' ' + show(v), g => { g.liveScore = { a: 7, b: 3, [k]: v }; }));
+rejects('a live score that is text', g => { g.liveScore = HOSTILE; });
+
+accepts('a generated simulation plan', g => { g.simPlan = G.buildSimPlan(); });
+// The server adds these points up into a live score without validating again.
+[['points', HOSTILE], ['points', '7'], ['points', -7], ['atMs', '5'], ['team', 'c']].forEach(([k, v]) =>
+  rejects('a simulated play with ' + k + ' ' + show(v), g => {
+    g.simPlan = G.buildSimPlan();
+    g.simPlan.events[0][k] = v;
+  }));
+rejects('a simulation plan whose plays are not a list', g => { g.simPlan = Object.assign(G.buildSimPlan(), { events: 'x' }); });
+rejects('a simulation plan with a bad quarter length', g => { g.simPlan = Object.assign(G.buildSimPlan(), { quarterMs: '1' }); });
+rejects('a simulation plan with a bad start', g => { g.simPlan = Object.assign(G.buildSimPlan(), { startedAt: HOSTILE }); });
+rejects('a simulation plan with a thousand plays', g => { g.simPlan = G.buildSimPlan(); while (g.simPlan.events.length < 1000) g.simPlan.events.push({ team: 'a', atMs: 1, points: 1 }); });
+
+check('validation never throws, whatever the shape', () => {
+  const values = [null, undefined, 0, 1, '', 'x', true, [], {}, [null], [[]], { a: null }, { q1: 5 }, JSON.parse('{"__proto__":1}')];
+  Object.keys(fullGame()).concat('liveScore', 'simPlan', 'potOverride', 'autoCutoffTime', 'kickoffTime', 'scoring').forEach(key => {
+    values.forEach(v => {
+      const g = fullGame();
+      g[key] = v;
+      const msg = G.validateGame(g);
+      assert(msg === null || typeof msg === 'string', key + ' gave ' + typeof msg);
+    });
+  });
+});
+
+check('what the app itself writes still validates', () => {
+  const manual = Object.assign(fullGame(), { scoring: 'manual', results: {} });
+  ['add', 'set', 'end', 'final'].forEach(op => {
+    const r = G.applyScoreOp(manual, { op, side: 'a', points: 7, a: 7, b: 3 });
+    eq(G.validateGame(r.game), null, op);
+  });
+  const sim = Object.assign(fullGame(), { simulation: true, scoring: 'simulation', results: {} });
+  eq(G.validateGame(G.lockGame(sim)), null, 'a locked simulation');
+});
+
 // ---------- auto cutoff ----------
 
 check('cutoff fires only after the configured time', () => {

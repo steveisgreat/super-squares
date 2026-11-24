@@ -12,6 +12,16 @@
     return e;
   }
 
+  // For any text that came from a person, a feed or the server.
+  function textEl(tag, cls, text) {
+    const e = el(tag, cls);
+    e.textContent = text;
+    return e;
+  }
+
+  // Fields that should be colors end up inside style attributes.
+  const isColor = window.GameLogic.isColor;
+
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
@@ -32,21 +42,26 @@
   // Native confirm()/alert() are unreliable on iPad and invisible on an
   // AirPlayed TV, so every prompt goes through these.
   //
-  // `message` is rendered as HTML, not text — callers rely on that to drop in
-  // <br> and inline markup. Anything interpolated into it that came from a
-  // person (team names, player names) MUST be run through escapeHtml at the
-  // call site.
+  // `message` is text, never HTML, so nothing in it needs escaping (a newline
+  // is a line break). Messages carry names and server errors, and one missed
+  // escape would be a script in another person's browser.
+  function messageEl(message) {
+    const p = textEl('p', '', message);
+    p.style.whiteSpace = 'pre-line';
+    return p;
+  }
+
   function showModal({ message, okText, cancelText }) {
     return new Promise(resolve => {
       const overlay = overlayEl();
       const box = el('div', 'card');
       box.style.cssText = 'max-width:440px; width:100%; box-shadow: var(--shadow-pop);';
-      box.appendChild(el('p', '', message));
+      box.appendChild(messageEl(message));
       const actions = el('div', 'actions');
-      const okBtn = el('button', '', okText || 'OK');
+      const okBtn = textEl('button', '', okText || 'OK');
       actions.appendChild(okBtn);
       if (cancelText !== null) {
-        const cancelBtn = el('button', 'secondary', cancelText || 'Cancel');
+        const cancelBtn = textEl('button', 'secondary', cancelText || 'Cancel');
         cancelBtn.addEventListener('click', () => { overlay.remove(); resolve(false); });
         actions.appendChild(cancelBtn);
       }
@@ -376,10 +391,10 @@
       const overlay = overlayEl();
       const box = el('div', 'card');
       box.style.cssText = 'max-width:480px; width:100%; box-shadow: var(--shadow-pop);';
-      box.appendChild(el('p', '', message));
+      box.appendChild(messageEl(message));
       const actions = el('div', 'actions');
       buttons.forEach(b => {
-        const btn = el('button', b.variant || '', b.label);
+        const btn = textEl('button', b.variant || '', b.label);
         btn.addEventListener('click', () => { overlay.remove(); resolve(b.value); });
         actions.appendChild(btn);
       });
@@ -474,6 +489,7 @@
     ];
   }
 
+  // `title` is HTML: callers escape what they put in it.
   function topbar(title, extraButtons, opts) {
     const bar = el('div', 'topbar');
     let homeBtn = null;
@@ -493,7 +509,7 @@
     // remotes, so tapping/clicking the icon also surfaces the same info
     // through the existing cross-device modal.
     h1.style.cursor = 'pointer';
-    h1.addEventListener('click', () => showAlert(infoLines.map(escapeHtml).join('<br>')));
+    h1.addEventListener('click', () => showAlert(infoLines.join('\n')));
     bar.appendChild(h1);
     const nav = el('div', 'nav');
     if (homeBtn && !(opts && opts.homeLeft)) nav.appendChild(homeBtn);
@@ -527,11 +543,11 @@
   }
 
   const LEAGUE_LABELS = { nfl: 'NFL', nba: 'NBA', other: 'Other' };
-  function leagueLabel(league) { return LEAGUE_LABELS[league] || 'Other'; }
+  const leagueKey = (league) => (Object.keys(LEAGUE_LABELS).includes(league) ? league : 'other');
+  function leagueLabel(league) { return LEAGUE_LABELS[leagueKey(league)]; }
 
   function leagueBadge(league) {
-    const cls = `league-badge league-${league || 'other'}`;
-    return `<span class="${cls}">${leagueLabel(league)}</span>`;
+    return `<span class="league-badge league-${leagueKey(league)}">${leagueLabel(league)}</span>`;
   }
 
   // ---------- Team colours ----------
@@ -566,7 +582,7 @@
     const league = game && game.league;
     if (league === 'other') {
       const custom = side === 'A' ? game.teamAColor : game.teamBColor;
-      const primary = custom || (side === 'B' ? DEFAULT_COLORS.teamB : DEFAULT_COLORS.teamA);
+      const primary = isColor(custom) ? custom : (side === 'B' ? DEFAULT_COLORS.teamB : DEFAULT_COLORS.teamA);
       return { primary, secondary: shadeColor(primary, -22), font: null, abbr: teamAbbr(name, null), matched: false, league };
     }
     const meta = teamMeta(name, league);
@@ -767,7 +783,7 @@
   }
 
   SBS.ui = {
-    el, escapeHtml, money, overlayEl, fullscreen, keepScreenAwake,
+    el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake,
     showModal, showConfirm, showAlert, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin,
     topbar, statusLabel, leagueLabel, leagueBadge, isTvBrowser, isPhone,
     formatKickoffTime, kickoffNotice,

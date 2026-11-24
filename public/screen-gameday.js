@@ -123,7 +123,7 @@
       const xDigit = game.axisX ? game.axisX[col] : null;
       card.innerHTML = `
         <div class="draw-reveal-label">Winning square</div>
-        <div class="draw-reveal-nums">${yDigit === null ? '&ndash;' : yDigit}&nbsp;&ndash;&nbsp;${xDigit === null ? '&ndash;' : xDigit}</div>
+        <div class="draw-reveal-nums">${yDigit === null ? '&ndash;' : escapeHtml(yDigit)}&nbsp;&ndash;&nbsp;${xDigit === null ? '&ndash;' : escapeHtml(xDigit)}</div>
         <div class="draw-reveal-name">${winner ? escapeHtml(winner.name) : 'Empty square'}</div>
       `;
       timer = setTimeout(finish, 5000);
@@ -234,7 +234,7 @@
     playerBtn.type = 'button';
     if (phone) { playerBtn.setAttribute('aria-label', 'Player View QR'); playerBtn.title = 'Player View QR'; }
     playerBtn.addEventListener('click', () => SBS.playerView.showPlayerLink(game.id));
-    const headerMeta = [SBS.ui.leagueBadge(game.league), game.description ? escapeHtml(game.description) : (game.gameDate || ''), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
+    const headerMeta = [SBS.ui.leagueBadge(game.league), escapeHtml(game.description || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
     app.appendChild(topbar('', [manageBtn, tvBtn, phoneBtn, playerBtn], { hideIcon: true, homeLeft: true }));
     const main = el('div', 'main');
     app.appendChild(main);

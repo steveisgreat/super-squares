@@ -247,28 +247,116 @@
     return a.every(n => Number.isInteger(n) && n >= 0 && n <= 9);
   }
 
+  // ---------- Field types ----------
+  // Every guest's browser draws what a host saved, and hosts are strangers
+  // (decision 012), so any field that reaches markup, a style or a lookup key
+  // is held to the exact type the screens expect. The screens escape as well.
+  const PICK_MODES = ['manual', 'auto', 'both'];
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const DATETIME_RE = /^\d{4}-\d{2}-\d{2}T[\d:.]{4,18}(Z|[+-]\d{2}:?\d{2})?$/;
+  const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+  const MAX_NAME = 40; // the form allows 10 plus a subscript
+  const MAX_TEXT = 200;
+  const MAX_PLAYERS = 500;
+  const MAX_SIM_EVENTS = 200;
+
+  const isUnset = v => v === undefined || v === null;
+  const isRecord = v => !!v && typeof v === 'object' && !Array.isArray(v);
+  const isColor = v => typeof v === 'string' && COLOR_RE.test(v);
+  const isText = (v, max) => typeof v === 'string' && v.length <= max;
+  const isAmount = (v, max) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= max;
+  const isWhole = (v, max) => Number.isInteger(v) && v >= 0 && v <= max;
+
+  // Names double as keys of game.players, so one that every object already has
+  // ("__proto__", "toString") would find something that is not a player.
+  function isPlayerName(name) {
+    return isText(name, MAX_NAME) && !!name.trim() && !(name in {});
+  }
+
+  function invalidPlayers(players) {
+    if (!isRecord(players)) return 'Players must be an object.';
+    const names = Object.keys(players);
+    if (names.length > MAX_PLAYERS) return 'There are too many players.';
+    for (const name of names) {
+      if (name in {} || name.length > MAX_NAME) return 'A player name is not allowed.';
+      const p = players[name];
+      if (!isRecord(p)) return 'Each player must be an object.';
+      if (p.paid !== undefined && typeof p.paid !== 'boolean') return 'A player can only be paid or unpaid.';
+      if (!isUnset(p.color) && !isColor(p.color)) return 'A player color must be a hex color (e.g. #336699).';
+    }
+    return null;
+  }
+
+  function invalidResults(results) {
+    if (!isRecord(results)) return 'Results must be an object.';
+    for (const q of QUARTERS) {
+      const entry = results[q];
+      if (isUnset(entry)) continue;
+      if (!isRecord(entry)) return `The ${QLABEL[q]} result must be an object.`;
+      for (const side of ['a', 'b']) {
+        const v = entry[side];
+        if (!isUnset(v) && v !== '' && !isWhole(v, 9999)) return `${QLABEL[q]} scores must be whole numbers from 0 to 9999.`;
+      }
+      const draw = entry.autoResolve;
+      if (isUnset(draw)) continue;
+      if (!isRecord(draw) || typeof draw.key !== 'string' || !/^\d-\d$/.test(draw.key)
+        || !isWhole(draw.row, 9) || !isWhole(draw.col, 9)
+        || (!isUnset(draw.drawnAt) && !isAmount(draw.drawnAt, Number.MAX_SAFE_INTEGER))) return `The ${QLABEL[q]} drawn winner is not valid.`;
+    }
+    return null;
+  }
+
+  function invalidLiveScore(live) {
+    if (!isRecord(live)) return 'The live score must be an object.';
+    for (const side of ['a', 'b']) {
+      if (!isUnset(live[side]) && !isWhole(live[side], 9999)) return 'Live scores must be whole numbers from 0 to 9999.';
+    }
+    if (!isUnset(live.period) && !isWhole(live.period, 99)) return 'The live score period must be a whole number.';
+    for (const key of ['clock', 'state', 'statusName', 'updatedAt']) {
+      if (!isUnset(live[key]) && !isText(live[key], 40)) return `The live score ${key} must be short text.`;
+    }
+    return null;
+  }
+
+  // The server adds these points up into liveScore (simLiveState) with no
+  // second look, so a bad plan would become a bad score.
+  function invalidSimPlan(plan) {
+    const bad = 'The simulation plan is not valid.';
+    if (!isRecord(plan) || !isText(plan.startedAt, 40) || isNaN(Date.parse(plan.startedAt))) return bad;
+    if (!isUnset(plan.quarterMs) && !isAmount(plan.quarterMs, 24 * 60 * 60 * 1000)) return bad;
+    if (!Array.isArray(plan.events) || plan.events.length > MAX_SIM_EVENTS) return bad;
+    for (const e of plan.events) {
+      if (!isRecord(e) || (e.team !== 'a' && e.team !== 'b') || !isAmount(e.atMs, Number.MAX_SAFE_INTEGER) || !isWhole(e.points, 99)) return bad;
+    }
+    return null;
+  }
+
   // Server-side guard against a malformed client persisting a corrupt game.
   // Returns an error string, or null when the shape is acceptable.
   function validateGame(game) {
     if (!game || typeof game !== 'object' || Array.isArray(game)) return 'Game must be an object.';
 
     if (!game.gameDate || typeof game.gameDate !== 'string') return 'Game date is required.';
+    if (!DATE_RE.test(game.gameDate)) return 'Game date must look like 2026-02-08.';
 
-    if (LEAGUES.indexOf(game.league) === -1) return `League must be one of: ${LEAGUES.join(', ')}.`;
-    if (game.league === 'other') {
-      for (const key of ['teamAColor', 'teamBColor']) {
-        if (game[key] !== undefined && game[key] !== null && game[key] !== '' && !/^#[0-9a-fA-F]{6}$/.test(game[key])) {
-          return `${key} must be a hex color (e.g. #336699).`;
-        }
-      }
+    for (const [key, label] of [['teamA', 'Team A'], ['teamB', 'Team B'], ['description', 'Description']]) {
+      if (!isUnset(game[key]) && !isText(game[key], MAX_TEXT)) return `${label} must be ${MAX_TEXT} characters or fewer.`;
     }
 
-    const price = Number(game.squarePrice);
-    if (!Number.isFinite(price) || price < 0) return 'Square price must be a number of 0 or more.';
+    if (LEAGUES.indexOf(game.league) === -1) return `League must be one of: ${LEAGUES.join(', ')}.`;
+    // Checked in every league: the setup form shows these whatever the league.
+    for (const [key, label] of [['teamAColor', 'Team A color'], ['teamBColor', 'Team B color']]) {
+      if (!isUnset(game[key]) && game[key] !== '' && !isColor(game[key])) return `${label} must be a hex color (e.g. #336699).`;
+    }
 
-    if (game.potOverride !== null && game.potOverride !== undefined) {
-      const override = Number(game.potOverride);
-      if (!Number.isInteger(override) || override < 0) return 'Total pot must be a whole number of 0 or more.';
+    if (!isAmount(game.squarePrice, 1e6)) return 'Square price must be a number from 0 to 1000000.';
+
+    if (!isUnset(game.potOverride) && !isWhole(game.potOverride, 1e9)) return 'Total pot must be a whole number of 0 or more.';
+
+    if (!isUnset(game.pickMode) && PICK_MODES.indexOf(game.pickMode) === -1) return `Pick mode must be one of: ${PICK_MODES.join(', ')}.`;
+    for (const [key, label] of [['autoCutoffTime', 'Cutoff'], ['kickoffTime', 'Kickoff']]) {
+      const v = game[key];
+      if (!isUnset(v) && v !== '' && !(typeof v === 'string' && DATETIME_RE.test(v))) return `${label} must be a date and time.`;
     }
 
     if (!Array.isArray(game.squares) || game.squares.length !== 100) return 'Squares must be an array of exactly 100 entries.';
@@ -276,13 +364,14 @@
       if (sq === null) continue;
       if (typeof sq !== 'object' || Array.isArray(sq)) return 'Each square must be null or an object.';
       if (typeof sq.name !== 'string' || !sq.name.trim()) return 'Each claimed square must have a non-empty name.';
+      if (!isPlayerName(sq.name)) return 'A player name is not allowed.';
     }
 
-    if (!game.payouts || typeof game.payouts !== 'object') return 'Payouts are required.';
+    if (!isRecord(game.payouts)) return 'Payouts are required.';
     let total = 0;
     for (const q of QUARTERS) {
-      const v = Number(game.payouts[q]);
-      if (!Number.isFinite(v) || v < 0) return `Payout for ${QLABEL[q]} must be a number of 0 or more.`;
+      const v = game.payouts[q];
+      if (!isAmount(v, 1000)) return `Payout for ${QLABEL[q]} must be a number of 0 or more.`;
       total += v;
     }
     if (Math.abs(total - 100) > 0.01) return `Quarterly payout percentages must total 100% (got ${total}%).`;
@@ -297,10 +386,11 @@
     }
     if ((game.status === 'started' || game.status === 'finished') && (!game.axisX || !game.axisY)) return 'A started game must have both axis number rows generated.';
 
-    if (game.results !== undefined && (typeof game.results !== 'object' || game.results === null || Array.isArray(game.results))) return 'Results must be an object.';
-    if (game.players !== undefined && (typeof game.players !== 'object' || game.players === null || Array.isArray(game.players))) return 'Players must be an object.';
-
-    return null;
+    return (game.results !== undefined && invalidResults(game.results))
+      || (game.players !== undefined && invalidPlayers(game.players))
+      || (!isUnset(game.liveScore) && invalidLiveScore(game.liveScore))
+      || (!isUnset(game.simPlan) && invalidSimPlan(game.simPlan))
+      || null;
   }
 
   // True when picking should be locked because the configured cutoff has passed.
@@ -574,7 +664,7 @@
     scoringMode, applyScoreOp, setQuarterScore, belowEndedQuarter, manualState, hasResult,
     shuffle, shuffledDigits, emptyGrid,
     potOf, actualPotOf, findCol, findRow, computeGame, computeLiveHighlight, payoutAmount, drawnDigits,
-    validateGame, isDigitPermutation, syncStatus,
+    validateGame, isPlayerName, isColor, isDigitPermutation, syncStatus,
     cutoffPassed, lockGame,
     SIM_QUARTER_MS, buildSimPlan, simLiveState, simCumulativeThroughQuarter
   };

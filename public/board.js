@@ -5,7 +5,7 @@
   'use strict';
 
   const SBS = window.SBS = window.SBS || {};
-  const { el, escapeHtml, teamColor, readableTextColor, teamBadge, teamStyle } = SBS.ui;
+  const { el, escapeHtml, isColor, teamColor, readableTextColor, teamBadge, teamStyle } = SBS.ui;
 
   // "Qn" for regulation, "OT" (or "2OT", etc.) once the game runs past four
   // quarters — ESPN numbers overtime periods 5, 6, ...
@@ -47,7 +47,7 @@
       </span>
       <span class="live-center">
         ${teamBadge(game, 'A', { cls: 'team-badge-sm' })}
-        <span class="live-score-digits">${live.a}–${live.b}</span>
+        <span class="live-score-digits">${escapeHtml(live.a)}–${escapeHtml(live.b)}</span>
         ${teamBadge(game, 'B', { cls: 'team-badge-sm' })}
         <span class="live-period">${escapeHtml(clockTxt)}</span>
         ${live.manual && live.updatedAt ? `<span class="live-updated" data-updated="${escapeHtml(live.updatedAt)}">${updatedAgo(live.updatedAt)}</span>` : ''}
@@ -86,7 +86,7 @@
   function nameTxt(game, name) {
     const players = game.players || {};
     const color = players[name] && players[name].color;
-    const style = color ? ` style="color:${color};"` : '';
+    const style = isColor(color) ? ` style="color:${color};"` : '';
     return `<div class="name-txt"${style}>${escapeHtml(name)}</div>`;
   }
 
@@ -172,11 +172,11 @@
 
     table.appendChild(el('div', 'cell head corner', ''));
     for (let c = 0; c < 10; c++) {
-      table.appendChild(el('div', 'cell head x' + (game.axisX ? '' : ' pending'), game.axisX ? game.axisX[c] : '–'));
+      table.appendChild(el('div', 'cell head x' + (game.axisX ? '' : ' pending'), game.axisX ? escapeHtml(game.axisX[c]) : '–'));
     }
 
     for (let r = 0; r < 10; r++) {
-      table.appendChild(el('div', 'cell head y' + (game.axisY ? '' : ' pending'), game.axisY ? game.axisY[r] : '–'));
+      table.appendChild(el('div', 'cell head y' + (game.axisY ? '' : ' pending'), game.axisY ? escapeHtml(game.axisY[r]) : '–'));
       for (let c = 0; c < 10; c++) {
         const sq = game.squares[r * 10 + c];
         const labels = computed.cellLabels[`${r}-${c}`] || [];

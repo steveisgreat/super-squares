@@ -95,7 +95,8 @@ async function findEvent(teamA, teamB, league) {
 function cumulativeThrough(competitor, n) {
   const lines = competitor.linescores || [];
   if (!lines.some(s => s.period === n)) return null;
-  return lines.filter(s => s.period <= n).reduce((sum, s) => sum + (Number(s.value) || 0), 0);
+  const sum = lines.filter(s => s.period <= n).reduce((total, s) => total + (Number(s.value) || 0), 0);
+  return Math.min(9999, Math.max(0, Math.trunc(sum)));
 }
 
 function hasScore(entry) {
@@ -160,13 +161,16 @@ function applyLiveData(game, comp) {
 
   const status = comp.status || {};
   const type = status.type || {};
+  // Coerced so an odd value from the feed can't make the host's next save fail
+  // validateGame.
+  const whole = (v, max) => Math.min(max, Math.max(0, Math.trunc(Number(v)) || 0));
   const live = {
-    a: Number(compA.score) || 0,
-    b: Number(compB.score) || 0,
-    period: status.period || 0,
-    clock: status.displayClock || '',
-    state: type.state || 'pre',
-    statusName: type.name || '',
+    a: whole(compA.score, 9999),
+    b: whole(compB.score, 9999),
+    period: whole(status.period, 99),
+    clock: String(status.displayClock || '').slice(0, 40),
+    state: String(type.state || 'pre').slice(0, 40),
+    statusName: String(type.name || '').slice(0, 40),
     completed: !!type.completed,
     updatedAt: new Date().toISOString()
   };

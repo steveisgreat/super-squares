@@ -10,6 +10,7 @@
 delete process.env.DATABASE_URL;
 
 const crypto = require('crypto');
+const G = require('./public/compute.js');
 const auth = require('./lib/auth.js');
 const store = require('./lib/store.js');
 const mailer = require('./lib/mailer.js');
@@ -534,6 +535,63 @@ async function run() {
     let threw = false;
     await readBody(stream([bytes, bytes]), bytes.length).catch(() => { threw = true; });
     assert(threw, 'over the limit');
+  });
+
+  await check('a full simulated board is half the limit or less, and anything over it is a 413 that writes nothing', async () => {
+    reset();
+    const full = Object.assign(board(GAME_A), {
+      scoring: 'simulation', simulation: true, status: 'picking',
+      description: 'Washington Commanders @ Tampa Bay Buccaneers', potOverride: 1000,
+      autoCutoffTime: '2027-02-14T18:45', kickoffTime: '2027-02-14T23:30Z'
+    });
+    // The longest name the form allows, at three bytes a character.
+    full.squares.forEach((s, i) => {
+      const name = '字'.repeat(8) + String(i).padStart(2, '0') + '₁₂';
+      full.squares[i] = { name };
+      full.players[name] = { paid: false, color: '#feca57' };
+    });
+    G.lockGame(full);
+    while (full.simPlan.events.length < 14) full.simPlan.events.push({ team: 'a', atMs: 479999, points: 7 });
+    G.QUARTERS.forEach(q => { full.results[q] = { a: 34, b: 31 }; });
+    full.results.final.autoResolve = { key: '5-6', row: 4, col: 7, drawnAt: 1787441568511 };
+    full.liveScore = { a: 34, b: 31, period: 4, clock: '0:00', state: 'post', completed: true, simulation: true, updatedAt: full.updatedAt };
+    const size = Buffer.byteLength(JSON.stringify(full));
+    assert(size * 2 <= 28 * 1024, `a full board is ${size} bytes`);
+    eq((await call('PUT', `/api/game/${GAME_A}`, { as: A, body: full })).statusCode, 200, 'a full board saves');
+
+    reset();
+    const huge = Object.assign(board(GAME_A), { padding: 'x'.repeat(28 * 1024) });
+    eq((await call('PUT', `/api/game/${GAME_A}`, { as: A, body: huge })).statusCode, 413, 'PUT');
+    eq((await call('POST', '/api/game', { as: A, body: huge })).statusCode, 413, 'POST');
+    eq((await call('PATCH', `/api/game/${GAME_A}/score`, { as: A, body: { op: 'end', padding: 'x'.repeat(4096) } })).statusCode, 413, 'PATCH');
+    eq((await call('POST', '/api/login', { body: { email: 'x'.repeat(5000) } })).statusCode, 413, 'login');
+    eq(db.writes, 0, 'writes');
+  });
+
+  await check('a board with a hostile field is a 400 that writes nothing', async () => {
+    reset();
+    const bad = Object.assign(board(GAME_A), { players: { Ann: { color: '"><img src=x onerror=alert(1)>' } } });
+    eq((await call('PUT', `/api/game/${GAME_A}`, { as: A, body: bad })).statusCode, 400, 'PUT');
+    eq((await call('POST', '/api/game', { as: A, body: bad })).statusCode, 400, 'POST');
+    eq(db.writes, 0, 'writes');
+  });
+
+  // ---------- the pages ----------
+
+  await check('the policy allows no inline script, and no page needs one', async () => {
+    const fs = require('fs');
+    const dir = require('path').join(__dirname, 'public');
+    const [rule] = require('./vercel.json').headers;
+    const csp = rule.headers.find(h => h.key === 'Content-Security-Policy').value;
+    eq(rule.source, '/(.*)', 'every path');
+    const scripts = csp.split('; ').find(d => d.startsWith('script-src '));
+    eq(scripts, "script-src 'self'");
+    assert(csp.includes("default-src 'self'") && csp.includes("object-src 'none'") && csp.includes("base-uri 'none'"), csp);
+    fs.readdirSync(dir).filter(f => f.endsWith('.html')).forEach(f => {
+      const html = fs.readFileSync(`${dir}/${f}`, 'utf8');
+      (html.match(/<script\b[^>]*>[^]*?<\/script>/gi) || []).forEach(s => assert(/^<script src="[^":]+"><\/script>$/.test(s), `${f}: ${s.slice(0, 60)}`));
+      assert(!/\son[a-z]+\s*=|javascript:|<style\b/i.test(html), `${f} has an inline handler or style block`);
+    });
   });
 
   // ---------- the mail itself ----------

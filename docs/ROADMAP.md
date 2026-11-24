@@ -56,9 +56,11 @@ edit or delete host B's games); `/code-review high` clean.
 *Progress:* part 1 done 2026-11-23 (migration 002, store scoping, sign-in and owner
 checks on the server, mailer, tests; see the decision's build notes). Part 2 done
 2026-11-23 (client sign-in: email and code prompt, `#login-` page, sign out everywhere,
-403 handling). Not live: `AUTH_MODE` stays unset. Left: part 3, escaping audit and
-Content-Security-Policy, smaller body limit, `scripts/assign-owner.js`, GitHub Actions,
-privacy page (email, `sbs_session`, pending sign-in in localStorage).
+403 handling). Part 3 done 2026-11-23 (escaping audit, stricter board validation,
+Content-Security-Policy, 28 KB game limit, `scripts/assign-owner.js`, CI workflow, privacy
+draft). Not live: `AUTH_MODE` stays unset. Left: the first CI run after a push, the
+`TEST_DATABASE_URL` secret, then going live (runbook, "Turn on host accounts") once R16
+and R10 are done.
 
 **R3. Manual current score** — `Sonnet` — ✅ shipped 2026-11-23 ([decision 011](decisions/011-manual-scoring.md)); R2 later swaps its
 host check for an owner check.

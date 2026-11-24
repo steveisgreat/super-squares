@@ -199,3 +199,22 @@ R2 part 2 (2026-11-23: client sign-in in `public/`):
 - A 403 sets `err.forbidden`, never prompts, and `SBS.handleForbidden` shows the message
   once and returns the server's copy. A 401 or 403 stops the auto-cutoff timer's retries.
 - Home makes one session call and does not wait for it.
+
+R2 part 3 (2026-11-23: escaping audit, Content-Security-Policy, body limit, script, CI):
+- The audit read every `innerHTML` and `el(…, html)` in `public/`. Script injection was
+  possible through winner names, live clock, period and score (player view), live score and
+  player colors (grid), game dates, setup-form values and league, the score panel's period,
+  and one error. All are fixed. A hostile `simPlan` could also write a bad live score,
+  because the server adds its points up without validating again.
+- `showAlert`, `showConfirm` and `showChoice` now take **text**, never HTML, so a missed
+  escape in a message can't matter.
+- `validateGame` holds each of those fields to an exact type. Numbers must be numbers, not
+  numeric strings (no stored board had any). Player names that every object already has as
+  a key (`__proto__`, `toString`) are refused. Live-feed fields are coerced at the source,
+  so an odd value from the feed can't block a host's save.
+- The policy is in `vercel.json` only, and `server.js` reads it from there. `style-src`
+  keeps `'unsafe-inline'` for `style=""` attributes; `style-src-elem` does not, so
+  current browsers refuse injected `<style>` blocks.
+- A full simulated board measures 9.6 KB (12.8 KB with names in a three-byte script). The
+  limit is 28 KB, and 4 KB for a score operation. Over it is 413.
+- The Postgres tests in CI read the secret `TEST_DATABASE_URL` and are skipped without it.

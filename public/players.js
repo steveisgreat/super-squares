@@ -6,6 +6,8 @@
   const SBS = window.SBS = window.SBS || {};
   const { el, escapeHtml, money, overlayEl, showChoice, showConfirm, showAlert } = SBS.ui;
 
+  const { isPlayerName } = window.GameLogic;
+
   const MAX_NAME_LEN = 10;
 
   const EDIT_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -97,7 +99,7 @@
     const totalCount = Array.from(group.variants.values()).reduce((a, b) => a + b, 0);
 
     const choice = await showChoice({
-      message: `"${escapeHtml(trimmed)}" already has ${totalCount} square${totalCount === 1 ? '' : 's'} picked (${variantNames.map(v => `"${escapeHtml(v)}"`).join(', ')}). Is this the same person?`,
+      message: `"${trimmed}" already has ${totalCount} square${totalCount === 1 ? '' : 's'} picked (${variantNames.map(v => `"${v}"`).join(', ')}). Is this the same person?`,
       buttons: [
         { label: 'Same Person — Combine', value: 'same' },
         { label: 'Different Person — Keep Separate', value: 'separate' },
@@ -131,7 +133,7 @@
 
   function playerSummaries(game) {
     ensurePlayers(game);
-    const counts = {};
+    const counts = Object.create(null);
     game.squares.forEach(sq => { if (sq) counts[sq.name] = (counts[sq.name] || 0) + 1; });
     return Object.keys(counts).sort((a, b) => a.localeCompare(b)).map(name => {
       const count = counts[name];
@@ -224,6 +226,7 @@
             async function commit() {
               const newName = input.value.trim().slice(0, MAX_NAME_LEN);
               if (!newName) return showAlert('Name cannot be empty.');
+              if (!isPlayerName(newName)) return showAlert('That name is not allowed. Choose a different name.');
               if (newName === p.name) return renderList();
               const collision = Object.keys(ensurePlayers(game))
                 .find(n => n.toLowerCase() === newName.toLowerCase() && n !== p.name);
@@ -240,7 +243,7 @@
           });
           row.querySelector('button.btn-delete').addEventListener('click', async () => {
             const startedWarning = (game.status === 'started' || game.status === 'finished') ? ' The game has already started — this may change quarter results tied to their square(s).' : '';
-            const ok = await showConfirm(`Remove all ${p.count} square${p.count === 1 ? '' : 's'} picked by "${escapeHtml(p.name)}"?${startedWarning} This cannot be undone.`);
+            const ok = await showConfirm(`Remove all ${p.count} square${p.count === 1 ? '' : 's'} picked by "${p.name}"?${startedWarning} This cannot be undone.`);
             if (!ok) return;
             game.squares.forEach((sq, i) => { if (sq && sq.name === p.name) game.squares[i] = null; });
             delete ensurePlayers(game)[p.name];

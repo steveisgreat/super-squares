@@ -1,0 +1,53 @@
+# Actions are pinned to a commit: a tag can be moved, a commit can't.
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - run: npm test
+
+  # Needs the repository secret TEST_DATABASE_URL, the connection string of a
+  # Neon branch kept for tests, never production (docs/runbook.md). Without it,
+  # and on pull requests from forks, this job says so and passes.
+  postgres:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # One at a time: every run shares the branch.
+    concurrency:
+      group: postgres-tests
+    env:
+      DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+    steps:
+      - if: env.DATABASE_URL == ''
+        run: echo "::notice::Postgres tests skipped. The TEST_DATABASE_URL secret is not set."
+      - if: env.DATABASE_URL != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: env.DATABASE_URL != ''
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - if: env.DATABASE_URL != ''
+        run: npm ci --ignore-scripts
+      - if: env.DATABASE_URL != ''
+        run: npm run test:store-pg
+      - if: env.DATABASE_URL != ''
+        run: npm run test:store

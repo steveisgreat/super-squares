@@ -30,7 +30,8 @@ LAN-only.
 | `lib/store-fs.js`, `lib/store-pg.js` | The two backends; both apply auto-cutoff on read |
 | `lib/version.js` | App version from `package.json`; adds `+<short hash>` on Vercel non-production |
 | `server-livescore.js` | ESPN scoreboard lookup, `refreshLiveScore` (refresh on read, decision 007), `getTodaysGames` |
-| `server.js` | LAN only: static files, certificate, single-port HTTP/HTTPS, host info |
+| `server.js` | LAN only: static files, certificate, single-port HTTP/HTTPS, host info; sends the security headers it reads from `vercel.json` |
+| `scripts/assign-owner.js` | One-off: gives boards with no owner to an account (runbook) |
 | `scripts/poll-scores.js` | Probe for the score providers (decision 001); not part of the app |
 
 ## API
@@ -54,7 +55,8 @@ list holds only the caller's boards. A foreign `Origin` on any write gets 403. A
 sign-in setup gets 503, as does a Vercel deploy with no sign-in set up at all.
 
 `PUT` sends the whole document with `updatedAt`; a stale `updatedAt` returns 409 with the
-current document.
+current document. Game bodies over 28 KB and other bodies over 4 KB get 413.
+`validateGame` (`compute.js`) holds every field that reaches markup to an exact type.
 
 ## Data
 
@@ -75,6 +77,10 @@ footer), `screen-picking`, `screen-gameday`, `screen-phone` (score entry),
 `#score-<id>`, `#player-<id>`). Every polling screen refetches its game about every 8 s.
 It is also a PWA (`manifest.webmanifest`, icons).
 
+`viewport-nudge.js` loads first, in the head. `el(tag, cls, html)` takes HTML, so callers
+escape; `textEl`, `showAlert`, `showConfirm` and `showChoice` take plain text. The
+Content-Security-Policy in `vercel.json` allows no inline script.
+
 ## External dependencies
 
 - ESPN's unofficial scoreboard API (scores and schedule).
@@ -83,5 +89,6 @@ It is also a PWA (`manifest.webmanifest`, icons).
 
 ## Known gaps
 
-No BRD, no CI, no end-to-end smoke test. Tests cover compute, both stores (Postgres
+No BRD, no end-to-end smoke test. CI (`.github/workflows/test.yml`) runs the tests; the
+Postgres ones need the `TEST_DATABASE_URL` secret. Tests cover compute, both stores (Postgres
 only when `DATABASE_URL` is set), auth, accounts, manual score and live score (`npm test`).

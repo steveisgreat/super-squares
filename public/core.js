@@ -63,7 +63,7 @@
         return true;
       } catch (e) {
         if (e.status !== 401) {
-          await SBS.ui.showAlert('Could not sign in: ' + SBS.ui.escapeHtml(e.message));
+          await SBS.ui.showAlert('Could not sign in: ' + e.message);
           return false;
         }
         msg = 'That password is not right. Try again?';
@@ -80,7 +80,7 @@
       try {
         session = await rawRequest('/api/session');
       } catch (e) {
-        await SBS.ui.showAlert('Could not sign in: ' + SBS.ui.escapeHtml(e.message));
+        await SBS.ui.showAlert('Could not sign in: ' + e.message);
         return false;
       }
       // Signed in from another tab since the 401.
@@ -150,7 +150,7 @@
   // { fresh } (fresh is null if the reload failed too).
   SBS.handleForbidden = async function (e, id) {
     if (!e || !e.forbidden) return null;
-    await SBS.ui.showAlert(SBS.ui.escapeHtml(e.message) + ' Your change was not saved.');
+    await SBS.ui.showAlert(e.message + ' Your change was not saved.');
     let fresh = null;
     try { fresh = await SBS.api.getGame(id); } catch (err) { /* keep what is on screen */ }
     return { fresh };

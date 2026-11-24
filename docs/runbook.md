@@ -12,7 +12,7 @@ Vercel project settings. Never commit them.
 | `DATABASE_URL` | cloud | Neon **pooled** connection string (host contains `-pooler`). Unset means the fs backend. |
 | `HOST_PASSWORD` | cloud | Host sign-in. Use 20+ random characters; it is the only brute-force defense. Unset disables auth on the LAN; on Vercel, unset with no accounts means 503 on every host route. |
 | `SESSION_SECRET` | accounts (optional for password) | Signs the session cookie. Accounts mode requires 32+ random characters; password mode defaults to `HOST_PASSWORD`. |
-| `AUTH_MODE` | cloud, after R2 | `accounts` turns on host accounts (decision 012). Unset keeps password mode. Any other value fails closed (503). **Leave unset until the rest of R2 ships (escaping audit, CSP, assigning existing boards).** |
+| `AUTH_MODE` | cloud, after R2 | `accounts` turns on host accounts (decision 012). Unset keeps password mode. Any other value fails closed (503). Turn it on with the steps in "Turn on host accounts" below. |
 | `APP_ORIGIN` | accounts | The site's own `https://` origin, used in emailed links. |
 | `RESEND_API_KEY`, `EMAIL_FROM` | accounts | Sign-in email. Off Vercel, without the key, the link and code print to the server console. Turn click tracking off for the domain in Resend: it rewrites the link. |
 | `LOGIN_EMAILS_PER_HOUR` | optional | Site-wide cap on sign-in emails. Default 200. |
@@ -37,6 +37,13 @@ production database, then `npm start`.
 `npm test` runs every suite. `test-store-pg.js` skips unless `DATABASE_URL` is set; point
 it at a Neon branch, since it writes rows.
 
+CI (`.github/workflows/test.yml`) runs the offline suites on every push to `master` and
+every pull request. The Postgres suites run there too once the repository secret
+`TEST_DATABASE_URL` exists: make a Neon branch for tests, copy its **pooled** connection
+string, and run `gh secret set TEST_DATABASE_URL` (it asks for the value, so the string
+stays out of the shell history). Never the production string. Delete the secret to turn
+them off.
+
 ## Database
 
 Schema is every file in `migrations/`, in number order (each is idempotent). Apply one by
@@ -45,6 +52,27 @@ before the first deploy that needs it. `002_host_accounts.sql` is needed only be
 `AUTH_MODE=accounts` is set; password mode runs without it (tested 2026-11-23). Migrations only add (expand, then contract).
 Neon free tier suspends after about 5 minutes idle, so the first query pays a 1–3 s cold
 start. Do not add a keepalive or scheduled ping.
+
+## Turn on host accounts
+
+Once, after R16 (sending domain) and R10 (sign-in firewall rule):
+
+1. Deploy with `AUTH_MODE` unset. Password mode keeps working.
+2. Apply `migrations/002_host_accounts.sql`.
+3. `node --env-file=.env.local scripts/assign-owner.js <email>` prints the database host
+   and the counts. Check both, then run it again with `--apply`.
+4. Set `SESSION_SECRET`, `APP_ORIGIN`, `RESEND_API_KEY`, `EMAIL_FROM`, then
+   `AUTH_MODE=accounts`, and redeploy.
+5. Run step 3 again, for boards made in between. Sign in and check the list.
+
+To go back, unset `AUTH_MODE` and redeploy. Boards keep their owner.
+
+## Security headers
+
+The Content-Security-Policy is in `vercel.json` and nowhere else; `server.js` reads it
+from there. It allows scripts from this origin only: no inline script, no `on…=`
+attributes, no third-party script. A new font, script, image or API host needs a change
+there. On previews it blocks the Vercel toolbar, which is expected.
 
 ## Deploy (Vercel)
 
@@ -62,6 +90,8 @@ start. Do not add a keepalive or scheduled ping.
 2. Sign in with `HOST_PASSWORD`, create a game, open its `#player-<id>` link in a private
    window (public read works signed out).
 3. `GET /api/games` signed out returns 401.
+4. The page response has a `Content-Security-Policy` header, and the browser console shows
+   no policy errors on Home and on a `#tv-<id>` view.
 
 ## Roll back
 

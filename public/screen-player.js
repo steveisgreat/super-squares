@@ -146,7 +146,7 @@
           : hasFinal ? computed.results.final.b
           : auto ? '–' : '';
         const statusTxt = game.status === 'finished' ? 'FINAL'
-          : (live && live.state === 'in') ? [live.period ? (live.period > 4 ? (live.period > 5 ? `${live.period - 4}OT` : 'OT') : `Q${live.period}`) : '', live.clock].filter(Boolean).join(' &middot; ')
+          : (live && live.state === 'in') ? [live.period ? (live.period > 4 ? (live.period > 5 ? `${live.period - 4}OT` : 'OT') : `Q${live.period}`) : '', live.clock].filter(Boolean).map(escapeHtml).join(' &middot; ')
           : 'In Progress';
         // Same glowing pill treatment the Home screen's game card uses for a
         // "started" game — a quiet visual cue that this one is live right now.
@@ -155,14 +155,14 @@
           <div class="player-ticker">
             <div class="pt-team badge-fit">
               ${teamBadge(game, 'A', { cls: 'team-badge-sm' })}
-              <div class="pt-pts">${scoreA}</div>
+              <div class="pt-pts">${escapeHtml(scoreA)}</div>
             </div>
             <div class="pt-mid">
               <div class="${statusCls}">${statusTxt}</div>
             </div>
             <div class="pt-team badge-fit">
               ${teamBadge(game, 'B', { cls: 'team-badge-sm' })}
-              <div class="pt-pts">${scoreB}</div>
+              <div class="pt-pts">${escapeHtml(scoreB)}</div>
             </div>
           </div>
         `;
@@ -302,10 +302,10 @@
           winnerTxt = 'Push (rolled over)'; winnerCls = 'ph-pending';
         } else if (res.resolved && res.winnerName) {
           const mine = res.winnerName === selectedPlayer;
-          winnerTxt = `${res.winnerName} &middot; ${money(res.amount)}`;
+          winnerTxt = `${escapeHtml(res.winnerName)} &middot; ${money(res.amount)}`;
           if (res.autoResolved) {
             const digits = drawnDigits(game, res);
-            if (digits) winnerTxt += ` <span class="ph-drawn">(Drawn ${digits.y}-${digits.x})</span>`;
+            if (digits) winnerTxt += ` <span class="ph-drawn">(Drawn ${escapeHtml(digits.y)}-${escapeHtml(digits.x)})</span>`;
           }
           winnerCls = mine ? 'ph-mine' : 'ph-live';
         } else if (q === 'final' && res.needsDraw) {
