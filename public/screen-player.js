@@ -10,13 +10,6 @@
   const { playerSummaries } = SBS.players;
   const { QUARTERS, QLABEL, computeGame, computeLiveHighlight, payoutAmount, drawnDigits } = window.GameLogic;
 
-  const QR_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
-    <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
-    <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
-    <path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20v.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-  </svg>`;
-
   function storageKey(id) { return `sbs-player-view-${id}`; }
 
   function squareInfo(game, computed, liveHighlight, idx) {
@@ -95,7 +88,8 @@
   // ---------- Join code: link, share, mini grid (R22, decision 016) ----------
 
   function joinUrl(game) {
-    return `${location.origin}/${game.joinCode}`;
+    // A board from before join codes keeps its long link until its owner next reads it.
+    return game.joinCode ? `${location.origin}/${game.joinCode}` : `${location.origin}/#player-${game.id}`;
   }
 
   // Native share sheet where there is one, otherwise copy the link. `note` is a
@@ -103,7 +97,7 @@
   async function shareBoard(game, note) {
     const url = joinUrl(game);
     const title = `${game.teamA || 'Team A'} vs ${game.teamB || 'Team B'} squares`;
-    const text = `Join the squares pool. Code ${game.joinCode}.`;
+    const text = 'Join the squares pool.' + (game.joinCode ? ` Code ${game.joinCode}.` : '');
     if (navigator.share) {
       try {
         await navigator.share({ title, text, url });
@@ -155,6 +149,71 @@
     card.appendChild(row);
     card.appendChild(note);
     return card;
+  }
+
+  // A guest passing the link on: text it, share it, or let someone scan it. There is
+  // no way to open the board again here; this phone already has it open.
+  function showInvite(game) {
+    const opener = document.activeElement;
+    const url = joinUrl(game);
+    const overlay = SBS.ui.overlayEl('0.65');
+    const box = el('div', 'card invite-dialog');
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', 'Invite friends');
+    let qr = '';
+    try {
+      qr = window.QRCode.toSvg(url, 180);
+    } catch (err) {
+      console.error('QR encode failed', err);
+    }
+    box.innerHTML = `<h3>Invite friends</h3>
+      <p>Send the link, or let them scan the code with their camera.</p>
+      ${qr ? `<div class="phone-qr">${qr}</div>` : ''}
+      ${game.joinCode ? `<div class="join-code" aria-label="Join code ${escapeHtml(game.joinCode.split('').join(' '))}">${escapeHtml(game.joinCode)}</div>` : ''}
+      <div class="join-url">${escapeHtml(url.replace(/^https?:\/\//, ''))}</div>`;
+
+    const actions = el('div', 'invite-actions');
+    const note = el('div', 'join-note');
+    note.setAttribute('role', 'status');
+    note.setAttribute('aria-live', 'polite');
+    const add = (cls, label, onClick) => {
+      const b = el('button', cls, label);
+      b.type = 'button';
+      b.addEventListener('click', onClick);
+      actions.appendChild(b);
+      return b;
+    };
+    if (isPhone()) {
+      const teams = `${game.teamA || 'Team A'} vs ${game.teamB || 'Team B'}`;
+      // "?&body=" is the one form both iPhone and Android read.
+      add('', 'Text a friend', () => {
+        location.href = `sms:?&body=${encodeURIComponent(`Join our squares pool for ${teams}: ${url}`)}`;
+      });
+    }
+    add(isPhone() ? 'secondary' : '', navigator.share ? 'Share link' : 'Copy link', () => shareBoard(game, note));
+    const done = add('secondary', 'Done', close);
+    box.appendChild(actions);
+    box.appendChild(note);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    actions.firstChild.focus();
+
+    function onKey(e) {
+      if (e.key === 'Escape') return close();
+      if (e.key !== 'Tab') return;
+      const first = actions.firstChild;
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); done.focus(); }
+      else if (!e.shiftKey && document.activeElement === done) { e.preventDefault(); first.focus(); }
+    }
+    function close() {
+      document.removeEventListener('keydown', onKey);
+      overlay.remove();
+      if (opener && opener.isConnected) opener.focus();
+    }
+    document.addEventListener('keydown', onKey);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    SBS.onLeaveScreen(close);
   }
 
   // A small 10x10 of the board: claimed squares shaded, the viewer's own
@@ -213,6 +272,12 @@
 
     const selectRow = el('div', 'player-select-row');
     wrap.appendChild(selectRow);
+
+    const inviteBtn = el('button', 'secondary player-invite-btn', 'Invite friends');
+    inviteBtn.type = 'button';
+    inviteBtn.hidden = true; // until the board loads
+    inviteBtn.addEventListener('click', () => showInvite(game));
+    wrap.appendChild(inviteBtn);
 
     const body = el('div', 'player-body');
     wrap.appendChild(body);
@@ -281,12 +346,6 @@
         </div>
         ${tickerHtml}
       `;
-      const qrBtn = el('button', 'icon-btn player-qr-btn', QR_ICON);
-      qrBtn.type = 'button';
-      qrBtn.setAttribute('aria-label', 'Show QR code for this screen');
-      qrBtn.title = 'Show QR code so others can join';
-      qrBtn.addEventListener('click', () => showPlayerLink(id, game.joinCode));
-      header.querySelector('.player-title-row').prepend(qrBtn);
       fitTeamBadges(header);
     }
 
@@ -460,6 +519,7 @@
       if (!game) return;
       drawHeader();
       drawSelect();
+      inviteBtn.hidden = false;
       drawBody();
     }
 
@@ -483,6 +543,7 @@
         if (e && e.status === 404) {
           header.innerHTML = `<div class="error-msg">This game no longer exists.</div>`;
           selectRow.innerHTML = '';
+          inviteBtn.hidden = true;
           body.innerHTML = '';
           return;
         }
@@ -501,9 +562,7 @@
     SBS.setManagedInterval(() => load(false), 15000);
   }
 
-  // Shows a QR code (and the raw address) linking straight back to this same
-  // read-only player screen, so the host — or another player who already has
-  // it open — can let someone else scan in without touching the TV/iPad.
+  // The host's QR code for the guest view. Guests pass the link on with showInvite.
   // `code` (R22): when the board has a join code, the QR and link use the short
   // /<code> form, the same link the host shares and the TV shows.
   function showPlayerLink(id, code) {
