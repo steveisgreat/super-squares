@@ -158,6 +158,75 @@ the search pages from R12, and "Start a board" into the app. No NFL marks.
 and accessibility pass in every look; version in the footer and `<meta
 name="version">`; Search Console set up and pages submitted.
 
+### Milestone 1b — Game-night experience (target 2027-01-10)
+
+From the 2026-11-24 flow review: Steve's game flow (sign up → set up → fill grid and
+collect → lock → watch → score → pay out, plus s1 remove player, s2 mark paid, s3 feed
+down) across phone (iPhone and Android), iPad, PC/laptop and TV, live and manual.
+Mock: the "Super-Squares flow redesign mock" design canvas (claude.ai artifact
+`EdFD9pgkFqqtHXdzQgiQmv`, private), with a device map of which screens get their own
+layout. The phone is the baseline (every screen works at 360 px); iPad and laptop get
+their own layouts only around the grid; the TV only shows boards. The order below is
+a proposal; Steve picks what is a launch must-have.
+
+**R18. Score-link pop-up copy on cloud** — `Haiku` — bug.
+"Phone Score Entry" on Vercel shows LAN-only text (same WiFi, self-signed certificate
+warning, Limit IP Address Tracking). Show it only on the LAN build.
+*Done:* cloud pop-up has no LAN text; LAN pop-up unchanged.
+
+**R19. Live-first setup** — `Sonnet`.
+The game picker moves into the form after league and date; picking a game fills teams,
+description and kickoff, sets the cutoff to kickoff and switches Scoring to Live.
+Manual is the fallback (no game picked, or Other). "Auto Fetch Score" becomes "Live";
+the raw-ESPN Details button goes.
+*Done:* browser check at 375, 1366 and 1920 px.
+
+**R20. Phone Game Day** — `Sonnet` — Depends on: R18.
+Tabs Score | Board | Players (Score first on Manual boards, Board first on Live); the
+whole 10×10 grid fits a 360 px phone; labeled actions instead of four bare icons;
+feed-down banner (s3) with take over and resume.
+*Done:* browser check at 360 and 390 px, TV view unchanged.
+
+**R21. Payout tracking** — `Opus` (money logic, test-first) — Depends on: R20.
+"Mark paid out" per quarter (the host pays off-app, decision 004); a game-over "who to
+pay" list; correcting a quarter that was already paid out warns and marks it
+"Needs settling" until the host clears it.
+*Done:* transition tests in `compute.js` for paid-out, correction and settle;
+`/code-review high` clean.
+
+**R22. Join codes and guest view** — `Sonnet` build, `Opus` review (new column,
+migration) — Depends on: none.
+A short join code per board (`/<code>`), a share button (system share sheet, iPhone and
+Android), guest link available before lock, the TV view shows the board filling with a
+big join QR before lock, and the guest view gets a small grid with my squares, "Not yet"
+instead of "Locked", and "scored by host" on Manual boards.
+*Done:* code uniqueness test; browser check on phone sizes and the TV view.
+
+**R23. TV pairing and the device chooser** — `Sonnet` build, `Opus` review — Depends on: R22.
+After lock, "What's in the room?" (Show on a TV, Score from another phone, Invite
+players). A TV opens `/tv`, shows a short code, and the host's phone enters it; the
+paired TV follows the host's current game. No server timers (the TV's normal poll
+picks up the pairing).
+*Done:* pairing works on a smart-TV browser and a second desktop browser; a TV never
+gets write access.
+
+**R24. Scorer-phone hand-off** — `Opus` (auth) — Depends on: R2; decision entry first.
+A one-time QR on the host's iPad or laptop signs a phone in for that board without an
+email code. Related to "per-board scorekeeper links" in Later (decision 012).
+*Done:* decision approved; token is single-use and short-lived; `/code-review high` clean.
+
+**R25. iPad and laptop layouts** — `Sonnet` — Depends on: R20.
+iPad: fill the grid by tapping squares; a table board with scoring and players in a side
+panel. Laptop: the same wide layouts plus paste-a-list of players, keyboard scoring
+shortcuts and "Present on the TV" over HDMI (TV view full screen on the second display).
+*Done:* browser check at 1180×820, 1366 and 1920 px.
+
+**R26. Mirror mode for one phone** — `Sonnet` — Depends on: R20.
+For AirPlay (iPhone) or Cast / Smart View (Android) with no second device: a landscape
+TV view with a tap-to-show score strip, Players blocked while mirroring, and a Do Not
+Disturb tip.
+*Done:* browser check in phone landscape; the strip hides after 3 s.
+
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
 
 **R8. Cache board reads at the edge** — `Opus` — Depends on: R3, R4a.
@@ -210,6 +279,8 @@ office-pool groups.
 - Phone app wrappers (Capacitor) for App Store and Google Play discovery —
   check Apple's real-money gaming guideline first.
 - Per-board scorekeeper links that can only enter scores (not in R2, decision 012).
+- Guests claim their own squares from their phones, the host confirms and marks paid
+  (2026-11-24 flow review; needs a claim capability and auth review, Opus).
 - Account upkeep: change email, self-service deletion, co-hosts (decision 012).
 - Spring basketball tournament push (NBA/Other already supported).
 - Unlimited squares after a grid sells out (open questions in memory notes).
@@ -243,3 +314,4 @@ office-pool groups.
 2. Ad budget for the final three weeks?
 3. Form an LLC before taking payments?
 4. Product name (R16): pick the public name. Decides the domain.
+5. Milestone 1b (R18–R26): which items are launch must-haves, and in what order?
