@@ -23,7 +23,7 @@
     app.innerHTML = '';
     const reopen = () => SBS.go({ screen: 'picking', game });
 
-    const headerMeta = [SBS.ui.leagueBadge(game.league), escapeHtml(game.description || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
+    const headerMeta = [SBS.ui.leagueBadge(game.league), escapeHtml(SBS.ui.shownDescription(game) || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
     const bar = topbar(`${teamBadge(game, 'A', { logoSize: 22, cls: 'team-badge-sm' })}<span class="vs-sep">vs</span>${teamBadge(game, 'B', { logoSize: 22, cls: 'team-badge-sm' })}<span class="header-year">${headerMeta}</span>`);
     const nav = bar.querySelector('.nav');
     const manageBtn = el('button', 'secondary', 'Manage Players');

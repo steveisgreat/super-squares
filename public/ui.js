@@ -688,6 +688,23 @@
 
   // A short fallback for team names that don't match a known team (so
   // free-text entries still get something reasonable in the abbreviated view).
+  // The description to show for a board, or '' when it only repeats the matchup: every screen
+  // that shows it also shows the teams. The form's own default ("Chiefs @ Eagles") and anything
+  // else naming both teams counts, by full name, nickname, city or capital abbreviation (KC).
+  function shownDescription(game) {
+    const desc = String((game && game.description) || '').trim();
+    if (!desc) return '';
+    const words = s => ' ' + String(s || '').toLowerCase().replace(/[!-\/:-@\[-`{-~\s‐-―‘’]+/g, ' ').trim() + ' ';
+    const text = words(desc);
+    const named = (team) => {
+      const meta = teamMeta(team, game.league);
+      const names = [team].concat(meta ? meta.names : []).map(words).filter(w => w.trim());
+      if (names.some(w => text.indexOf(w) !== -1)) return true;
+      return !!meta && new RegExp('(^|[^A-Za-z0-9])' + meta.abbr.toUpperCase() + '($|[^A-Za-z0-9])').test(desc);
+    };
+    return named(game.teamA) && named(game.teamB) ? '' : desc;
+  }
+
   function teamAbbr(name, meta) {
     if (meta) return meta.abbr.toUpperCase();
     const words = String(name || '').trim().split(/\s+/).filter(Boolean);
@@ -919,7 +936,7 @@
   SBS.ui = {
     el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake, keepPartyAwake, partyHistory,
     showModal, showConfirm, showAlert, disturbMessage, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin,
-    topbar, statusLabel, leagueLabel, leagueBadge, isTvBrowser, isPhone,
+    shownDescription, topbar, statusLabel, leagueLabel, leagueBadge, isTvBrowser, isPhone,
     formatKickoffTime, kickoffNotice,
     teamMeta, teamStyle, applyTeamColors, resetTeamColors, teamLogoTag,
     legalLinks, teamColor, readableTextColor, teamBadge, fitTeamBadges, teamAbbr, shadeColor,

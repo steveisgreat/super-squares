@@ -3,7 +3,7 @@
   'use strict';
 
   const SBS = window.SBS = window.SBS || {};
-  const { el, escapeHtml, topbar, showAlert, showConfirm, teamMeta, teamLogoTag, teamBadge, resetTeamColors, fitTeamBadges, isTvBrowser } = SBS.ui;
+  const { shownDescription, el, escapeHtml, topbar, showAlert, showConfirm, teamMeta, teamLogoTag, teamBadge, resetTeamColors, fitTeamBadges, isTvBrowser } = SBS.ui;
   const { emptyGrid } = window.GameLogic;
   const { openManagePlayersModal } = SBS.players;
 
@@ -94,10 +94,6 @@
 
   function matchName(g) {
     return `${g.teamA || 'Team A'} vs ${g.teamB || 'Team B'}`;
-  }
-
-  function descLine(g) {
-    return g.description || `${g.teamA || ''} @ ${g.teamB || ''}`;
   }
 
   function chipHtml(g) {
@@ -247,7 +243,7 @@
     showMenu(opener, {
       label: 'More for ' + matchName(g),
       headerTitle: matchName(g),
-      headerSub: `${descLine(g)} · ${chipFor(g).text}`,
+      headerSub: [shownDescription(g), chipFor(g).text].filter(Boolean).join(' · '),
       items
     });
   }
@@ -255,13 +251,14 @@
   // ---------- Cards ----------
   function buildGameCard(g) {
     const name = matchName(g);
+    const desc = shownDescription(g);
     const c = el('article', 'home-card');
     c.setAttribute('aria-label', `${name}, ${chipFor(g).text}`);
     c.innerHTML = `
       <div class="home-card-top">${chipHtml(g)}<span class="home-when">${escapeHtml(whenLabel(g.gameDate))}</span></div>
       <button class="home-more" type="button" aria-label="${escapeHtml('More for ' + name)}" aria-haspopup="dialog" aria-expanded="false">${DOTS_ICON}</button>
       <div class="home-match badge-fit">${teamBadge(g, 'A', { logoSize: 22, cls: 'home-badge' })}<span class="vs-sep">vs</span>${teamBadge(g, 'B', { logoSize: 22, cls: 'home-badge' })}</div>
-      <div class="home-desc">${escapeHtml(descLine(g))}</div>
+      ${desc ? `<div class="home-desc">${escapeHtml(desc)}</div>` : ''}
       <div class="home-actions">
         <button class="home-primary" type="button" aria-label="${escapeHtml(primaryLabel(g) + ': ' + name)}"><span>${escapeHtml(primaryLabel(g))}</span>${CHEVRON_ICON}</button>
         <button class="home-party" type="button" aria-label="${escapeHtml('Party View for ' + name)}" title="Party View">${MAXIMIZE_ICON}<span class="home-party-text">Party View</span></button>
@@ -479,11 +476,11 @@
     const name = matchName(g);
     tile.setAttribute('aria-label', `Show Party View: ${name}, ${chipFor(g).text}`);
     const when = g.gameDate === todayValue() ? '' : whenLabel(g.gameDate);
-    const desc = [g.description || `${g.teamA || ''} @ ${g.teamB || ''}`, when].filter(Boolean).join(' · ');
+    const desc = [shownDescription(g), when].filter(Boolean).join(' · ');
     tile.innerHTML = `
       ${chipHtml(g)}
       <span class="home-match badge-fit">${teamBadge(g, 'A', { logoSize: 48, cls: 'home-badge' })}<span class="vs-sep">vs</span>${teamBadge(g, 'B', { logoSize: 48, cls: 'home-badge' })}</span>
-      <span class="tv-tile-desc">${escapeHtml(desc)}</span>
+      ${desc ? `<span class="tv-tile-desc">${escapeHtml(desc)}</span>` : ''}
       <span class="tv-tile-cta">${MAXIMIZE_ICON}<span>Show Party View</span></span>`;
     tile.addEventListener('click', () => SBS.go({ screen: 'tv', id: g.id, from: 'home' }));
     return tile;
@@ -678,7 +675,7 @@
     const app = SBS.appEl;
     resetTeamColors();
     app.innerHTML = '';
-    app.appendChild(topbar(editGame ? `Edit Game — ${escapeHtml(editGame.description || editGame.gameDate || '')}` : 'New Game — Setup'));
+    app.appendChild(topbar(editGame ? `Edit Game — ${escapeHtml(shownDescription(editGame) || editGame.gameDate || '')}` : 'New Game — Setup'));
     const main = el('div', 'main');
     app.appendChild(main);
 

@@ -78,7 +78,7 @@
           <span class="pm-vs">vs</span>
           ${teamBadge(game, 'B', { logoSize: 22 })}
         </div>
-        <div class="phone-sub">${SBS.ui.leagueBadge(game.league)} ${game.description ? escapeHtml(game.description) + ' &middot; ' : ''}Pot ${money(computed.pot)}</div>
+        <div class="phone-sub">${SBS.ui.leagueBadge(game.league)} ${SBS.ui.shownDescription(game) ? escapeHtml(SBS.ui.shownDescription(game)) + ' &middot; ' : ''}Pot ${money(computed.pot)}</div>
       `;
       fitTeamBadges(header);
 
