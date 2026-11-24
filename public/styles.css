@@ -926,6 +926,10 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: 1.5rem; }
   text-align: center;
 }
 
+.footer-links { margin-top: 10px; }
+.footer-links a { color: var(--muted); }
+.footer-links a:hover, .footer-links a:focus-visible { color: var(--accent); }
+
 .hidden { display: none !important; }
 
 .games-picker label { margin-top: 0; }

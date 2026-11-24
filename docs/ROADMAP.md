@@ -103,7 +103,9 @@ Use Stripe test mode until Steve approves live keys.
 *Done:* webhook signature and idempotency tests; free limit cannot be bypassed
 from the client; `/code-review high` clean.
 
-**R6. Legal and trust pages** — `Sonnet` — Depends on: R0.
+**R6. Legal and trust pages** — `Sonnet` — drafted 2026-11-23, **not done**: needs
+Steve's and a lawyer's review, and the bracketed placeholders filled (name, company,
+support email, state; R16). Pages carry a draft banner and `noindex`.
 Terms of Service (entertainment and tracking only, no pot handling), privacy
 policy, contact/support email, footer links. Draft only — Steve reviews with a
 lawyer.

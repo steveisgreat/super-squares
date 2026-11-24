@@ -374,6 +374,11 @@
     return `<span class="${cls}" style="background:${bg}; color:${fg};"><span class="team-badge-name" style="${fontStyle}"><span class="badge-full">${escapeHtml(name)}</span><span class="badge-abbr">${escapeHtml(style.abbr)}</span></span></span>`;
   }
 
+  function legalLinks() {
+    return el('div', 'footer-note footer-links',
+      '<a href="terms.html">Terms</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="contact.html">Contact</a>');
+  }
+
   // Downgrades team-badge display within each `.badge-fit` container, in
   // order, until its content stops overflowing: full name -> abbreviation.
   // All badges sharing a container downgrade
@@ -499,7 +504,7 @@
     topbar, statusLabel, leagueLabel, leagueBadge, isTvBrowser, isPhone,
     formatKickoffTime, kickoffNotice,
     teamMeta, teamStyle, applyTeamColors, resetTeamColors,
-    teamColor, readableTextColor, teamBadge, fitTeamBadges, teamAbbr, shadeColor,
+    legalLinks, teamColor, readableTextColor, teamBadge, fitTeamBadges, teamAbbr, shadeColor,
     TV_ICON, PHONE_ICON, PEOPLE_ICON
   };
 })();

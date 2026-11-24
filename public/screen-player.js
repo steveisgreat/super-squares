@@ -109,6 +109,7 @@
 
     const body = el('div', 'player-body');
     wrap.appendChild(body);
+    wrap.appendChild(SBS.ui.legalLinks());
 
     let game = null;
     let selectedPlayer = null;

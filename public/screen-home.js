@@ -258,6 +258,7 @@
       });
       signInActions.appendChild(signInBtn);
       card.appendChild(signInActions);
+      main.appendChild(SBS.ui.legalLinks());
       return;
     }
 
@@ -320,6 +321,7 @@
     const versionNote = el('div', 'footer-note');
     versionNote.id = 'app-version';
     main.appendChild(versionNote);
+    main.appendChild(SBS.ui.legalLinks());
     SBS.api.getSession().then(s => {
       if (s && s.version) versionNote.textContent = 'Super Squares v' + s.version;
     }).catch(() => {});
