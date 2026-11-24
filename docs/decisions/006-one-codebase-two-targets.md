@@ -1,5 +1,9 @@
 # 006 — One codebase, two deployment targets; storage behind an interface
 
+> **Partly superseded by [014](014-retire-lan-build.md):** the LAN product, certificates,
+> LAN discovery, `.bat` scripts and `/api/hosts` are gone. One code path and the
+> `lib/store.js` fs and Postgres backends stand (fs now serves local development and tests).
+
 **Date:** 2026-08 (cloud migration, recorded 2026-11-23) · **Status:** accepted ·
 **Source:** `docs/archive/migration-plan.md` Phases 1–3
 

@@ -1,9 +1,6 @@
 // Vercel serverless entry point. A thin wrapper, not a rewrite — handleApi
 // is already a framework-free (req, res) function (see lib/api.js), written
-// once and shared with the LAN server in server.js. No getHostInfo is
-// passed: there's one public origin here and the browser already knows it,
-// so /api/hosts reports no addresses and the client falls back to
-// location.origin (see screen-gameday.js / screen-player.js).
+// once and shared with the local dev server in server.js.
 'use strict';
 
 // Vercel sets VERCEL only when a project exposes its system variables. This

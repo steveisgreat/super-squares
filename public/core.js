@@ -15,7 +15,7 @@
     try {
       res = await fetch(path, Object.assign({ credentials: 'same-origin' }, opts));
     } catch (e) {
-      throw new Error('Could not reach the server. Make sure it\'s running (double-click start-app.bat or start-server.bat in the project folder), then try again.');
+      throw new Error('Could not reach the server. Check your connection and try again.');
     }
     let data = null;
     try { data = await res.json(); } catch (e) { /* no body */ }
@@ -120,7 +120,6 @@
     saveGame: (game) => request(`/api/game/${game.id}`, json('PUT', game)),
     patchScore: (id, op) => request(`/api/game/${id}/score`, json('PATCH', op)),
     deleteGame: (id) => request(`/api/game/${id}`, { method: 'DELETE' }),
-    getHosts: () => request('/api/hosts'),
     getTodaysGames: (date, league) => request(`/api/todays-games?${new URLSearchParams({ date: date || '', league: league || '' })}`)
   };
 

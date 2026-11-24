@@ -1996,7 +1996,6 @@ body.phone-mode #app { padding: 0; }
 
 .phone-link-list { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 12px 0; }
 .phone-qr-block { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.phone-link-fallback { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
 /* White plate behind the code: scanners need the light quiet zone, which the
    dark theme would otherwise swallow. */
 .phone-qr {

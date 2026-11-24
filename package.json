@@ -1,7 +1,7 @@
 {
   "name": "super-squares",
   "version": "1.0.0",
-  "description": "Local-network squares grid game for any sport",
+  "description": "Squares pool web app for any sport",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -21,7 +21,6 @@
     "node": "24.x"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.1.0",
-    "selfsigned": "^5.5.0"
+    "@neondatabase/serverless": "^1.1.0"
   }
 }

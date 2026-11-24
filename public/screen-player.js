@@ -386,57 +386,27 @@
   // Shows a QR code (and the raw address) linking straight back to this same
   // read-only player screen, so the host — or another player who already has
   // it open — can let someone else scan in without touching the TV/iPad.
-  async function showPlayerLink(id) {
+  function showPlayerLink(id) {
     const overlay = SBS.ui.overlayEl('0.65');
     const box = el('div', 'card');
     box.style.cssText = 'max-width:520px; width:100%; box-shadow: var(--shadow-pop);';
     box.innerHTML = `<h3 style="margin-top:0">Scan to view your squares</h3>
       <p style="color:var(--muted)">Point a phone's camera at this code to open the same read-only player view — your squares, quarter winners, and a live status readout. Nothing here can change the game.</p>
-      <div class="phone-link-intro"></div>
-      <div class="phone-link-list">Loading addresses…</div>`;
+      <div class="phone-link-list"></div>`;
     overlay.appendChild(box);
     document.body.appendChild(overlay);
 
     const list = box.querySelector('.phone-link-list');
+    const url = `${location.origin}${location.pathname}#player-${id}`;
+    let qr = '';
     try {
-      const hosts = await SBS.api.getHosts();
-      const path = `${location.pathname}#player-${id}`;
-      if (!hosts.addresses.length) {
-        // Cloud deploy: there's one public origin and the browser already
-        // knows it, so there's no LAN address list to report.
-        const url = `${location.origin}${path}`;
-        let qr = '';
-        try {
-          qr = window.QRCode.toSvg(url, 150);
-        } catch (err) {
-          console.error('QR encode failed', err);
-        }
-        list.innerHTML = qr
-          ? `<div class="phone-qr-block"><div class="phone-qr">${qr}</div><div class="phone-link">${escapeHtml(url)}</div></div>`
-          : `<div class="phone-link">${escapeHtml(url)}</div>`;
-      } else {
-        // LAN build only: the self-signed certificate warning.
-        box.querySelector('.phone-link-intro').innerHTML = `<p style="color:var(--muted)">First time on this WiFi, the phone may warn the connection isn't private — that's expected on a home network. Tap "Advanced" then "proceed" to continue.</p>`;
-        const scheme = hosts.httpsReady ? 'https' : 'http';
-        const urls = hosts.addresses.map(ip => `${scheme}://${ip}:${hosts.port}${path}`);
-        let qr = '';
-        try {
-          qr = window.QRCode.toSvg(urls[0], 150);
-        } catch (err) {
-          console.error('QR encode failed', err);
-        }
-        const qrBlock = qr
-          ? `<div class="phone-qr-block"><div class="phone-qr">${qr}</div><div class="phone-link">${escapeHtml(urls[0])}</div></div>`
-          : `<div class="phone-link">${escapeHtml(urls[0])}</div>`;
-        const otherUrls = urls.slice(1);
-        const otherBlock = otherUrls.length
-          ? `<div class="phone-link-fallback">${otherUrls.map(u => `<div class="phone-link">${escapeHtml(u)}</div>`).join('')}</div>`
-          : '';
-        list.innerHTML = qrBlock + otherBlock;
-      }
-    } catch (e) {
-      list.innerHTML = `<p class="error-msg">Could not read the server's address: ${escapeHtml(e.message)}</p>`;
+      qr = window.QRCode.toSvg(url, 150);
+    } catch (err) {
+      console.error('QR encode failed', err);
     }
+    list.innerHTML = qr
+      ? `<div class="phone-qr-block"><div class="phone-qr">${qr}</div><div class="phone-link">${escapeHtml(url)}</div></div>`
+      : `<div class="phone-link">${escapeHtml(url)}</div>`;
 
     const actions = el('div', 'actions');
     const openHere = el('button', 'secondary', 'Open it on this device');

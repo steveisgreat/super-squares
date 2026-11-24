@@ -14,26 +14,23 @@ Vercel project settings. Never commit them.
 | Variable | Needed | Purpose |
 |---|---|---|
 | `DATABASE_URL` | cloud | Neon **pooled** connection string (host contains `-pooler`). Unset means the fs backend. |
-| `HOST_PASSWORD` | cloud | Host sign-in. Use 20+ random characters; it is the only brute-force defense. Unset disables auth on the LAN; on Vercel, unset with no accounts means 503 on every host route. |
+| `HOST_PASSWORD` | cloud | Host sign-in. Use 20+ random characters; it is the only brute-force defense. Unset disables auth off Vercel (local dev); on Vercel, unset with no accounts means 503 on every host route. |
 | `SESSION_SECRET` | accounts (optional for password) | Signs the session cookie. Accounts mode requires 32+ random characters; password mode defaults to `HOST_PASSWORD`. |
 | `AUTH_MODE` | cloud, after R2 | `accounts` turns on host accounts (decision 012). Unset keeps password mode. Any other value fails closed (503). Turn it on with the steps in "Turn on host accounts" below. |
 | `APP_ORIGIN` | accounts | The site's own `https://` origin, used in emailed links. |
 | `RESEND_API_KEY`, `EMAIL_FROM` | accounts | Sign-in email. Off Vercel, without the key, the link and code print to the server console. Turn click tracking off for the domain in Resend: it rewrites the link. |
 | `LOGIN_EMAILS_PER_HOUR` | optional | Site-wide cap on sign-in emails. Default 200. |
-| `SCORE_PRIMARY`, `SCORE_SECONDARY` | cloud, for Live mode | Score provider adapter names (decision 001): `espn` and `balldontlie`. LAN default is `espn` with no secondary; on Vercel, unset means no provider, so every Live board shows "live feed unavailable" and falls back to the manual panel. |
+| `SCORE_PRIMARY`, `SCORE_SECONDARY` | cloud, for Live mode | Score provider adapter names (decision 001): `espn` and `balldontlie`. Local default is `espn` with no secondary; on Vercel, unset means no provider, so every Live board shows "live feed unavailable" and falls back to the manual panel. |
 | `BALLDONTLIE_API_KEY` | when it is the secondary | Key for BALLDONTLIE; never logged or returned. |
-| `PORT` | LAN | Defaults to 3000. |
+| `PORT` | local dev | Defaults to 3000. |
 
 Node does not read `.env.local` by itself. Export the variables in the shell before
 `npm start`, or deploy to Vercel where they are set per environment.
 
-## Run locally (LAN build)
+## Run locally (development)
 
-`start-app.bat` (opens the browser), `start-server.bat` (logs in the window),
-`stop-server.bat`, or `npm start`. The server prints the localhost and phone URLs. Data
-goes to `data/`; back that folder up (the RileySoftLabs backup script covers it).
-Phones on the same WiFi use the printed `https://<ip>:3000` and accept the one-time
-certificate warning.
+`npm start` serves <http://localhost:3000> on 127.0.0.1 only (decision 014). Data goes to
+`data/`. A phone can't reach it; check phone flows on a Vercel preview.
 
 To run the cloud storage locally, set `DATABASE_URL` to a Neon **branch**, never the
 production database, then `npm start`.

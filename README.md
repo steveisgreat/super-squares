@@ -1,102 +1,35 @@
 # Super-Squares
 
-A self-hosted squares grid game for any sport — NFL, NBA, or a custom "Other" matchup. Runs on your PC, played from any device (iPad, phone, laptop) on the same WiFi network — great for AirPlaying to a TV. You can run any number of games at once, across any mix of sports and dates.
+A squares-pool web app for any sport: hosts create boards, players claim squares, scores
+pay out per quarter, and a TV view shows the grid. The product is the hosted app
+(Vercel + Neon); its address is in `docs/runbook.md`.
 
-## Requirements
+This README covers running it locally for development only.
 
-- [Node.js](https://nodejs.org) installed on the hosting PC (no other dependencies needed).
+## Run it locally
 
-## Running it
-
-**Easiest way:** double-click **`start-app.bat`** in this folder. It starts the server in its own window and automatically opens the app in your default browser.
-
-Other scripts included:
-- **`start-server.bat`** — starts the server only (in the current window, with logs visible) and prints the URLs to use. Use this if you want to watch server logs or troubleshoot. Close the window (or press `Ctrl+C`) to stop it.
-- **`stop-server.bat`** — shuts down a server started with `start-app.bat` (or any leftover server on port 3000).
-
-Prefer the command line? Same thing manually:
+Needs [Node.js](https://nodejs.org) 24.
 
 ```bash
-node server.js
+npm start
 ```
 
-Either way, the server prints two URLs:
-- `http://localhost:3000` — open this on the PC itself.
-- `http://<your-pc-ip>:3000` — open this on your iPad or any other device connected to the **same WiFi network**.
+Then open <http://localhost:3000>. The server listens on `127.0.0.1` only (set `PORT` to
+change the port), stores games as JSON files in `data/`, and has no sign-in unless you set
+`HOST_PASSWORD` or `AUTH_MODE` (see `.env.example`). It is not reachable from other
+devices; to try the app on a phone, use a Vercel preview deployment.
 
-To AirPlay to a TV: open the iPad URL in Safari, then use Control Center → Screen Mirroring to send it to the TV (1080p layout is supported).
-
-## How to use it
-
-1. **Setup (Step 1):** Create a new game — choose the league (NFL, NBA, or Other), the game date, an optional description, team names (or colors, for Other), price per square, quarterly payout percentages (must total 100%), how squares can be picked (manual/auto/both), and an optional auto-cutoff time.
-2. **Pick Squares (Step 2):** Players enter their name and number of squares, then auto-pick or manually tap squares. The host can lock the board at any time (or it locks automatically at the cutoff time) — this randomly assigns the 0-9 numbers to each row/column and starts the game.
-3. **Game Day (Step 3):** Enter each team's score (last digit) at the end of every quarter. Winning squares are highlighted automatically. Editing a score recalculates everything, including rollover ("push") amounts. If the Final Score square is empty, use "Randomly Draw Winner" to pick a valid winner.
-
-Every game is saved independently, so you can run several at once — different sports, different dates, or several games on the same day. The Home screen splits them into an **Active** section (anything not finished, or finished earlier today) and a collapsed **Game Archive** for everything older. Archived games can't be replayed, but quarterly results can still be corrected if needed.
-
-If a push (nobody in the winning square) rolls money forward, the rollover goes to whichever quarter is scored next — so it is still paid out correctly even if you fill the quarters in out of order.
-
-## Using more than one device at once
-
-The board can be open on several devices at the same time. The Pick Squares screen refreshes itself every few seconds, so squares claimed on the iPad show up on the PC without a reload. If two devices happen to save at the same moment, the second one is told the board changed and reloads the latest version instead of overwriting the other device's picks.
-
-The auto-cutoff is enforced by the server as well as the browser, so picking still locks at the cutoff time even if every device is asleep or closed.
-
-This is what makes the game-day arrangement work: the phone, the iPad and the TV are all looking at the same saved game, and each one refreshes on its own.
-
-## Team colors & logos
-
-For the **NFL** and **NBA** leagues, if the team names you enter in Step 1 match a real team (e.g. "Chiefs", "Kansas City Chiefs", or "KC"), the app automatically applies that team's real colors and logo throughout the grid, board, and TV view. A live preview appears under each team name field as you type. If a name doesn't match any team, it falls back to generic red/blue styling — nothing breaks.
-
-For the **Other** league (any sport without built-in team data), you instead pick one color per team directly in Setup — the app derives a matching shade for the accents automatically.
-
-Logos are fetched at runtime from ESPN's public logo CDN, so the hosting PC needs an internet connection for logos to display (everything else works fully offline). If a logo can't be fetched (no internet, unknown team, Other league, etc.), a generic helmet icon is shown instead so the layout never looks broken.
-
-## Payments & players
-
-Each claim in Step 2 has a **"Mark as Paid"** checkbox. An **Unpaid Total** stat is shown on both the Step 2 and Step 3 screens — click it (or the **"💰 Manage Payments & Players"** button) to open a list of every player with their square count, amount owed, a paid/unpaid toggle, and a **Remove** button that clears all of that player's squares. This is available on both screens specifically so a late payment (e.g. someone who called in to claim squares before lock but pays after the game starts) can still be marked paid from Game Day.
-
-## Duplicate names
-
-If you enter a name that already has squares (e.g. "Steve" again), the app asks whether it's the same person (combines their squares/payment status) or a different person — in which case both are kept separate and labeled with a subscript number (`Steve₁`, `Steve₂`) throughout the grid and payment list.
-
-## Game day setup: grid on the TV, scores on your phone
-
-The intended arrangement once the game starts:
-
-1. **iPad → TV (AirPlay):** open the **TV Grid View** on the iPad and mirror it to the television. The grid fills the screen and refreshes itself — nobody needs to touch it all game.
-2. **Phone:** open the **Phone Score Entry** view. At the end of each quarter, tap the two score digits. The TV updates within a few seconds on its own.
-
-### TV / Grid-Only View
-
-From the Game Day screen (Step 3), click **"🖥️ Open TV Grid View"** — a clean, large-format, grid-only view: no forms or controls, just the matchup header and a big board sized to fill a 1080p screen edge-to-edge. Direct link: `http://<your-pc-ip>:3000/#tv-<game-id>`.
-
-- **⛶ Fullscreen** hides the browser's own toolbars. The button appears top-right and **fades out after three seconds of no input**, so the television shows nothing but the grid; move the mouse or tap the screen to bring it back.
-- The view holds a **screen wake lock** while it's open, so the iPad doesn't auto-lock and kill the AirPlay session mid-game.
-- On an iPad, the most reliable way to lose Safari's toolbars entirely is **Share → Add to Home Screen**, then launch it from that icon — it opens with no browser chrome at all.
-
-### Phone Score Entry
-
-From Game Day, click **"📱 Phone Score Entry"** — it shows the address to open on your phone (same WiFi), e.g. `http://<your-pc-ip>:3000/#score-<game-id>`.
-
-The phone view is built for one thumb at a party: pick a quarter from the tabs across the top, then **tap the last digit** of each team's score on a big keypad — no typing, so the keyboard never covers the screen. Each tap saves immediately and the TV picks it up on its next refresh. It also shows what the quarter pays, who won it, and a running list of winners so far. Quarters already scored are ticked, and it opens on the first quarter still needing a score.
-
-If a quarter's winning square is empty, the **Randomly Draw Winner** button is available here too.
-
-### If a phone can't connect
-
-The server speaks both `http://` and `https://` on the same port. HTTPS uses a self-signed certificate (there's no real domain to get a trusted one for on a local network), so the **first time** a phone opens the address it'll get a "this connection is not private" warning — that's expected, tap **Advanced → proceed** and it'll go straight in after that.
-
-If the page doesn't load at all (blank/spinning tab, or "the server stopped responding") rather than showing that warning, the phone likely can't reach the PC on the network at all. On iPhone, check **Settings → Wi-Fi → (ⓘ) next to the network → turn off "Limit IP Address Tracking"** for that network — with it on, iOS can use a private, rotating IP that breaks local-device connections like this one. If that's not it, also check the router for an "AP Isolation" / "Client Isolation" / "Guest Network" setting that blocks devices on the same WiFi from reaching each other.
-
-## Data storage
-
-Each game is saved as its own JSON file (named by a generated ID) in the `data/` folder. Back that folder up if you want to preserve history long-term. Saves are written to a temporary file and then renamed into place, so a crash or power cut mid-save can't leave a half-written game behind.
-
-## Development
-
-The payout math, board validation and cutoff rules live in `public/compute.js`, shared by the browser and the server. They have tests (no dependencies, no test runner):
+## Tests
 
 ```bash
 npm test
 ```
+
+No test runner or extra dependencies. Postgres tests skip without `DATABASE_URL`.
+
+## More
+
+- Architecture: `ARCHITECTURE.md`
+- Deploy, configure, roll back: `docs/runbook.md`
+- Why it is built this way: `docs/decisions.md`
+- What's next: `docs/ROADMAP.md`

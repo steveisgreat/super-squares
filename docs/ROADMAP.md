@@ -228,6 +228,12 @@ TV view with a tap-to-show score strip, Players blocked while mirroring, and a D
 Disturb tip.
 *Done:* browser check in phone landscape; the strip hides after 3 s.
 
+**R27. Retire the LAN build** — `Sonnet` — ✅ shipped 2026-11-24 ([decision 014](decisions/014-retire-lan-build.md)).
+Steve's call (2026-11-24). The cloud app is the only product; `npm start` is a
+localhost-only dev server. Removed the certificates, LAN discovery, `/api/hosts`, the
+`.bat` scripts, the `selfsigned` dependency and the LAN README.
+*Done:* tests pass; preview runs on 127.0.0.1; pop-ups and the TV corner QR use the page's origin.
+
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
 
 **R8. Cache board reads at the edge** — `Opus` — Depends on: R3, R4a.

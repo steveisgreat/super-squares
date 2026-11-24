@@ -5,19 +5,18 @@ Last checked against the code: 2026-11-23.
 
 ## Shape
 
-One Node codebase, two deployment targets (decision 006):
+One Node codebase, two ways to run it (decisions 006, 014):
 
-| | LAN build | Cloud build |
+| | Local dev | Cloud (the product) |
 |---|---|---|
-| Entry | `server.js` (`npm start`, `start-app.bat`) | `api/[...path].js` (Vercel function) plus `public/` served statically (`vercel.json`) |
+| Entry | `server.js` (`npm start`, plain HTTP on 127.0.0.1) | `api/[...path].js` (Vercel function) plus `public/` served statically (`vercel.json`) |
 | Storage | `lib/store-fs.js`, one JSON file per game in `data/` | `lib/store-pg.js`, Neon Postgres |
 | Selected by | `DATABASE_URL` unset | `DATABASE_URL` set |
 | Auth | off (nothing set) | password (`HOST_PASSWORD`); accounts (`AUTH_MODE=accounts`) once R2 ships; never off |
-| Extras | self-signed HTTPS and HTTP on one port, LAN IP discovery, `.bat` scripts | none; one public origin |
+| Reach | this computer only | one public origin |
 
 The same `lib/api.js` handles every `/api/*` request in both targets. It is
-framework-free (`handleApi(req, res, pathname, query, getHostInfo)`) and imports nothing
-LAN-only.
+framework-free (`handleApi(req, res, pathname, query)`).
 
 ## Server modules
 
@@ -31,7 +30,7 @@ LAN-only.
 | `lib/version.js` | App version from `package.json`; adds `+<short hash>` on Vercel non-production |
 | `lib/scores/` | Score providers (decision 001): `espn.js` and `balldontlie.js` adapters, `index.js` (config, failover, no-backward merge, quarter completion), `slate.js` (the shared slate: one claimed refresh per league and date every 15 s, merge into a board, `listGames` for the picker) |
 | `server-livescore.js` | Simulation scoring (`applySimulatedData`) via `refreshLiveScore`. Its ESPN lookup (`findEvent`, `getTodaysGames`) is no longer called by the API and remains only for `test-livescore.js` |
-| `server.js` | LAN only: static files, certificate, single-port HTTP/HTTPS, host info; sends the security headers it reads from `vercel.json` |
+| `server.js` | Local dev only: static files and the API on 127.0.0.1; sends the security headers it reads from `vercel.json` |
 | `scripts/assign-owner.js` | One-off: gives boards with no owner to an account (runbook) |
 | `scripts/poll-scores.js` | Probe for the score providers (decision 001); not part of the app |
 
@@ -45,7 +44,6 @@ LAN-only.
 | `POST /api/login`, `POST /api/login/verify` | accounts mode: send the link and code; use either one |
 | `POST /api/session/revoke-all` | accounts mode: sign out everywhere |
 | `GET /api/game/:id` | public (the id is the read capability); a Live board merges the shared slate into `liveScore` and adds a response-only `liveFeed: { available, fetchedAt }`; writes the game only when a quarter newly completes |
-| `GET /api/hosts` | public; LAN addresses, empty on Vercel |
 | `GET /api/games` | host only; list summaries |
 | `GET /api/todays-games` | host only; the setup screen's schedule, read from the shared slate (no provider call of its own) |
 | `POST /api/game`, `PUT /api/game/:id`, `DELETE /api/game/:id` | host only |
@@ -94,7 +92,7 @@ Content-Security-Policy in `vercel.json` allows no inline script.
 ## External dependencies
 
 - Score providers: ESPN's unofficial scoreboard API (primary) and BALLDONTLIE (secondary), reached only through `lib/scores/`.
-- Neon Postgres (cloud only). Resend for sign-in email (accounts mode only). Runtime packages: `@neondatabase/serverless`, `selfsigned`.
+- Neon Postgres (cloud only). Resend for sign-in email (accounts mode only). Runtime package: `@neondatabase/serverless`.
 - Node 24.x (`engines`).
 
 ## Known gaps

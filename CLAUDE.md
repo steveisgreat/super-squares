@@ -4,18 +4,18 @@ A football/basketball squares-pool web app: hosts create boards, players claim s
 scores pay out per quarter, a TV view shows the grid. Being readied for public sale for
 the NFL championship game on **2027-02-14** (`docs/ROADMAP.md`).
 
-**Profile: hosted app** (Vercel + Neon), plus a LAN build from the same code
-(decision 006). The global `~/.claude/CLAUDE.md` and the `project-docs` skill apply;
+**Profile: hosted app** (Vercel + Neon). The LAN build was retired
+(decision 014). The global `~/.claude/CLAUDE.md` and the `project-docs` skill apply;
 this file overrides them where they differ.
 
 ## Stack and commands
 
-Node 24, no build step, vanilla JS front end in `public/`, two runtime dependencies
-(`@neondatabase/serverless`, `selfsigned`). Branch is **`master`**, not `main`.
+Node 24, no build step, vanilla JS front end in `public/`, one runtime dependency
+(`@neondatabase/serverless`). Branch is **`master`**, not `main`.
 
 | Task | Command |
 |---|---|
-| Run (LAN build, fs storage) | `npm start` (port 3000), or `start-app.bat` |
+| Run locally (dev server, fs storage, 127.0.0.1) | `npm start` (port 3000) |
 | All tests | `npm test` (Postgres tests skip without `DATABASE_URL`) |
 | One suite | `npm run test:store`, `test:auth`, `test:accounts`, `test:livescore`, `test:store-fs`, `test:store-pg` |
 | Preview pane | `preview_start` with name `super-squares` (`.claude/launch.json`) |
@@ -32,7 +32,7 @@ Details for env vars, deploy and rollback: `docs/runbook.md`.
 | How do I deploy, configure, roll back? | `docs/runbook.md`, `.env.example` |
 | Live-score provider design | `docs/decisions/001-score-providers.md` |
 | Research notes (score-feed probe) | `docs/research/` |
-| How do I run the LAN version as a player or host? | `README.md` |
+| How do I run it locally? | `README.md` |
 | Old migration plan, retired notes | `docs/archive/` (grep it, never read it whole) |
 | Scratch: briefs, ledgers, probe logs | `docs/working/` (git-ignored) |
 
@@ -47,14 +47,13 @@ GitHub Issues on `steveisgreat/super-squares` (labels `bug`, `feature`, `idea`, 
 - **No tests unless asked** (project memory). Exception: money logic in
   `public/compute.js` is test-first, and a fix to a bug found in review keeps its
   regression test. Never delete or skip a test to get green.
-- **Two targets, one code path.** Anything under `lib/` or `api/` must work on Vercel
-  and on the LAN server. LAN-only code (certificates, `localIPs()`, the HTTP/HTTPS
-  multiplexer) stays in `server.js`.
+- **One code path.** Anything under `lib/` or `api/` must work on Vercel and under the
+  local dev server (`server.js`, localhost only). No LAN-only code (decision 014).
 - **Storage goes through `lib/store.js` only.** Never read `data/` or call Postgres
   from a route. `updateGame` is the one atomic check-and-write (decision 008).
 - **Authorization is route-level** in `lib/api.js` (`denyUnlessSignedIn`,
   `denyUnlessOwner`), never in the store. A game id is a read capability only
-  (decisions 009, 012). With nothing set, auth is off off-Vercel only, and the LAN build
+  (decisions 009, 012). With nothing set, auth is off off-Vercel only, and local dev
   must keep working that way. `owner_id` is a column, never in `doc`.
 - **Never add a keepalive, cron ping or poller** for Neon. Design for the cold start
   (global rule). No timer-based server work: Vercel has no long-lived process
