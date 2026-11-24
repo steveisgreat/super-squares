@@ -1,9 +1,8 @@
 // Zero-dependency tests for the live-score provider layer (lib/scores/*).
 //
-// Adapters are checked against saved fixtures in test-fixtures/scores/. Files named
-// *.synthetic.json were built by hand (ESPN: edited from the one captured body;
-// BALLDONTLIE: from poll summaries, except bdl-in-2nd.json) and should be
-// replaced with real captures when available. completedQuarters and mergeNoBackward
+// Adapters are checked against saved fixtures in test-fixtures/scores/, trimmed from real
+// responses (CIN at WSH, 2026-11-23). Files named *.synthetic.json were built by hand for
+// moments that were not captured: before kickoff, Q1, "End of 3rd" (BALLDONTLIE) and overtime. completedQuarters and mergeNoBackward
 // decide when money-adjacent results are written, so they have the densest cases.
 //
 // No network: fetch is always injected. Run with:  node test-scores.js   (or: npm test)
@@ -118,14 +117,27 @@ function game(o) {
   await check('espn: end of quarter and halftime -> break with period', () => {
     const [a] = espn.normalize(fixture('espn-end-q1.synthetic.json'), 'nfl', ET, 'T');
     eq([a.state, a.period], ['break', 1]);
-    const [b] = espn.normalize(fixture('espn-halftime.synthetic.json'), 'nfl', ET, 'T');
-    eq([b.state, b.period, b.away.score], ['break', 2, 10]);
-    const [c] = espn.normalize(fixture('espn-end-q3.synthetic.json'), 'nfl', ET, 'T');
+    const [b] = espn.normalize(fixture('espn-halftime.json'), 'nfl', ET, 'T');
+    eq([b.state, b.period, b.home.score, b.away.score], ['break', 2, 7, 10]);
+    const [c] = espn.normalize(fixture('espn-end-q3.json'), 'nfl', ET, 'T');
     eq([c.state, c.period], ['break', 3]);
   });
   await check('espn: final -> post with totals', () => {
-    const [g] = espn.normalize(fixture('espn-final.synthetic.json'), 'nfl', ET, 'T');
-    eq([g.state, g.home.score, g.away.score, g.home.ot], ['post', 14, 13, null]);
+    const [g] = espn.normalize(fixture('espn-final.json'), 'nfl', ET, 'T');
+    eq([g.state, g.home.score, g.away.score, g.home.ot], ['post', 22, 20, null]);
+    eq(scores.completedQuarters(g), {
+      q1: { home: 0, away: 0 }, q2: { home: 7, away: 10 }, q3: { home: 13, away: 17 }, final: { home: 22, away: 20 }
+    });
+  });
+  await check('espn: a mid-game delay keeps period and clock and settles nothing early', () => {
+    const [g] = espn.normalize(fixture('espn-delayed.json'), 'nfl', ET, 'T');
+    eq([g.state, g.period, g.clock], ['in', 3, '12:03']);
+    eq(Object.keys(scores.completedQuarters(g)), ['q1', 'q2']);
+  });
+  await check('espn: total ahead of the quarter line (captured body, 17 vs 16) settles nothing', () => {
+    const [g] = espn.normalize(fixture('espn-total-ahead.json'), 'nfl', ET, 'T');
+    eq([g.away.score, g.away.quarters], [17, [0, 10, 6, null]]);
+    eq(scores.completedQuarters(g), {});
   });
   await check('espn: overtime in progress and final OT land in ot', () => {
     const [a] = espn.normalize(fixture('espn-ot.synthetic.json'), 'nfl', ET, 'T');
@@ -201,7 +213,7 @@ function game(o) {
     const one = n => bdl.normalize(fixture(n), 'nfl', ET, 'T')[0];
     eq([one('bdl-in-1st.synthetic.json').state, one('bdl-in-1st.synthetic.json').period, one('bdl-in-1st.synthetic.json').clock], ['in', 1, '14:54']);
     eq([one('bdl-end-q1.synthetic.json').state, one('bdl-end-q1.synthetic.json').period], ['break', 1]);
-    eq([one('bdl-halftime.synthetic.json').state, one('bdl-halftime.synthetic.json').period], ['break', 2]);
+    eq([one('bdl-halftime.json').state, one('bdl-halftime.json').period], ['break', 2]);
     eq([one('bdl-end-q3.synthetic.json').state, one('bdl-end-q3.synthetic.json').period], ['break', 3]);
     const mid = one('bdl-in-2nd.json');
     eq([mid.away.score, mid.home.score, mid.away.quarters, mid.home.quarters], [10, 0, [0, 10, null, null], [0, 0, null, null]]);
@@ -209,12 +221,32 @@ function game(o) {
   });
   await check('bdl: final, overtime, final OT', () => {
     const one = n => bdl.normalize(fixture(n), 'nfl', ET, 'T')[0];
-    const f = one('bdl-final.synthetic.json');
-    eq([f.state, f.home.score, f.away.score, f.home.ot], ['post', 14, 13, null]);
+    const f = one('bdl-final.json');
+    eq([f.state, f.home.score, f.away.score, f.home.ot], ['post', 22, 20, null]);
+    eq(scores.completedQuarters(f), {
+      q1: { home: 0, away: 0 }, q2: { home: 7, away: 10 }, q3: { home: 13, away: 17 }, final: { home: 22, away: 20 }
+    });
     const o = one('bdl-ot.synthetic.json');
     eq([o.state, o.period, o.home.ot], ['in', 5, 0]);
     const fo = one('bdl-final-ot.synthetic.json');
     eq([fo.state, fo.away.ot, fo.away.score], ['post', 3, 20]);
+  });
+  await check('bdl: "Delayed" mid-game (captured body) keeps settled quarters and no more', () => {
+    const g = bdl.normalize(fixture('bdl-delayed.json'), 'nfl', ET, 'T')[0];
+    eq([g.state, g.period, g.clock], ['in', null, null]);
+    eq(Object.keys(scores.completedQuarters(g)), ['q1', 'q2']);
+  });
+  await check('bdl: Q3 settles from "15:00 - 4th" when "End of 3rd" never shows (captured body)', () => {
+    const g = bdl.normalize(fixture('bdl-q4-start.json'), 'nfl', ET, 'T')[0];
+    eq([g.state, g.period, g.clock], ['in', 4, '15:00']);
+    eq(scores.completedQuarters(g).q3, { home: 13, away: 17 });
+  });
+  await check('bdl: "End of 4th" (seen 30 s before "Final") never settles the final', () => {
+    const body = fixture('bdl-final.json');
+    Object.assign(body.data.find(x => x.home_team.abbreviation === 'WSH'), { status: 'End of 4th', status_state: 'in_progress' });
+    const g = bdl.normalize(body, 'nfl', ET, 'T')[0];
+    eq([g.state, g.period], ['break', 4]);
+    eq(Object.keys(scores.completedQuarters(g)), ['q1', 'q2', 'q3']);
   });
   await check('bdl: unknown status text degrades to null period and clock, state in', () => {
     const g = bdl.normalize(fixture('bdl-unknown-status.synthetic.json'), 'nfl', ET, 'T')[0];
@@ -401,7 +433,7 @@ function game(o) {
       const g = bdl.normalize(body(status, st), 'nfl', ET, 'T')[0];
       eq(scores.completedQuarters(g), {}, status);
     }
-    const e = fixture('espn-final.synthetic.json');
+    const e = fixture('espn-final.json');
     e.events[0].competitions[0].competitors.forEach(c => { delete c.score; });
     assert(!scores.completedQuarters(espn.normalize(e, 'nfl', ET, 'T')[0]).final, 'espn final without scores');
   });
@@ -414,7 +446,7 @@ function game(o) {
     }
   });
   await check('espn: canceled is never final, even if flagged completed', () => {
-    const e = fixture('espn-final.synthetic.json');
+    const e = fixture('espn-final.json');
     e.events[0].competitions[0].status.type = { name: 'STATUS_CANCELED', state: 'post', completed: true };
     eq(scores.completedQuarters(espn.normalize(e, 'nfl', ET, 'T')[0]), {});
   });
@@ -433,8 +465,8 @@ function game(o) {
   await check('completedQuarters: from real normalized fixtures', () => {
     const g = bdl.normalize(fixture('bdl-end-q1.synthetic.json'), 'nfl', ET, 'T')[0];
     eq(scores.completedQuarters(g), { q1: { home: 0, away: 0 } });
-    const e = espn.normalize(fixture('espn-halftime.synthetic.json'), 'nfl', ET, 'T')[0];
-    eq(scores.completedQuarters(e), { q1: { home: 0, away: 0 }, q2: { home: 0, away: 10 } });
+    const e = espn.normalize(fixture('espn-halftime.json'), 'nfl', ET, 'T')[0];
+    eq(scores.completedQuarters(e), { q1: { home: 0, away: 0 }, q2: { home: 7, away: 10 } });
     const f = espn.normalize(fixture('espn-final-ot.synthetic.json'), 'nfl', ET, 'T')[0];
     eq(scores.completedQuarters(f).final, { home: 17, away: 20 });
   });

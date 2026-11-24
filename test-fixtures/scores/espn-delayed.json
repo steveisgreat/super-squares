@@ -16,7 +16,7 @@
                 "abbreviation": "WSH",
                 "displayName": "Washington Commanders"
               },
-              "score": "14",
+              "score": "7",
               "linescores": [
                 {
                   "value": 0,
@@ -24,19 +24,14 @@
                   "period": 1
                 },
                 {
-                  "value": 0,
-                  "displayValue": "0",
+                  "value": 7,
+                  "displayValue": "7",
                   "period": 2
                 },
                 {
-                  "value": 7,
-                  "displayValue": "7",
+                  "value": 0,
+                  "displayValue": "0",
                   "period": 3
-                },
-                {
-                  "value": 7,
-                  "displayValue": "7",
-                  "period": 4
                 }
               ]
             },
@@ -46,7 +41,7 @@
                 "abbreviation": "CIN",
                 "displayName": "Cincinnati Bengals"
               },
-              "score": "13",
+              "score": "10",
               "linescores": [
                 {
                   "value": 0,
@@ -59,31 +54,27 @@
                   "period": 2
                 },
                 {
-                  "value": 3,
-                  "displayValue": "3",
-                  "period": 3
-                },
-                {
                   "value": 0,
                   "displayValue": "0",
-                  "period": 4
+                  "period": 3
                 }
               ]
             }
           ],
           "status": {
-            "clock": 0,
-            "displayClock": "0:00",
-            "period": 4,
+            "clock": 723,
+            "displayClock": "12:03",
+            "period": 3,
             "type": {
-              "id": "0",
-              "name": "STATUS_FINAL",
-              "state": "post",
-              "completed": true,
-              "description": "Final",
-              "detail": "Final",
-              "shortDetail": "Final"
-            }
+              "id": "7",
+              "name": "STATUS_DELAYED",
+              "state": "in",
+              "completed": false,
+              "description": "Delayed",
+              "detail": "Delayed",
+              "shortDetail": "Delayed"
+            },
+            "isTBDFlex": false
           }
         }
       ]

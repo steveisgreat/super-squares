@@ -2,7 +2,8 @@
 
 Feeds roadmap R4a and decision 001. Raw data is **git-ignored** at
 `docs/working/score-poll-2026-11-23/` (`raw.jsonl` = every 15 s poll, `changes.log` =
-changes only). R4a must trim it into committed test fixtures.
+changes only); full response bodies are in `docs/working/score-raw-2026-11-23/`. The
+committed fixtures in `test-fixtures/scores/` are trimmed from those bodies.
 
 ## How to run the probe
 ```
@@ -24,7 +25,7 @@ node scripts/poll-scores.js [YYYY-MM-DD] [intervalSeconds]   # defaults: today E
 | One call = all games that day | yes | yes (`/nfl/v1/games`, up to 100 per page) |
 | Before kickoff | scores `0`, `STATUS_SCHEDULED` | scores **`null`**, status text `"11/23 - 8:15 PM EST"`, `status_state: scheduled` |
 | Clock / quarter | separate fields (`period`, `displayClock`) | **inside `status` text**: `"14:54 - 1st"`, `"End of 1st"`, `"15:00 - 2nd"` (no separate fields) |
-| End of quarter | `STATUS_END_PERIOD` (also `STATUS_HALFTIME`) | `status` = `"End of 1st"` (expect `"Halftime"`, `"End of 3rd"` — unconfirmed) |
+| End of quarter | `STATUS_END_PERIOD` (also `STATUS_HALFTIME`) | `status` = `"End of 1st"`, `"Halftime"`, `"End of 4th"`; "End of 3rd" never showed (see below) |
 | Quarter scores | `linescores[]` per competitor | `home_team_q1..q4`, `_ot`; **a quarter's field fills in DURING that quarter** (q1 showed 0 at 14:54 1st) |
 | Update cadence | clock moves every ~30–45 s | fixed 15 s cycle (`updated_at` on :00/:15/:30/:45) |
 | Lag | baseline; **ahead of Steve's TV broadcast** | ~15–30 s behind ESPN |
@@ -51,9 +52,28 @@ always ahead of the broadcast.
 
 **Outcome:** ESPN primary, BALLDONTLIE secondary (decision 001 §2).
 
-## Not yet observed (check raw.jsonl after the game)
-Halftime text; end of Q3; final (`STATUS_FINAL` vs
-BDL `status_state: final`, `"Final"`); overtime if any.
+## Rest of the game (final: Commanders 22, Bengals 20, no overtime)
+BALLDONTLIE showed each later score 15–77 s after ESPN (usually 30–46 s, both from 15 s
+polls) and the final 30 s after (04:19:34 vs 04:20:04). No poll failed once the BALLDONTLIE
+key was set. Both feeds ended on the same quarters: 0–0, 10–7, 7–6, 3–9 (CIN–WSH).
+
+| Seen | What it means for the code |
+|---|---|
+| BDL skipped "End of 3rd": the polls went from a Q3 clock to `"15:00 - 4th"` | Break text can be missed; Q3 settles from the next period |
+| BDL `"End of 4th"` (22–20) 30 s before `"Final"` | Must not settle the final; it does not |
+| BDL `"Delayed"` with `status_state: delayed` (a new value); ESPN `STATUS_DELAYED` | Stays in progress; nothing extra settles |
+| BDL flipped back once at kickoff (1st quarter → scheduled, null scores → 1st) and once in the delay (Delayed → Q3 clock → Delayed) | One provider can go backward on its own; the no-backward rule covers provider switches only |
+| ESPN total and quarter lines disagreed four times, one 15 s poll each (e.g. 17 vs 0+10+6) | The "must add up" rule was needed: it waits one refresh |
+
+Still not observed: overtime, and BALLDONTLIE "End of 3rd". Those fixtures stay synthetic,
+as do the before-kickoff and Q1 ones (bodies were not captured then).
+
+**For R4a part 2:**
+- `completedQuarters` is only what one reading supports, and can be empty for one refresh.
+  A missing key must never clear a quarter already settled.
+- Not seen, but possible: ESPN reports a break before a try or a correction posts, with
+  totals that still add up. Decide whether a later reading may update a provider-settled
+  quarter (never a host-set one).
 
 ## Implications for decision 001 §5 (quarter-end detection)
 BALLDONTLIE is NOT period-less: the adapter parses `status` (`/^(\d+:\d\d) - (1st|2nd|3rd|4th|OT)$/`,

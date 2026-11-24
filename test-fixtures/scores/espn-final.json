@@ -16,7 +16,7 @@
                 "abbreviation": "WSH",
                 "displayName": "Washington Commanders"
               },
-              "score": "0",
+              "score": "22",
               "linescores": [
                 {
                   "value": 0,
@@ -24,9 +24,19 @@
                   "period": 1
                 },
                 {
-                  "value": 0,
-                  "displayValue": "0",
+                  "value": 7,
+                  "displayValue": "7",
                   "period": 2
+                },
+                {
+                  "value": 6,
+                  "displayValue": "6",
+                  "period": 3
+                },
+                {
+                  "value": 9,
+                  "displayValue": "9",
+                  "period": 4
                 }
               ]
             },
@@ -36,7 +46,7 @@
                 "abbreviation": "CIN",
                 "displayName": "Cincinnati Bengals"
               },
-              "score": "10",
+              "score": "20",
               "linescores": [
                 {
                   "value": 0,
@@ -47,6 +57,16 @@
                   "value": 10,
                   "displayValue": "10",
                   "period": 2
+                },
+                {
+                  "value": 7,
+                  "displayValue": "7",
+                  "period": 3
+                },
+                {
+                  "value": 3,
+                  "displayValue": "3",
+                  "period": 4
                 }
               ]
             }
@@ -54,16 +74,17 @@
           "status": {
             "clock": 0,
             "displayClock": "0:00",
-            "period": 2,
+            "period": 4,
             "type": {
-              "id": "0",
-              "name": "STATUS_HALFTIME",
-              "state": "in",
-              "completed": false,
-              "description": "Halftime",
-              "detail": "Halftime",
-              "shortDetail": "Halftime"
-            }
+              "id": "3",
+              "name": "STATUS_FINAL",
+              "state": "post",
+              "completed": true,
+              "description": "Final",
+              "detail": "Final",
+              "shortDetail": "Final"
+            },
+            "isTBDFlex": false
           }
         }
       ]

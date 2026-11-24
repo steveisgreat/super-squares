@@ -16,7 +16,7 @@
                 "abbreviation": "WSH",
                 "displayName": "Washington Commanders"
               },
-              "score": "7",
+              "score": "10",
               "linescores": [
                 {
                   "value": 0,
@@ -24,13 +24,13 @@
                   "period": 1
                 },
                 {
-                  "value": 0,
-                  "displayValue": "0",
+                  "value": 7,
+                  "displayValue": "7",
                   "period": 2
                 },
                 {
-                  "value": 7,
-                  "displayValue": "7",
+                  "value": 3,
+                  "displayValue": "3",
                   "period": 3
                 }
               ]
@@ -41,7 +41,7 @@
                 "abbreviation": "CIN",
                 "displayName": "Cincinnati Bengals"
               },
-              "score": "13",
+              "score": "17",
               "linescores": [
                 {
                   "value": 0,
@@ -54,26 +54,27 @@
                   "period": 2
                 },
                 {
-                  "value": 3,
-                  "displayValue": "3",
+                  "value": 6,
+                  "displayValue": "6",
                   "period": 3
                 }
               ]
             }
           ],
           "status": {
-            "clock": 0,
-            "displayClock": "0:00",
+            "clock": 424,
+            "displayClock": "7:04",
             "period": 3,
             "type": {
-              "id": "0",
-              "name": "STATUS_END_PERIOD",
+              "id": "2",
+              "name": "STATUS_IN_PROGRESS",
               "state": "in",
               "completed": false,
-              "description": "End of 3rd Quarter",
-              "detail": "End of 3rd Quarter",
-              "shortDetail": "End of 3rd Quarter"
-            }
+              "description": "In Progress",
+              "detail": "7:04 - 3rd Quarter",
+              "shortDetail": "7:04 - 3rd"
+            },
+            "isTBDFlex": false
           }
         }
       ]
