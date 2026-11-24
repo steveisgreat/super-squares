@@ -230,12 +230,7 @@
 
     async function setScore(side, value) {
       if (saving) return;
-      if (!game.results[activeQ]) game.results[activeQ] = {};
-      game.results[activeQ][side] = value;
-      if (activeQ === 'final') {
-        const entry = game.results.final;
-        if (entry.autoResolve && entry.autoResolve.key !== `${entry.a}-${entry.b}`) delete entry.autoResolve;
-      }
+      window.GameLogic.setQuarterScore(game, activeQ, side, value);
       draw(); // optimistic: the tap feels instant, the save follows
       await save();
     }

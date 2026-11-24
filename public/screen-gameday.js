@@ -466,6 +466,9 @@
     let lastSeenDrawAt = null;
     let activeDrawReveal = null;
     function checkDrawSync(freshGame) {
+      // Only a draw that decides the final counts: a corrected score leaves
+      // the old draw stored but unused.
+      if (!computeGame(freshGame).results.final.autoResolved) return;
       const info = freshGame.results && freshGame.results.final && freshGame.results.final.autoResolve;
       if (!info || !info.drawnAt || info.drawnAt === lastSeenDrawAt) return;
       lastSeenDrawAt = info.drawnAt;
@@ -1244,7 +1247,8 @@
         // already played out elsewhere, run it here too before letting the
         // normal celebration flow announce the winner.
         const finalEntry = game.results && game.results.final;
-        const drawInfo = finalEntry && finalEntry.autoResolve;
+        // Ignore a stored draw the current score no longer uses.
+        const drawInfo = computed.results.final.autoResolved && finalEntry && finalEntry.autoResolve;
         if (drawInfo && drawInfo.drawnAt && drawInfo.drawnAt !== lastSeenDrawAt) {
           lastSeenDrawAt = drawInfo.drawnAt;
           const elapsed = Date.now() - drawInfo.drawnAt;

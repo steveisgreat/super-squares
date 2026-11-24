@@ -193,6 +193,30 @@ check('a stored draw is ignored once the final score changes', () => {
   assert(res.needsDraw, 'a fresh draw is required');
 });
 
+// Regression: issue #2. The phone keypad compared the draw's row-col key with
+// the scores and deleted the drawn winner on almost any tap.
+check('keypad taps on the final keep the stored draw', () => {
+  const g = makeGame({ '5,5': 'Ann' }, {
+    results: { final: { a: 17, b: 2, autoResolve: { key: '7-2', row: 5, col: 5, drawnAt: 1 } } }
+  });
+  const result = () => G.computeGame(g).results.final;
+  eq(result().winnerName, 'Ann', 'drawn winner before any tap');
+  G.setQuarterScore(g, 'final', 'a', 17);
+  eq(result().winnerName, 'Ann', 'same digit tapped again');
+  G.setQuarterScore(g, 'final', 'a', '');
+  assert(!result().resolved, 'no winner while the score is incomplete');
+  G.setQuarterScore(g, 'final', 'a', 18);
+  assert(result().needsDraw, 'a different empty square still needs its own draw');
+  G.setQuarterScore(g, 'final', 'a', 17);
+  eq([result().winnerName, result().autoResolved], ['Ann', true], 'score corrected back');
+});
+
+check('setQuarterScore creates a missing quarter and touches only one side', () => {
+  const g = makeGame({}, { results: {} });
+  G.setQuarterScore(g, 'q1', 'a', 7);
+  eq(g.results, { q1: { a: 7 } }, 'results');
+});
+
 // ---------- shuffle ----------
 
 check('shuffledDigits returns each digit exactly once', () => {

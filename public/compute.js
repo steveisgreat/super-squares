@@ -560,9 +560,18 @@
     return finish();
   }
 
+  // Keypad entry: set one team's score for one quarter, in place. A stored
+  // final draw is left alone on purpose. It is keyed by grid row-col and
+  // computeGame ignores one that does not match the current score, so a score
+  // typed wrong and then corrected keeps its drawn winner.
+  function setQuarterScore(game, quarter, side, value) {
+    if (!game.results[quarter]) game.results[quarter] = {};
+    game.results[quarter][side] = value;
+  }
+
   return {
     QUARTERS, QLABEL, STATUSES, LEAGUES, SCORING_MODES,
-    scoringMode, applyScoreOp, belowEndedQuarter, manualState, hasResult,
+    scoringMode, applyScoreOp, setQuarterScore, belowEndedQuarter, manualState, hasResult,
     shuffle, shuffledDigits, emptyGrid,
     potOf, actualPotOf, findCol, findRow, computeGame, computeLiveHighlight, payoutAmount, drawnDigits,
     validateGame, isDigitPermutation, syncStatus,
