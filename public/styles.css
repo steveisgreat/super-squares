@@ -2554,6 +2554,12 @@ kbd {
 .mirror-main[hidden] { display: none; }
 .mirror-board { flex: 1 1 auto; min-width: 0; }
 .mirror-side { flex: 0 0 clamp(170px, 26vw, 240px); display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: hidden; }
+/* Names: never broken inside a word, sized by board.js fitNames. The current winner stands out by weight and the
+   ping around its square; the TV's growing-text effect would undo the fitted size. */
+.mirror-screen .tv-board-wrap .board-table { grid-template-columns: repeat(11, minmax(0, 1fr)); }
+.mirror-screen .cell .name-txt { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; word-break: normal; }
+.mirror-screen .cell { padding: 0 1px; }
+.mirror-screen .cell.live-winner .name-txt { animation: none; font-weight: 800; }
 .mirror-header { margin-bottom: 0; }
 .mirror-header .tv-meta { font-size: 0.9rem; gap: 8px; }
 .mirror-quarters { grid-template-columns: 1fr; gap: 4px; margin-bottom: 0; flex: 1 1 auto; min-height: 0; align-content: start; }
@@ -2729,6 +2735,13 @@ button.gd-onair {
   }
   .mirror-winning[hidden] { display: none; }
   .mirror-board { order: 3; flex: 1 1 0; min-height: 0; width: 100%; }
+  /* Upright every pixel of width goes to the names; the squares are tall enough for two words. */
+  .mirror-screen .board-grid-outer { padding: 5px; gap: 3px; border-radius: 12px; }
+  .mirror-screen .tv-board-wrap .board-table { gap: 2px; }
+  .mirror-screen .tv-board-wrap .teamA-label { padding: 8px 1px; }
+  .mirror-screen .tv-board-wrap .teamA-label-text { font-size: 1rem; }
+  .mirror-screen .tv-board-wrap .teamA-label .team-logo { --logo-size: 20px !important; }
+  .mirror-screen .cell .name-txt { white-space: normal; }
   .mirror-quarters { order: 4; flex: 0 0 auto; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .mirror-quarters .tv-qchip { padding: 2px 8px 3px; }
   .mirror-quarters .tvq-top { font-size: 0.75rem; }

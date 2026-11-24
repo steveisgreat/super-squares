@@ -331,13 +331,33 @@
     });
   }
 
+  // Phone Party View: a name never breaks inside a word. One too wide for its square gets smaller, down
+  // to MIN_NAME_PX; past that the CSS cuts it with an ellipsis. Widths are read in one pass and
+  // sizes written in another, so 100 squares cost one layout.
+  const MIN_NAME_PX = 7;
+  function fitNames(root) {
+    const names = Array.prototype.slice.call((root || document).querySelectorAll('.mirror-screen .name-txt'));
+    if (!names.length) return;
+    names.forEach(n => { n.style.fontSize = ''; });
+    const sizes = names.map(n => {
+      // 1 px off each: the browser rounds these. Height matters for two words in a short square.
+      const room = n.parentElement.clientHeight;
+      const w = n.scrollWidth > n.clientWidth ? (n.clientWidth - 1) / n.scrollWidth : 1;
+      const h = room && n.offsetHeight > room ? (room - 1) / n.offsetHeight : 1;
+      if (!n.clientWidth || (w === 1 && h === 1)) return 0;
+      const px = parseFloat(window.getComputedStyle(n).fontSize) * Math.min(w, h);
+      return Math.max(MIN_NAME_PX, Math.floor(px * 10) / 10);
+    });
+    names.forEach((n, i) => { if (sizes[i]) n.style.fontSize = sizes[i] + 'px'; });
+  }
+
   // A resize or a turn of the phone changes how much room the axis bars have (one listener for
   // the page, as ui.js does for the team badges).
   let axisResizeTimer = null;
   window.addEventListener('resize', () => {
     clearTimeout(axisResizeTimer);
-    axisResizeTimer = setTimeout(() => fitAxisLabels(document), 120);
+    axisResizeTimer = setTimeout(() => { fitAxisLabels(document); fitNames(document); }, 120);
   });
 
-  SBS.board = { renderPickBoard, renderFullBoard, renderLiveScoreBar, syncCornerInsets, fitAxisLabels };
+  SBS.board = { renderPickBoard, renderFullBoard, renderLiveScoreBar, syncCornerInsets, fitAxisLabels, fitNames };
 })();

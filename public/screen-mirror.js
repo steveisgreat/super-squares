@@ -244,6 +244,7 @@
         SBS.board.renderFullBoard(boardWrap, game, computed, liveHighlight);
         fitTeamBadges(boardWrap);
         if (SBS.board.syncCornerInsets) SBS.board.syncCornerInsets(boardWrap);
+        SBS.board.fitNames(screenEl);
       }
     }
 
@@ -294,6 +295,8 @@
     }
 
     load(true);
+    // The web font changes how wide a name is: fit again once it has loaded.
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (!closed) SBS.board.fitNames(screenEl); });
     SBS.setManagedInterval(() => load(false), POLL_MS);
   }
 
