@@ -235,11 +235,13 @@
     // same abbreviation the rest of the app already uses for tight spaces,
     // but only once the full name actually overflows its bar (checked below,
     // after layout, since that's the only reliable way to know).
+    // The full and short names ride on the text element, so a resize or a phone turned
+    // sideways can fit it again (fitAxisLabels below).
     function fitAxisLabel(labelEl, textEl, side, vertical) {
-      const overflowing = vertical
-        ? labelEl.scrollHeight > labelEl.clientHeight + 1
-        : labelEl.scrollWidth > labelEl.clientWidth + 1;
-      if (overflowing) textEl.textContent = teamStyle(game, side).abbr;
+      textEl.dataset.full = side === 'A' ? game.teamA : game.teamB;
+      textEl.dataset.abbr = teamStyle(game, side).abbr;
+      labelEl.dataset.vertical = vertical ? '1' : '';
+      refitAxisLabel(labelEl, textEl);
     }
 
     const scroll = el('div', 'board-scroll');
@@ -313,5 +315,29 @@
     teamALabel.style.height = `calc(100% - ${ch}px)`;
   }
 
-  SBS.board = { renderPickBoard, renderFullBoard, renderLiveScoreBar, syncCornerInsets };
+  // Full name first; the short one only when the full one overflows its axis bar.
+  function refitAxisLabel(labelEl, textEl) {
+    if (!textEl || !textEl.dataset.full) return;
+    textEl.textContent = textEl.dataset.full;
+    const overflowing = labelEl.dataset.vertical
+      ? labelEl.scrollHeight > labelEl.clientHeight + 1
+      : labelEl.scrollWidth > labelEl.clientWidth + 1;
+    if (overflowing) textEl.textContent = textEl.dataset.abbr;
+  }
+
+  function fitAxisLabels(root) {
+    Array.prototype.forEach.call((root || document).querySelectorAll('.teamA-label, .teamB-label'), labelEl => {
+      refitAxisLabel(labelEl, labelEl.querySelector('[data-full]'));
+    });
+  }
+
+  // A resize or a turn of the phone changes how much room the axis bars have (one listener for
+  // the page, as ui.js does for the team badges).
+  let axisResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(axisResizeTimer);
+    axisResizeTimer = setTimeout(() => fitAxisLabels(document), 120);
+  });
+
+  SBS.board = { renderPickBoard, renderFullBoard, renderLiveScoreBar, syncCornerInsets, fitAxisLabels };
 })();
