@@ -61,7 +61,7 @@
     const beforeCount = before ? before.count : 0;
     const beforePaid = before ? before.paidCount : 0;
     // A name with no squares is nobody's: an old phone's tag must not own these.
-    if (!beforeCount && players[name]) { delete players[name].g; delete players[name].paidSquares; }
+    if (!beforeCount && players[name]) { players[name].paid = false; delete players[name].g; delete players[name].paidSquares; }
     const at = Math.floor(Date.now() / 1000);
     indexes.forEach(i => { game.squares[i] = { name, at }; });
     if (players[name] && players[name].g) {
@@ -196,6 +196,21 @@
     return `Picked on their own phone${shown.length ? ' &middot; ' + escapeHtml(shown.join(', ')) + more : ''}`;
   }
 
+  const changedMsg = "That player's squares just changed. Check the list and try again.";
+  const countOf = (doc, name) => doc.squares.filter(sq => sq && sq.name === name).length;
+
+  // The one guarded way to mark a name paid or unpaid (Manage Players and the picking screen's
+  // Paid pill both save it): `p` is the summary the host was looking at. If a guest changed that
+  // name's squares since, the mark could settle squares nobody has paid for, so it is refused.
+  function paidChange(p, checked) {
+    return (doc) => {
+      if (countOf(doc, p.name) !== p.count) return changedMsg;
+      const players = ensurePlayers(doc);
+      players[p.name] = Object.assign({}, players[p.name], { paid: checked });
+      delete players[p.name].paidSquares; // paid or unpaid in full, the host's word
+    };
+  }
+
   // Modal for marking players paid/unpaid and removing a player's picks entirely.
   // Available from both Step 2 and Step 3 on purpose — someone may call in to
   // claim squares before lock but only pay after the game has started.
@@ -231,8 +246,6 @@
       if (onUpdate) onUpdate();
     }
 
-    const changedMsg = "That player's squares just changed. Check the list and try again.";
-    const countOf = (doc, name) => doc.squares.filter(sq => sq && sq.name === name).length;
 
     function renderList() {
       const summaries = playerSummaries(game);
@@ -268,14 +281,7 @@
           `;
           row.querySelector('input[type=checkbox]').addEventListener('change', async (e) => {
             const checked = e.target.checked;
-            await apply(doc => {
-              // The host looked at this many squares. If a guest changed them since, the
-              // mark could settle squares nobody has paid for.
-              if (countOf(doc, p.name) !== p.count) return changedMsg;
-              const players = ensurePlayers(doc);
-              players[p.name] = Object.assign({}, players[p.name], { paid: checked });
-              delete players[p.name].paidSquares; // paid or unpaid in full, the host's word
-            });
+            await apply(paidChange(p, checked));
           });
           row.querySelector('.player-rename').addEventListener('click', () => {
             const nameRow = row.querySelector('.player-name-row');
@@ -334,7 +340,7 @@
 
   SBS.players = {
     ensurePlayers, ensurePlayerColor, markPlayerPaid, addSquares, replaceGame, formatAt, renameSquares,
-    collectNameGroups, resolveNameForPick,
+    collectNameGroups, resolveNameForPick, paidChange, ownedLine,
     playerSummaries, unpaidTotal, openManagePlayersModal,
     toSubscript, fromSubscript, stripSubscript
   };

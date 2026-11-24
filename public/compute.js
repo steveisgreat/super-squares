@@ -887,6 +887,59 @@
       .replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
+  // R25: the host pastes "name, squares, optional unpaid|paid" lines and adds them all at once.
+  // Pure: { rows: [{ line, name, count, paid }], errors: [{ line, message }], total, open }.
+  // Only lines with no error are rows. `line` is 1-based over the pasted text (blank lines count);
+  // an error about the whole list (does not fit) has line 0. Paid is the default.
+  // A name that already has squares is refused, never merged: a merge would change what that
+  // person owes. The caller re-runs this on the freshest board before saving.
+  const PASTE_MAX_LINES = 100;
+  function parsePlayerList(text, game) {
+    const squares = (game && game.squares) || [];
+    const baseKey = n => String(n).replace(/[₀-₉]+$/, '').toLowerCase();
+    const held = Object.create(null);
+    let open = 0;
+    squares.forEach(sq => {
+      if (!sq) { open++; return; }
+      const k = baseKey(sq.name);
+      held[k] = (held[k] || 0) + 1;
+    });
+    const out = { rows: [], errors: [], total: 0, open };
+    const lines = String(text === undefined || text === null ? '' : text).split(/\r\n|\r|\n/);
+    const seen = Object.create(null);
+    let nonBlank = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const line = i + 1;
+      const trimmed = lines[i].trim();
+      if (!trimmed) continue;
+      nonBlank++;
+      if (nonBlank > PASTE_MAX_LINES) { out.errors.push({ line, message: `Too many lines. Paste ${PASTE_MAX_LINES} players at most.` }); break; }
+      const err = message => { out.errors.push({ line, message }); };
+      const tokens = trimmed.split(/[\t,\s]+/).filter(Boolean);
+      let paid = true;
+      const last = tokens[tokens.length - 1].toLowerCase();
+      if (last === 'paid' || last === 'unpaid') { paid = last === 'paid'; tokens.pop(); }
+      const countTok = tokens.length ? tokens[tokens.length - 1] : '';
+      if (!/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(countTok)) { err('Add the number of squares after the name.'); continue; }
+      tokens.pop();
+      if (!/^\d+$/.test(countTok) || Number(countTok) < 1 || Number(countTok) > 100) { err('The number of squares must be a whole number from 1 to 100.'); continue; }
+      const name = tokens.join(' ');
+      if (!name) { err('Add a name before the number.'); continue; }
+      if (Array.from(name).length > 10) { err('Names can be 10 characters at most.'); continue; }
+      if (!isPlayerName(name)) { err('That name is not allowed.'); continue; }
+      const key = baseKey(name);
+      if (seen[key]) { err(`${name} is already on line ${seen[key]}. List each person once.`); continue; }
+      seen[key] = line;
+      if (held[key]) { err(`${name} already has ${held[key]} square${held[key] === 1 ? '' : 's'}. Add more under Claim Squares.`); continue; }
+      out.rows.push({ line, name, count: Number(countTok), paid });
+      out.total += Number(countTok);
+    }
+    if (out.total > open) {
+      out.errors.push({ line: 0, message: `That is ${out.total} squares and only ${open} ${open === 1 ? 'is' : 'are'} open.` });
+    }
+    return out;
+  }
+
   // The typed name as it would be stored, or { error }. 1-10 code points after NFC; letters,
   // digits, space and . ' - & only (no control, invisible or subscript characters).
   function cleanGuestName(raw) {
@@ -1119,7 +1172,7 @@
   return {
     PLAYER_COLORS, pickPlayerColor,
     applyGuestOp, guestCap, guestNameOf, paidSquareCount, unpaidSquares, cleanGuestName, nameKey,
-    owedSummary, paidAfterAdd, pruneEmptyPlayers, unpaidGuestPicks,
+    owedSummary, paidAfterAdd, pruneEmptyPlayers, unpaidGuestPicks, parsePlayerList,
     QUARTERS, QLABEL, STATUSES, LEAGUES, SCORING_MODES,
     scoringMode, manualEntry, applyScoreOp, setQuarterScore, belowEndedQuarter, manualState, hasResult,
     shuffle, shuffledDigits, emptyGrid,

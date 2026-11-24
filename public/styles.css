@@ -165,6 +165,11 @@ h3 { font-family: var(--serif); font-size: 1.15rem; color: var(--text); font-wei
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 16px;
 }
+/* Home game cards (R25): two columns on an iPad-wide screen, three from a laptop up. */
+@media (min-width: 1024px) { .grid-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .grid-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* The setup form is one narrow column: centered, not stretched across a laptop. */
+.main > .card:has(#league-group) { max-width: 720px; margin-left: auto; margin-right: auto; }
 
 .game-card {
   position: relative;
@@ -537,6 +542,98 @@ input[type=color] {
 @media (max-width: 900px) {
   .pick-layout,
   .pick-layout.board-first { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* --- Step 2 fill-the-grid layout (R25) ---
+   Below 1024 px (or on a phone) it is the older layout: join code, stats and guest picks, then
+   the claim card and board (side by side from 901 px). From 1024 px the board sits on the left, sticky, sized from both the width and the height so the whole 10x10 grid and the claim
+   card show without scrolling; the panel is on the right and scrolls with the page. */
+.pick-fill .fill-only, .pick-fill .fill-head { display: none; }
+@media (min-width: 901px) {
+  .pick-fill { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); column-gap: 22px; align-items: start; }
+  .pick-fill > * { grid-column: 1 / -1; }
+  .pick-fill > .claim-card { grid-column: 1; grid-row: 4 / span 2; }
+  .pick-fill > .board-card { grid-column: 2; grid-row: 4; }
+  .pick-fill > .finish-card { grid-column: 2; grid-row: 5; }
+}
+.claim-card .manual-banner { flex-direction: column; align-items: stretch; margin-top: 12px; }
+.claim-card .manual-banner .manual-for { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.claim-card .manual-banner .manual-name { font-size: 1.5rem; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.claim-card .manual-banner .manual-count { font-size: 1.05rem; font-weight: 600; }
+.claim-card .manual-banner .manual-paid { font-size: 0.95rem; }
+.claim-card .manual-banner .manual-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.claim-card .manual-banner .manual-actions button { min-height: 44px; }
+.tap-hint { margin: 10px 0 0; color: var(--muted); font-size: 0.85rem; }
+.cell[role=button] { cursor: pointer; }
+.cell[role=button]:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; z-index: 1; }
+.cell.empty-pick[role=button] { min-width: 44px; min-height: 44px; }
+.paste-card textarea {
+  width: 100%;
+  min-height: 110px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  resize: vertical;
+}
+.paste-card textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.paste-status, .paste-msg { margin-top: 8px; font-size: 0.9rem; min-height: 1.2em; }
+.paste-ok { color: var(--muted); }
+.paste-bad { color: var(--danger); }
+.paste-msg { color: var(--accent-hi); font-weight: 600; }
+.fill-player { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.fill-player:last-child { border-bottom: none; }
+.fill-player-info { min-width: 0; }
+.fill-player-info .player-name { overflow-wrap: anywhere; }
+button.paid-pill { min-width: 88px; min-height: 44px; border-radius: 22px; padding: 6px 16px; font-size: 0.9rem; flex-shrink: 0; }
+button.paid-pill.is-paid { background: var(--good-soft); color: var(--good); border-color: var(--good); }
+button.paid-pill.is-unpaid { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+button.paid-pill:hover { filter: brightness(1.2); }
+
+@media (min-width: 1024px) {
+  .pick-fill:not(.is-phone) {
+    --panel-w: clamp(340px, 30vw, 440px);
+    /* The board's cell: what the width allows and what the height allows (11 rows, plus the top
+       bar, header line, card padding and legend), never under 44 px, then the page scrolls. */
+    --cell: clamp(44px, min(calc((min(100vw, 1600px) - 136px - var(--panel-w)) / 11), calc((100vh - 212px) / 11)), 100px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--panel-w);
+    column-gap: 22px;
+    align-items: start;
+  }
+  .main:has(.pick-fill:not(.is-phone)) .pick-title { display: none; }
+  .pick-fill:not(.is-phone) > *,
+  .pick-fill:not(.is-phone) > .claim-card,
+  .pick-fill:not(.is-phone) > .finish-card { grid-column: 2; grid-row: auto; }
+  .pick-fill:not(.is-phone) > .board-card {
+    grid-column: 1;
+    grid-row: 1 / span 8;
+    position: sticky;
+    top: 76px;
+    padding: 12px 14px 8px;
+    margin-bottom: 0;
+  }
+  .pick-fill:not(.is-phone) .fill-only { display: block; }
+  .pick-fill:not(.is-phone) .fill-head { display: block; font-size: 1.05rem; margin: 0 0 8px; color: var(--muted); }
+  .pick-fill:not(.is-phone) .fill-head strong { color: var(--text); }
+  .pick-fill:not(.is-phone) .board-title { display: none; }
+  .pick-fill:not(.is-phone) .board-scroll { padding-bottom: 0; overflow-x: auto; }
+  .pick-fill:not(.is-phone) .board-table {
+    grid-template-columns: repeat(11, var(--cell));
+    grid-auto-rows: var(--cell);
+    width: max-content;
+    margin: 0 auto;
+  }
+  .pick-fill:not(.is-phone) .cell { min-height: 0; }
+  .pick-fill:not(.is-phone) .cell.head { font-size: 1rem; }
+  .pick-fill:not(.is-phone) .cell .name-txt { padding-top: 0; font-size: clamp(0.62rem, calc(var(--cell) * 0.2), 0.85rem); }
+  .pick-fill:not(.is-phone) .board-legend { margin-top: 6px; }
+  .pick-fill:not(.is-phone) .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pick-fill:not(.is-phone) .stat-box.fill-dup { display: none; }
+  .pick-fill:not(.is-phone) .stat-box { padding: 6px 12px; }
 }
 
 .manual-banner {

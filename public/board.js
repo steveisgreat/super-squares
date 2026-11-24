@@ -109,12 +109,21 @@
     return `<div class="name-txt"${style}>${escapeHtml(name)}</div>`;
   }
 
-  // Step 2 preview. `state` is { selecting, selected, target, onToggle }.
+  // Step 2 preview. `state` is { selecting, selected, target, pickColor, onFilled, onOpen }.
+  // onFilled(idx): tap on a claimed square. onOpen(idx): tap on an open one (the screen decides
+  // whether that starts a selection or toggles a square); with neither, the squares are inert.
+  // Every tappable square is one stop in a roving-tabindex grid: Tab enters and leaves it once,
+  // the arrow keys, Home and End move inside it, Enter and Space tap.
   function renderPickBoard(holder, game, state) {
+    // A redraw (a poll, a tap) must leave the keyboard where it was.
+    const act = document.activeElement;
+    const hadFocus = !!(act && holder.contains(act) && act.dataset && act.dataset.i);
+    let rove = hadFocus ? Number(act.dataset.i) : (holder._rove === undefined ? -1 : holder._rove);
     holder.innerHTML = '';
     const isUnpaid = unpaidChecker(game);
     const scroll = el('div', 'board-scroll');
     const table = el('div', 'board-table');
+    const tappable = [];
 
     table.appendChild(el('div', 'cell head corner', ''));
     for (let c = 0; c < 10; c++) table.appendChild(el('div', 'cell head x pending', '–'));
@@ -124,6 +133,7 @@
       for (let c = 0; c < 10; c++) {
         const idx = r * 10 + c;
         const sq = game.squares[idx];
+        const where = `Row ${r + 1} column ${c + 1}`;
         let cls = 'cell';
         let label = '';
         if (sq) {
@@ -137,20 +147,39 @@
           if (state.selected.includes(idx)) cls += ' selected';
         }
         const cell = el('div', cls, label);
+        cell.dataset.i = String(idx);
+        let handler = null;
         if (sq && state.onFilled) {
           // The host taps a claimed square to see who has it (and remove or reassign it).
           cell.classList.add('is-tappable');
-          cell.setAttribute('role', 'button');
-          cell.tabIndex = 0;
-          cell.setAttribute('aria-label', `Row ${r + 1} column ${c + 1}, ${sq.name}`);
-          cell.addEventListener('click', () => state.onFilled(idx));
-          cell.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); state.onFilled(idx); }
-          });
-        }
-        if (!sq && state.selecting) {
+          cell.setAttribute('aria-label', `${where}, ${sq.name}`);
+          handler = state.onFilled;
+        } else if (!sq && state.onOpen) {
+          const picked = state.selected.includes(idx);
+          cell.setAttribute('aria-label', `${where}, open${picked ? ', selected' : ''}`);
+          if (state.selecting) cell.setAttribute('aria-pressed', String(picked));
           if (state.pickColor) cell.style.setProperty('--pick-color', state.pickColor);
-          cell.addEventListener('click', () => state.onToggle(idx));
+          handler = state.onOpen;
+        }
+        if (handler) {
+          cell.setAttribute('role', 'button');
+          cell.tabIndex = -1;
+          cell.addEventListener('click', () => { holder._rove = idx; handler(idx); });
+          cell.addEventListener('focus', () => { holder._rove = idx; });
+          cell.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); holder._rove = idx; handler(idx); return; }
+            const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -10, ArrowDown: 10 }[e.key];
+            let to = -1;
+            if (step) {
+              for (let j = idx + step; j >= 0 && j < 100; j += step) { if (Math.abs(step) === 1 && Math.floor(j / 10) !== Math.floor(idx / 10)) break; if (tappable[j]) { to = j; break; } }
+            } else if (e.key === 'Home' || e.key === 'End') {
+              const row = Math.floor(idx / 10);
+              for (let j = e.key === 'Home' ? row * 10 : row * 10 + 9; j >= row * 10 && j < row * 10 + 10; j += e.key === 'Home' ? 1 : -1) { if (tappable[j]) { to = j; break; } }
+            } else return;
+            e.preventDefault();
+            if (to >= 0) focusPickCell(holder, tappable, to);
+          });
+          tappable[idx] = cell;
         }
         table.appendChild(cell);
       }
@@ -158,6 +187,22 @@
 
     scroll.appendChild(table);
     holder.appendChild(scroll);
+
+    // The one tab stop: where the keyboard last was if that square can still be tapped, else the
+    // first that can.
+    if (!tappable[rove]) rove = tappable.findIndex(Boolean);
+    if (rove >= 0) {
+      tappable[rove].tabIndex = 0;
+      holder._rove = rove;
+      if (hadFocus) tappable[rove].focus({ preventScroll: true });
+    }
+  }
+
+  function focusPickCell(holder, tappable, idx) {
+    tappable.forEach(c => { if (c) c.tabIndex = -1; });
+    tappable[idx].tabIndex = 0;
+    holder._rove = idx;
+    tappable[idx].focus();
   }
 
   // Step 3 / TV board, with axis numbers and per-quarter badges. `liveHighlight`
