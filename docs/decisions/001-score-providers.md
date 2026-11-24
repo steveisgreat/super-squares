@@ -89,11 +89,12 @@ watching.
 ### 5. Detecting the end of a quarter
 In order of trust:
 1. The provider's `state`/`period` (ESPN: period advanced, `break`, or `post`).
-2. With no `period` (BALLDONTLIE): quarter n is complete once quarter n+1 has a
-   non-null value, or the game is `post`. **Provisional**: the probe has to
-   confirm whether a quarter's field fills in during that quarter or only after
-   it ends. If this is the only signal, Q2 settles only when the second half
-   starts. That is acceptable because the host can end Q2 at halftime.
+2. BALLDONTLIE has no separate period field, but the **probe (2026-11-23) showed
+   its `status` text carries it**: `"14:54 - 1st"`, `"End of 1st"`,
+   `"15:00 - 2nd"`. The adapter parses that into `period`/`clock`/`state`.
+   Quarter fields fill in *during* the quarter, so "quarter n+1 has a value"
+   is only a fallback (about 80 s slower than the status text). Details:
+   `docs/research/2026-11-23-score-feed-probe.md`.
 3. **The host always wins.** A quarter result entered or edited by the host is
    stamped `source: 'host'` and is never overwritten by a feed. That
    generalizes today's "never touch a quarter that already has a score".

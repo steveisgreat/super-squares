@@ -85,7 +85,8 @@ Adapters for ESPN and BALLDONTLIE behind one `LiveGame` shape;
 fs equivalent; one claimed refresh per league and date every 15 s; boards merge
 the slate into `liveScore` on read and write only on quarter completion; the
 "live feed unavailable" fallback to the manual panel; `/api/todays-games` reads
-the slate.
+the slate. Probe findings and API call details:
+`docs/research/2026-11-23-score-feed-probe.md`.
 *Done:* fixture tests from the 2026-11-23 probe for both adapters, failover,
 quarter-end detection with and without `period`, host-wins, and claim
 concurrency in both stores; `/code-review medium` clean; a simulated 50-board
