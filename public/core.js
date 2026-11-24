@@ -117,6 +117,12 @@
     revokeAllSessions: () => rawRequest('/api/session/revoke-all', { method: 'POST' }),
     getGame: (id) => request(`/api/game/${id}`),
     getJoin: (code) => rawRequest(`/api/join/${encodeURIComponent(code)}`),
+    // TV pairing (R23). The TV's calls are raw: it has no host session and must never prompt.
+    createTv: () => rawRequest('/api/tv', { method: 'POST' }),
+    getTv: (token) => rawRequest(`/api/tv/${encodeURIComponent(token)}`),
+    getMyTvs: () => request('/api/tv/mine'),
+    pairTv: (code, gameId) => request('/api/tv/pair', json('POST', { code, gameId })),
+    followTv: (gameId, o) => request('/api/tv/follow', json('POST', { gameId }), o),
     createGame: (game) => request('/api/game', json('POST', game)),
     saveGame: (game) => request(`/api/game/${game.id}`, json('PUT', game)),
     patchScore: (id, op) => request(`/api/game/${id}/score`, json('PATCH', op)),
@@ -178,7 +184,8 @@
     if (route.screen === 'editGame') return s.editGame(route.game);
     if (route.screen === 'picking') return s.picking(route.game);
     if (route.screen === 'board') return s.board(route.game);
-    if (route.screen === 'tv') return s.tv(route.id);
+    if (route.screen === 'tv') return s.tv(route.id, route.paired);
+    if (route.screen === 'tv-pair') return s.tvPair();
     if (route.screen === 'phone') return s.phone(route.id, route.back);
     if (route.screen === 'player') return s.player(route.id);
     if (route.screen === 'join') return s.join(route.code);
@@ -199,6 +206,8 @@
     const hash = window.location.hash || '';
     // /<join code>: the guest link (R22). The server serves this same page for
     // it; the code is resolved to a board id, then the player view opens.
+    // /tv: a TV asking to be paired with a board (R23).
+    if (/^\/tv\/?$/i.test(window.location.pathname) && !hash) return { screen: 'tv-pair' };
     const joinPath = window.location.pathname.match(/^\/([2-9A-HJKMNP-Za-hjkmnp-z]{6})\/?$/);
     if (joinPath && !hash) return { screen: 'join', code: joinPath[1].toUpperCase() };
     const tv = hash.match(new RegExp(`^#tv-(${ID_RE})$`, 'i'));

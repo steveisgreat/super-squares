@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test.js && node test-store.js && node test-auth.js && node test-accounts.js && node test-livescore.js && node test-score.js && node test-payout.js && node test-scores.js && node test-slates.js && node test-store-fs.js && node test-joincode.js && node test-store-pg.js",
+    "test": "node test.js && node test-store.js && node test-auth.js && node test-accounts.js && node test-livescore.js && node test-score.js && node test-payout.js && node test-scores.js && node test-slates.js && node test-store-fs.js && node test-joincode.js && node test-tv.js && node test-store-pg.js",
     "test:store": "node test-store.js",
     "test:auth": "node test-auth.js",
     "test:accounts": "node test-accounts.js",
@@ -15,6 +15,7 @@
     "test:scores": "node test-scores.js",
     "test:store-fs": "node test-store-fs.js",
     "test:joincode": "node test-joincode.js",
+    "test:tv": "node test-tv.js",
     "test:store-pg": "node test-store-pg.js",
     "test:slates": "node test-slates.js"
   },

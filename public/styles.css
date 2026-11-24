@@ -2382,3 +2382,37 @@ button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color:
 .tv-join-or { font-size: clamp(0.8rem, 1vw, 1.2rem); color: var(--muted); }
 .tv-join-url { font-size: clamp(1rem, 1.3vw, 1.6rem); font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
 .tv-join-code-big { font-size: clamp(2rem, 3.2vw, 4.2rem); font-weight: 800; letter-spacing: 0.14em; padding-left: 0.14em; color: #fff; line-height: 1.1; }
+
+/* TV pairing (R23): the /tv screen, and the host's "What's in the room?" chooser. */
+.tvp-screen {
+  min-height: 100vh; box-sizing: border-box; padding: 4vh 5vw;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 2.5vh; background: var(--bg); color: var(--text);
+}
+.tvp-title { margin: 0; font-size: clamp(1.6rem, 4vw, 4.5rem); font-weight: 800; color: var(--accent); }
+.tvp-steps { margin: 0; max-width: 40ch; font-size: clamp(1rem, 1.9vw, 2.2rem); color: var(--muted); line-height: 1.35; }
+.tvp-steps strong { color: var(--text); }
+.tvp-code {
+  font-size: clamp(3rem, 15vw, 16rem); font-weight: 800; line-height: 1; letter-spacing: 0.12em; padding-left: 0.12em;
+  color: #fff; text-shadow: 0 0 24px rgba(0, 229, 255, 0.45); max-width: 100%;
+}
+.tvp-status { margin: 0; font-size: clamp(0.95rem, 1.5vw, 1.8rem); color: var(--muted); }
+.tvp-unpair {
+  position: fixed; right: 12px; bottom: 10px; background: none; border: 0; padding: 6px 8px; min-height: 0;
+  color: var(--muted); font-size: 0.85rem; text-decoration: underline; cursor: pointer; opacity: 0.7;
+}
+.tvp-unpair:hover, .tvp-unpair:focus-visible { opacity: 1; color: var(--text); }
+
+.room-card { max-width: 480px; width: 100%; max-height: 92vh; overflow-y: auto; box-shadow: var(--shadow-pop); box-sizing: border-box; }
+.room-title { margin-top: 0; }
+.room-opt { padding: 12px 0; border-top: 1px solid var(--border); }
+.room-opt h4 { margin: 0 0 6px; font-size: 1rem; color: var(--accent); }
+.room-opt p { margin: 0 0 8px; color: var(--muted); font-size: 0.92rem; line-height: 1.4; }
+.room-url { color: var(--text); overflow-wrap: anywhere; }
+.room-label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
+.room-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.room-code {
+  width: 9ch; box-sizing: content-box; font-size: 1.4rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; text-align: center;
+}
+.room-status { min-height: 1.3em; margin: 8px 0 0; }
+.room-status.room-error { color: var(--danger); }

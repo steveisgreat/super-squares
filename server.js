@@ -29,7 +29,8 @@ const MIME = {
 function serveStatic(req, res, pathname) {
   // /<join code> is the guest link: the same page, which resolves the code itself
   // (vercel.json has the matching rewrite).
-  let requested = pathname === '/' || JoinCode.PATH_RE.test(pathname) ? '/index.html' : pathname;
+  // /tv is the TV pairing screen (R23), also the same page.
+  let requested = pathname === '/' || pathname === '/tv' || JoinCode.PATH_RE.test(pathname) ? '/index.html' : pathname;
   try {
     requested = decodeURIComponent(requested);
   } catch (e) {

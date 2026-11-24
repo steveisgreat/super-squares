@@ -174,7 +174,7 @@ async function main() {
 
   await check('vercel.json and the dev server rewrite the same codes', () => {
     const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'vercel.json'), 'utf8'));
-    const rw = cfg.rewrites.find(r => r.destination === '/index.html');
+    const rw = cfg.rewrites.find(r => r.destination === '/index.html' && r.source.startsWith('/:code'));
     assert(rw, 'no rewrite to /index.html');
     const m = rw.source.match(/^\/:code\((.+)\)$/);
     assert(m, `unexpected source ${rw.source}`);

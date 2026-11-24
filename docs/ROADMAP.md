@@ -208,7 +208,9 @@ big join QR before lock, and the guest view gets a small grid with my squares, "
 instead of "Locked", and "scored by host" on Manual boards.
 *Done:* code uniqueness test; browser check on phone sizes and the TV view.
 
-**R23. TV pairing and the device chooser** — `Sonnet` build, `Opus` review — Depends on: R22.
+**R23. TV pairing and the device chooser** — `Sonnet` build, `Opus` review — Depends on: R22. — ✅ shipped 2026-11-24
+([decision 017](decisions/017-tv-pairing.md), migration 005: apply before the push). Not checked on a
+real smart-TV browser. "Score from another phone" is text only until R24.
 After lock, "What's in the room?" (Show on a TV, Score from another phone, Invite
 players). A TV opens `/tv`, shows a short code, and the host's phone enters it; the
 paired TV follows the host's current game. No server timers (the TV's normal poll

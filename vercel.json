@@ -2,6 +2,7 @@
   "outputDirectory": "public",
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/[...path]" },
+    { "source": "/tv", "destination": "/index.html" },
     { "source": "/:code([2-9A-HJKMNP-Za-hjkmnp-z]{6})", "destination": "/index.html" }
   ],
   "headers": [

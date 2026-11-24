@@ -1,5 +1,6 @@
 node_modules/
 data/*.json
+data/*.code
 
 # Secrets. .env.local holds the real Neon connection string; only the
 # placeholder template is ever committed.

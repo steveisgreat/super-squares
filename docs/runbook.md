@@ -106,6 +106,9 @@ needs a change there. On previews it blocks the Vercel toolbar, which is expecte
   (decision 016). Every game read selects `join_code`, so without it every board fails to
   load. It only adds a nullable column and a unique index, so applying it early is safe.
   Then check `/<code>` on the preview: the rewrite is tested only locally.
+- **Before the push that ships R23:** apply `migrations/005_tv_pairings.sql` to production
+  (decision 017). Only `/api/tv` uses it, so without it only TV pairing fails. Then check
+  `/tv` on the preview (rewrite in `vercel.json`).
 - **Before the first push that ships R4a part 2:** apply `migrations/003_live_slates.sql`
   and set `SCORE_PRIMARY=espn` (plus `SCORE_SECONDARY` and `BALLDONTLIE_API_KEY` if
   wanted) in Vercel production. On Vercel, unset means no provider (decision 001), so

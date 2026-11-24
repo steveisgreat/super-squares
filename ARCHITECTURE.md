@@ -48,6 +48,11 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `GET /api/todays-games` | host only; the setup screen's schedule, read from the shared slate (no provider call of its own) |
 | `POST /api/game`, `PUT /api/game/:id`, `DELETE /api/game/:id` | host only |
 | `PATCH /api/game/:id/score` | host only; one manual-score operation (decision 011) |
+| `POST /api/tv` | anonymous; a TV asks to pair → `{ code, token }` (decision 017) |
+| `GET /api/tv/:token` | the TV reads its pairing → `{ state: 'waiting', code }` or `{ state: 'paired', gameId }`; 404 unknown or expired |
+| `POST /api/tv/pair` | owner of `gameId`; `{ code, gameId }` pairs a waiting TV and retires the code |
+| `POST /api/tv/follow` | owner of `gameId`; moves all the caller's paired TVs to that board |
+| `GET /api/tv/mine` | signed in; `{ count }` of the caller's paired TVs |
 | `GET /api/join/:code` | public; a join code resolves to `{ id }` (decision 016); 400 malformed, 404 unknown |
 | `GET /<code>` (6 characters) | static; serves `index.html`, which resolves the code and opens the guest view |
 | `PATCH /api/game/:id/payout` | host only; mark a quarter paid out, undo, or settle (decision 015); a record only, no money moves |

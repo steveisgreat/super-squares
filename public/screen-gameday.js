@@ -7,6 +7,8 @@
   const { el, escapeHtml, money, topbar, showAlert, showConfirm, applyTeamColors, teamBadge, teamStyle, fitTeamBadges, readableTextColor, isPhone, TV_ICON, PHONE_ICON, PEOPLE_ICON } = SBS.ui;
   const { unpaidTotal, openManagePlayersModal } = SBS.players;
   const { disturbMessage } = SBS.ui;
+  // Tabler "devices" (MIT, 24 px outline), for the In the room button.
+  const DEVICES_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 9a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1v-10z"/><path d="M18 8v-3a1 1 0 0 0 -1 -1h-13a1 1 0 0 0 -1 1v12a1 1 0 0 0 1 1h9"/><path d="M16 9h2"/></svg>';
   const { QUARTERS, QLABEL, computeGame, payoutAmount, drawnDigits, payoutStatus, whoToPay, paidQuartersDisturbed } = window.GameLogic;
 
   // Silver Lombardi-style trophy for the NFL quarter-end celebration.
@@ -230,6 +232,14 @@
     playerBtn.addEventListener('click', () => SBS.playerView.showPlayerLink(game.id, game.joinCode));
     const headerMeta = [SBS.ui.leagueBadge(game.league), escapeHtml(game.description || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
     const actionBtns = [manageBtn, tvBtn, phoneBtn, playerBtn];
+    // Once the board is locked: pair a TV, score from another phone, invite players (R23).
+    const locked = game.status === 'started' || game.status === 'finished';
+    if (locked) {
+      const roomBtn = actionBtn(DEVICES_ICON, 'In the room', "What's in the room?");
+      roomBtn.classList.add('room-btn');
+      roomBtn.addEventListener('click', () => SBS.deviceChooser.open(game, roomBtn));
+      actionBtns.push(roomBtn);
+    }
     // The topbar keeps the four desktop buttons; on a phone they sit in a labeled row below it.
     app.appendChild(topbar('', phone ? [] : actionBtns, { hideIcon: true, homeLeft: true }));
     const main = el('div', 'main' + (phone ? ' gd-phone' : ''));
@@ -782,6 +792,7 @@
       }
     }
     SBS.setManagedInterval(pollLive, 8000);
+    SBS.deviceChooser.onGameDay(game, app.querySelector('.room-btn') || null);
     SBS.onLeaveScreen(() => {
       if (activeDrawReveal) { activeDrawReveal.cancel(); activeDrawReveal = null; }
     });
@@ -824,7 +835,7 @@
   }
 
   // ---------- TV / grid-only view (1080p, no controls, self-refreshing) ----------
-  function renderTV(id) {
+  function renderTV(id, paired) {
     const app = SBS.appEl;
     app.innerHTML = '';
     document.body.classList.add('tv-mode');
@@ -896,7 +907,8 @@
     });
 
     controls.appendChild(fsBtn);
-    controls.appendChild(exitBtn);
+    // A paired TV has no host to go back to: no Exit.
+    if (!paired) controls.appendChild(exitBtn);
 
     const stopFsWatch = SBS.ui.fullscreen.onChange(syncFsLabel);
     syncFsLabel();
@@ -1561,6 +1573,11 @@
       } catch (e) {
         // Deleted on another device — nothing left here to show.
         if (e && e.status === 404) {
+          if (paired) {
+            // The host's board is gone; stay and keep checking the pairing for the next one.
+            header.innerHTML = '<div class="error-msg">This board is no longer available. Waiting for the host…</div>';
+            return;
+          }
           SBS.go({ screen: 'home' });
           return;
         }
@@ -1570,6 +1587,28 @@
 
     load();
     SBS.setManagedInterval(load, 4000);
+
+    // A paired TV keeps asking its token which board it is for, at the same cadence, so
+    // when the host opens another locked board the TV moves with them. It holds only the
+    // token: no session, nothing that writes.
+    if (paired) {
+      let checking = false;
+      SBS.setManagedInterval(async () => {
+        if (checking || SBS.currentScreen() !== 'tv') return;
+        checking = true;
+        try {
+          const r = await SBS.api.getTv(SBS.tvToken.get() || '');
+          if (SBS.currentScreen() !== 'tv') return;
+          if (r.state === 'paired' && r.gameId !== id) SBS.go({ screen: 'tv', id: r.gameId, paired: true });
+          else if (r.state !== 'paired') SBS.go({ screen: 'tv-pair' });
+        } catch (e) {
+          // Unknown or expired: get a new code. Anything else (offline): keep showing the board.
+          if (e && e.status === 404 && SBS.currentScreen() === 'tv') { SBS.tvToken.clear(); SBS.go({ screen: 'tv-pair' }); }
+        } finally {
+          checking = false;
+        }
+      }, 4000);
+    }
   }
 
   SBS.screens.board = renderBoard;
