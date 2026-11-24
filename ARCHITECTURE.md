@@ -95,7 +95,8 @@ always wins.
 `index.html` loads plain scripts in order: `compute.js` (payout math, validation,
 cutoff rules, shared with the server and unit-tested), `teams.js` (NFL/NBA names
 colors and ESPN logo URLs), `qrcode.js`, `core.js` (API client, routing, sign-in prompt by mode and 401 replay, 403 handling), `ui.js`,
-`players.js`, `board.js`, `score-panel.js` (manual score), then screens: `screen-home` (saved games, setup, version
+`players.js`, `board.js`, `score-panel.js` (manual score; keyboard scoring on a laptop), `present.js` (Present on an HDMI TV:
+the TV view in its own window, on the second screen when the browser can), then screens: `screen-home` (saved games, setup, version
 footer), `screen-picking`, `screen-gameday`, `screen-phone` (score entry),
 `screen-player` (read-only My Squares), `screen-tvpair` (TV pairing, "What's in the room?"),
 `screen-handoff` (scorer-phone code and the `#handoff-<token>` page), and `app.js` (hash router: `#tv-<id>`,

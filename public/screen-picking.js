@@ -4,7 +4,7 @@
 
   const SBS = window.SBS = window.SBS || {};
   const { el, textEl, escapeHtml, money, topbar, showConfirm, showAlert, applyTeamColors, teamBadge, fitTeamBadges, overlayEl } = SBS.ui;
-  const { unpaidTotal, openManagePlayersModal, paidChange, ownedLine, playerSummaries, resolveNameForPick, ensurePlayerColor, addSquares, replaceGame, formatAt, ensurePlayers, renameSquares, collectNameGroups } = SBS.players;
+  const { unpaidTotal, openManagePlayersModal, resolveNameForPick, ensurePlayerColor, addSquares, replaceGame, formatAt, ensurePlayers, renameSquares, collectNameGroups } = SBS.players;
   const { shuffle, lockGame, isPlayerName, unpaidGuestPicks, pruneEmptyPlayers, parsePlayerList } = window.GameLogic;
 
   // Guards the one irreversible action in the app (drawing the axis numbers).
@@ -540,52 +540,18 @@
       updateManualBanner();
     }
 
-    // ---- Players in the panel (wide screens): who has what, and the Paid pill ----
-    const playersCard = el('div', 'card players-card fill-only');
-    playersCard.appendChild(el('h3', '', 'Players'));
-    const playersMsg = el('div', 'paste-bad');
-    playersMsg.setAttribute('role', 'status');
-    playersCard.appendChild(playersMsg);
-    const plist = el('div', 'fill-players');
-    playersCard.appendChild(plist);
-    const manage2 = el('button', 'secondary', 'Manage Players');
-    manage2.type = 'button';
-    manage2.addEventListener('click', () => openManagePlayersModal(game, reopen));
-    playersCard.appendChild(el('div', 'actions', '')).appendChild(manage2);
-
-    function drawPlayers() {
-      const focused = document.activeElement && plist.contains(document.activeElement) ? document.activeElement.dataset.name : null;
-      const sums = playerSummaries(game);
-      plist.innerHTML = '';
-      if (!sums.length) plist.appendChild(el('p', 'player-muted', 'No squares picked yet.'));
-      sums.forEach(p => {
-        const row = el('div', 'fill-player');
-        const info = el('div', 'fill-player-info');
-        info.innerHTML = `<div class="player-name">${escapeHtml(p.name)}</div><div class="player-sub">${ownedLine(p)}</div>`;
-        const pill = el('button', 'paid-pill ' + (p.paid ? 'is-paid' : 'is-unpaid'), p.paid ? 'Paid' : 'Unpaid');
-        pill.type = 'button';
-        pill.dataset.name = p.name;
-        pill.setAttribute('aria-label', `${p.name}: ${p.paid ? 'paid' : 'unpaid'}. ${p.paid ? 'Mark unpaid' : 'Mark paid'}`);
-        pill.addEventListener('click', () => togglePaid(p));
-        row.appendChild(info);
-        row.appendChild(pill);
-        plist.appendChild(row);
-        if (focused === p.name) pill.focus();
-      });
-    }
-
-    // The same guarded save as Manage Players (paidChange): refused if a guest changed this
-    // name's squares since the list was drawn.
-    async function togglePaid(p) {
-      if (saving) return;
-      saving = true;
-      const r = await persist(paidChange(p, !p.paid), m => { playersMsg.textContent = m; });
-      saving = false;
-      if (!r) return drawPlayers();
-      replaceGame(game, r.game);
-      playersMsg.textContent = r.refused || '';
-      afterGameChange();
-    }
+    // ---- Players in the panel (wide screens): who has what, and the Paid pill (shared with Game Day) ----
+    const players = SBS.players.playersCard({
+      cls: 'fill-only',
+      getGame: () => game,
+      save: persist,
+      manage: () => openManagePlayersModal(game, reopen),
+      busy: () => saving,
+      setBusy: (v) => { saving = v; },
+      onSaved: (r) => { replaceGame(game, r.game); afterGameChange(); }
+    });
+    const playersCard = players.el;
+    const drawPlayers = players.draw;
 
     // ---- Paste a list of players (wide screens; auto and both modes) ----
     let pasteCard = null;

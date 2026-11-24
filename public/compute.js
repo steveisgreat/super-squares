@@ -836,6 +836,41 @@
     return finish();
   }
 
+  // Keyboard scoring (Game Day, R25 part b). Q W E score for team A and P O I for team B, in the
+  // order of the league's usual plays; other sports use Q and P for one point. Keys are matched
+  // without regard to case. Returns a fresh 'add' op, or null for a key that scores nothing.
+  const SCORE_KEY_POINTS = { nfl: [7, 3, 2], nba: [3, 2, 1] };
+  function scoreKeyOp(league, key) {
+    if (typeof key !== 'string' || key.length !== 1) return null;
+    const k = key.toLowerCase();
+    const a = 'qwe'.indexOf(k);
+    const b = 'poi'.indexOf(k);
+    if (a === -1 && b === -1) return null;
+    const table = SCORE_KEY_POINTS[league] || [1];
+    const i = a !== -1 ? a : b;
+    if (i >= table.length) return null;
+    return { op: 'add', side: a !== -1 ? 'a' : 'b', points: table[i] };
+  }
+
+  // The op that undoes `op` after it was applied to `before` and gave `after` (both whole games),
+  // or null when there is nothing to undo from the keyboard. An add is undone by the opposite add,
+  // for what it really moved (a score clamped at 0 or 999 moved less than asked). An end or a final
+  // is undone by the 'undo' op. Everything else (set, edit, resume) is not undone this way.
+  function inverseScoreOp(op, before, after) {
+    if (!op || typeof op !== 'object' || !before || !after) return null;
+    if (op.op === 'add') {
+      if (op.side !== 'a' && op.side !== 'b') return null;
+      const moved = manualState(after)[op.side] - manualState(before)[op.side];
+      return moved === 0 ? null : { op: 'add', side: op.side, points: -moved };
+    }
+    if (op.op === 'end' || op.op === 'final') {
+      const same = JSON.stringify(before.results || {}) === JSON.stringify(after.results || {})
+        && JSON.stringify(manualState(before)) === JSON.stringify(manualState(after));
+      return same ? null : { op: 'undo' };
+    }
+    return null;
+  }
+
   // Keypad entry: set one team's score for one quarter, in place. A stored
   // final draw is left alone on purpose. It is keyed by grid row-col and
   // computeGame ignores one that does not match the current score, so a score
@@ -1174,7 +1209,7 @@
     applyGuestOp, guestCap, guestNameOf, paidSquareCount, unpaidSquares, cleanGuestName, nameKey,
     owedSummary, paidAfterAdd, pruneEmptyPlayers, unpaidGuestPicks, parsePlayerList,
     QUARTERS, QLABEL, STATUSES, LEAGUES, SCORING_MODES,
-    scoringMode, manualEntry, applyScoreOp, setQuarterScore, belowEndedQuarter, manualState, hasResult,
+    scoringMode, manualEntry, applyScoreOp, scoreKeyOp, inverseScoreOp, setQuarterScore, belowEndedQuarter, manualState, hasResult,
     shuffle, shuffledDigits, emptyGrid,
     potOf, actualPotOf, findCol, findRow, computeGame, computeLiveHighlight, payoutAmount, drawnDigits,
     payoutStatus, applyPayoutOp, paidQuartersDisturbed, whoToPay,

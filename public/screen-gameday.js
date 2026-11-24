@@ -274,6 +274,17 @@
     `;
     main.appendChild(strip);
     strip.querySelector('#unpaid-stat').addEventListener('click', () => openManagePlayersModal(game, reopen));
+    // Brings the numbers up to date in place (a poll, a Paid pill). The pot box is left alone while
+    // the host is typing in it.
+    function drawStrip() {
+      const boxes = strip.querySelectorAll('.stat-box');
+      boxes[1].querySelector('.val').textContent = String(game.squares.filter(sq => sq).length);
+      const unpaid = unpaidTotal(game);
+      boxes[3].querySelector('.val').textContent = money(unpaid);
+      boxes[3].classList.toggle('warn', unpaid > 0);
+      const potIn = strip.querySelector('#pot-input');
+      if (document.activeElement !== potIn) potIn.value = String(Math.round(computeGame(game).pot));
+    }
 
     // Blanking the field clears the override and falls back to the actual
     // collected total (squares sold × price); typing a number overrides it.
@@ -329,6 +340,7 @@
     // Manual scoring: the current-score panel sits above the quarter cards
     // and hides itself in any other mode or before the board is locked.
     const scorePanel = SBS.scorePanel.create({
+      keyboard: !phone, // the Keyboard scoring switch shows on wide screens with a mouse only
       getGame: () => game,
       setGame: (g) => {
         Object.assign(game, g);
@@ -672,6 +684,82 @@
     renderWhoToPay();
     fitTeamBadges(app);
 
+    // ---- Wide screens (1024 px and up, not a phone): board left, panel right ----
+    // Everything above is built in the order of the narrow page. On a wide screen the same pieces
+    // are put in the panel in their reading order, which is the keyboard order too.
+    let players = null;
+    function redrawAll() {
+      const c = computeGame(game);
+      SBS.board.renderFullBoard(boardHolder, game, c);
+      fitTeamBadges(boardHolder);
+      refreshQuarterCards(c);
+      scorePanel.update();
+      updateFeedBanner();
+      drawStrip();
+      if (players) players.draw();
+    }
+
+    // The Paid pill: the same guarded save as Manage Players, through saveWith, so a score that
+    // changed on another device is kept (the change is applied again to the newer board). A score
+    // typed here and still waiting on its debounce is saved first, as sendPayout does.
+    async function savePlayers(change, showErr) {
+      try {
+        if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; await doSave(); }
+        return await SBS.saveWith(game, change);
+      } catch (e) {
+        if (await SBS.handleConflict(e, game.id)) return null;
+        const denied = await SBS.handleForbidden(e, game.id);
+        if (denied) {
+          if (SBS.currentScreen() === 'board') SBS.openGame(denied.fresh || game);
+          return null;
+        }
+        showErr('Failed to save: ' + e.message);
+        return null;
+      }
+    }
+
+    let presentCard = null;
+    if (!phone) {
+      players = SBS.players.playersCard({
+        getGame: () => game,
+        save: savePlayers,
+        manage: () => openManagePlayersModal(game, reopen),
+        // Assigned over, not replaced: the answer to a save has no live-feed fields.
+        onSaved: (r) => { Object.assign(game, r.game); redrawAll(); }
+      });
+      players.draw();
+      presentCard = SBS.present.card(game.id);
+      SBS.onLeaveScreen(presentCard.destroy);
+
+      const wideQuery = window.matchMedia('(min-width: 1024px)');
+      const fineQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
+      const placeCards = () => {
+        const wide = wideQuery.matches;
+        const focused = document.activeElement;
+        layout.classList.toggle('gd-wide', wide);
+        boardCard.classList.toggle('gd-board', wide);
+        if (wide) {
+          const order = [boardCard, scorePanel.el, SBS.present.eligible() ? presentCard.el : null, resultsCard, players.el, joinCard, strip];
+          order.forEach(n => { if (n) layout.appendChild(n); });
+          if (!SBS.present.eligible()) presentCard.el.remove();
+        } else {
+          resultsCard.insertBefore(scorePanel.el, resultsCard.firstChild);
+          layout.append(boardCard, resultsCard);
+          players.el.remove();
+          presentCard.el.remove();
+          if (joinCard) main.insertBefore(joinCard, layout);
+          main.insertBefore(strip, layout);
+        }
+        if (focused && focused !== document.activeElement && document.body.contains(focused) && focused !== document.body) focused.focus();
+        fitTeamBadges(boardHolder);
+      };
+      [wideQuery, fineQuery].forEach(m => { if (m.addEventListener) m.addEventListener('change', placeCards); else m.addListener(placeCards); });
+      SBS.onLeaveScreen(() => {
+        [wideQuery, fineQuery].forEach(m => { if (m.removeEventListener) m.removeEventListener('change', placeCards); else m.removeListener(placeCards); });
+      });
+      if (wideQuery.matches) placeCards();
+    }
+
     // The keypad warns before it unsettles a paid quarter. Once the first
     // keystroke is confirmed the quarter already reads Needs settling, so the
     // rest of the number does not ask again.
@@ -765,6 +853,8 @@
     async function pollLive() {
       if (saveTimer || syncing || scorePanel.busy()) return;
       syncing = true;
+      // A TV window the host closed by hand is noticed here (and when this window is focused).
+      if (SBS.present) SBS.present.refresh();
       try {
         const fresh = await SBS.api.getGame(game.id);
         const feedChanged = !!(fresh.liveFeed && fresh.liveFeed.available === false) !== !!(game.liveFeed && game.liveFeed.available === false);
@@ -779,6 +869,10 @@
           refreshQuarterCards(newComputed);
           scorePanel.update();
           updateFeedBanner();
+          drawStrip();
+          if (players) players.draw();
+          // A change made somewhere else: what this screen scored no longer undoes cleanly.
+          scorePanel.clearUndo();
         }
       } catch (e) {
         // Deleted on another device — nothing left here to show.
@@ -866,6 +960,13 @@
 
     exitBtn.addEventListener('click', async () => {
       if (SBS.ui.fullscreen.active()) await SBS.ui.fullscreen.exit();
+      // A window the host console opened to present on a TV (R25 part b): Exit closes it.
+      // (The opener may be gone: the console tab was closed. Closing still works for a window a
+      // script opened; if the browser refuses, fall through to Home.)
+      if (window.name.indexOf('sbs-tv-') === 0) {
+        window.close();
+        if (window.closed) return;
+      }
       window.location.hash = '';
       SBS.go({ screen: 'home' });
     });

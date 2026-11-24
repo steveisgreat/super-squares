@@ -211,6 +211,75 @@
     };
   }
 
+  // The Players card in the panel of a wide screen (the picking screen and Game Day share it):
+  // name, squares, what is owed, a Paid/Unpaid pill and the Manage Players button. The pill makes
+  // the same guarded save as Manage Players (paidChange).
+  // opts: { getGame(), save(change, showErr) -> result or null, onSaved(result), manage(), cls?,
+  //         busy?(), setBusy?(bool) }. `save` is the screen's own saver (it knows how to handle a
+  // conflict there); null means it dealt with the failure. `onSaved` redraws the screen.
+  function playersCard(opts) {
+    const card = el('div', 'card players-card' + (opts.cls ? ' ' + opts.cls : ''));
+    card.appendChild(el('h3', '', 'Players'));
+    const msg = el('div', 'paste-bad');
+    msg.setAttribute('role', 'status');
+    card.appendChild(msg);
+    const list = el('div', 'fill-players');
+    card.appendChild(list);
+    const manage = el('button', 'secondary', 'Manage Players');
+    manage.type = 'button';
+    manage.addEventListener('click', () => opts.manage());
+    card.appendChild(el('div', 'actions', '')).appendChild(manage);
+
+    let busyNow = false;
+    const busy = () => (opts.busy ? opts.busy() : busyNow);
+    const setBusy = (v) => { if (opts.setBusy) opts.setBusy(v); else busyNow = v; };
+    let sig = null;
+
+    // Redraws in place. Unchanged rows are not rebuilt (so a poll never takes focus or a hover
+    // from the pill), and a rebuild puts focus back on the same person's pill.
+    function draw() {
+      const sums = playerSummaries(opts.getGame());
+      const next = JSON.stringify(sums.map(p => [p.name, p.count, p.paid, p.owed, p.paidCount, p.unpaidCount, p.total]));
+      if (next === sig) return;
+      sig = next;
+      const focused = document.activeElement && list.contains(document.activeElement) ? document.activeElement.dataset.name : null;
+      list.innerHTML = '';
+      if (!sums.length) list.appendChild(el('p', 'player-muted', 'No squares picked yet.'));
+      sums.forEach(p => {
+        const row = el('div', 'fill-player');
+        const info = el('div', 'fill-player-info');
+        info.innerHTML = `<div class="player-name">${escapeHtml(p.name)}</div><div class="player-sub">${ownedLine(p)}</div>`;
+        const pill = el('button', 'paid-pill ' + (p.paid ? 'is-paid' : 'is-unpaid'), p.paid ? 'Paid' : 'Unpaid');
+        pill.type = 'button';
+        pill.dataset.name = p.name;
+        pill.setAttribute('aria-label', `${p.name}: ${p.paid ? 'paid' : 'unpaid'}. ${p.paid ? 'Mark unpaid' : 'Mark paid'}`);
+        pill.addEventListener('click', () => toggle(p));
+        row.appendChild(info);
+        row.appendChild(pill);
+        list.appendChild(row);
+        if (focused === p.name) pill.focus();
+      });
+    }
+
+    // Refused if someone changed this name's squares since the list was drawn.
+    async function toggle(p) {
+      if (busy()) return;
+      setBusy(true);
+      let r = null;
+      try {
+        r = await opts.save(paidChange(p, !p.paid), m => { msg.textContent = m; });
+      } finally {
+        setBusy(false);
+      }
+      if (!r) { sig = null; return draw(); }
+      msg.textContent = r.refused || '';
+      sig = null;
+      opts.onSaved(r);
+    }
+
+    return { el: card, draw };
+  }
+
   // Modal for marking players paid/unpaid and removing a player's picks entirely.
   // Available from both Step 2 and Step 3 on purpose — someone may call in to
   // claim squares before lock but only pay after the game has started.
@@ -341,7 +410,7 @@
   SBS.players = {
     ensurePlayers, ensurePlayerColor, markPlayerPaid, addSquares, replaceGame, formatAt, renameSquares,
     collectNameGroups, resolveNameForPick, paidChange, ownedLine,
-    playerSummaries, unpaidTotal, openManagePlayersModal,
+    playerSummaries, unpaidTotal, playersCard, openManagePlayersModal,
     toSubscript, fromSubscript, stripSubscript
   };
 })();

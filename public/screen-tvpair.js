@@ -137,6 +137,9 @@
         </form>
         <p class="room-status" id="room-status" role="status" aria-live="polite"></p>
       </section>
+      <section class="room-opt room-present" aria-labelledby="room-present-h" hidden>
+        <h4 id="room-present-h">Present on an HDMI TV</h4>
+      </section>
       <section class="room-opt" aria-labelledby="room-score-h">
         <h4 id="room-score-h">Score from another phone</h4>
         <p>Hand score entry for this board to one phone. It scans a code; no sign-in.</p>
@@ -150,6 +153,15 @@
       <div class="actions"><button type="button" class="secondary" id="room-close">Close</button></div>`;
     overlay.appendChild(box);
     document.body.appendChild(overlay);
+
+    // On a laptop with a mouse: show the board on a TV plugged in by HDMI (R25 part b).
+    let presentView = null;
+    const presentSection = box.querySelector('.room-present');
+    if (SBS.present && SBS.present.eligible()) {
+      presentView = SBS.present.view(game.id, { idle: 'Open the TV view in its own window, on the second screen when this browser can find one. This screen stays your console.' });
+      presentSection.appendChild(presentView.el);
+      presentSection.hidden = false;
+    }
 
     const form = box.querySelector('#room-form');
     const input = box.querySelector('#room-code');
@@ -175,6 +187,7 @@
 
     function close() {
       document.removeEventListener('keydown', onKey, true);
+      if (presentView) presentView.destroy();
       overlay.remove();
       openChooser = null;
       if (opener && opener.focus) opener.focus();

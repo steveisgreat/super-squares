@@ -225,9 +225,10 @@ A one-time QR on the host's iPad or laptop signs a phone in for that board witho
 email code. Related to "per-board scorekeeper links" in Later (decision 012).
 *Done:* decision approved; token is single-use and short-lived; `/code-review high` clean.
 
-**R25. iPad and laptop layouts** — `Sonnet` — Depends on: R20 ✅. **In progress:** the picking screen
-(wide layout, tap squares to claim, paste a list, players panel) is built 2026-11-24; Game Day,
-keyboard scoring and Present on the TV are next.
+**R25. iPad and laptop layouts** — `Sonnet` — Depends on: R20 ✅. ✅ built 2026-11-24: picking
+screen (wide layout, tap squares to claim, paste a list, players panel) and Game Day (board left,
+panel right with Players, keyboard scoring switch off by default, Present on an HDMI TV). Not tried
+on a real iPad, a real second screen or Firefox/Safari yet.
 iPad: fill the grid by tapping squares; a table board with scoring and players in a side
 panel. Laptop: the same wide layouts plus paste-a-list of players, keyboard scoring
 shortcuts and "Present on the TV" over HDMI (TV view full screen on the second display).
