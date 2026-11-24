@@ -99,6 +99,7 @@ colors and ESPN logo URLs), `qrcode.js`, `core.js` (API client, routing, sign-in
 the TV view in its own window, on the second screen when the browser can), then screens: `screen-home` (saved games, setup, version
 footer), `screen-picking`, `screen-gameday`, `screen-phone` (score entry),
 `screen-player` (read-only My Squares), `screen-tvpair` (TV pairing, "What's in the room?"),
+`screen-mirror` (Mirror mode for one phone, `#mirror-<id>`: TV-style board, score strip on tap),
 `screen-handoff` (scorer-phone code and the `#handoff-<token>` page), and `app.js` (hash router: `#tv-<id>`,
 `#score-<id>`, `#player-<id>`). Every polling screen refetches its game about every 8 s.
 It is also a PWA (`manifest.webmanifest`, icons).

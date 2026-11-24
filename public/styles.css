@@ -2646,3 +2646,66 @@ kbd {
   .gd-wide > .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .gd-wide > .stat-strip .stat-box { padding: 6px 12px; }
 }
+
+/* ---- Mirror mode for one phone (R26, screen-mirror.js) ----
+   The TV board on a phone whose screen is mirrored to the room. Landscape: board left, score
+   header and quarters in a narrow column on the right. Portrait: only the turn-sideways prompt. */
+.mirror-screen { padding: 6px 8px; }
+.mirror-main { flex: 1 1 auto; min-height: 0; display: flex; gap: 8px; }
+.mirror-main[hidden] { display: none; }
+.mirror-board { flex: 1 1 auto; min-width: 0; }
+.mirror-side { flex: 0 0 clamp(170px, 26vw, 240px); display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: hidden; }
+.mirror-header { margin-bottom: 0; }
+.mirror-header .tv-meta { font-size: 0.9rem; gap: 8px; }
+.mirror-quarters { grid-template-columns: 1fr; gap: 4px; margin-bottom: 0; flex: 1 1 auto; min-height: 0; align-content: start; }
+.mirror-quarters .tv-qchip { padding: 0 8px 1px; }
+.mirror-quarters .tvq-top { font-size: 0.55rem; }
+.mirror-quarters .tvq-score { font-size: 0.85rem; }
+.mirror-quarters .tvq-status { font-size: 0.62rem; }
+.mirror-exit {
+  align-self: flex-end; flex: 0 0 auto;
+  min-height: 44px; min-width: 44px; padding: 1px 10px; font-size: 0.72rem;
+  opacity: 0.5; background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+}
+.mirror-exit:focus-visible { opacity: 1; outline: 3px solid var(--accent); }
+.mirror-turn, .mirror-note {
+  display: none; position: absolute; inset: 0; z-index: 8; background: var(--bg);
+  flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 24px;
+}
+.mirror-note { display: flex; font-size: 1.1rem; }
+.mirror-turn-title { font-size: 1.6rem; font-weight: 800; }
+.mirror-turn-sub { color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.8rem; }
+@media (orientation: portrait) {
+  .mirror-turn { display: flex; }
+  .mirror-strip { display: none; }
+}
+.mirror-tip {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 3px 6px; font-size: 0.68rem; line-height: 1.25;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text);
+}
+.mirror-tip-ok { min-height: 44px; min-width: 44px; padding: 0 10px; font-size: 0.8rem; }
+.mirror-strip {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 13; max-height: 62vh; overflow-y: auto;
+  background: var(--panel); border-top: 1px solid var(--border-strong, var(--border)); box-shadow: var(--shadow-pop);
+}
+.mirror-strip[hidden] { display: none; }
+.mirror-strip .score-panel { border: 0; border-radius: 0; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 12px; padding: 4px 8px; }
+.mirror-strip .sp-title, .mirror-strip .sp-ended { display: none; }
+.mirror-strip .sp-note { grid-column: 1 / -1; margin: 0; }
+.mirror-strip .sp-team { grid-column: 1; flex-wrap: nowrap; gap: 6px; }
+.mirror-strip .sp-head { flex: 0 0 84px; }
+.mirror-strip .sp-input { width: 3.4rem; min-height: 44px; font-size: 1.25rem; padding: 2px; }
+.mirror-strip .sp-quick { flex: 1 1 auto; flex-wrap: nowrap; gap: 4px; }
+.mirror-strip .sp-quick .sp-btn { flex: 1 1 0; padding: 0 4px; min-width: 44px; }
+.mirror-strip .sp-actions { grid-column: 2; grid-row: 1 / span 2; flex-direction: column; }
+.mirror-header .tv-meta { flex-direction: column; align-items: stretch; gap: 2px; min-width: 0; width: 100%; }
+.mirror-header .live-score-bar { font-size: 0.85rem; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+.mirror-header .live-label { font-size: 0.7rem; }
+.mirror-header .live-center { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.mirror-header .live-score-digits { white-space: nowrap; }
+.mirror-header .badge-full { display: none; }
+.mirror-header .badge-abbr { display: inline; }
+.mirror-header .live-score-bar { width: 100%; min-width: 0; box-sizing: border-box; }
+.mirror-header .live-center { max-width: 100%; justify-content: center; }
+.mirror-header .live-center .team-logo { display: none; }
+.mirror-header .live-updated, .mirror-header .live-period { display: none; }

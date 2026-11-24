@@ -228,6 +228,7 @@
     if (route.screen === 'picking') return s.picking(route.game);
     if (route.screen === 'board') return s.board(route.game);
     if (route.screen === 'tv') return s.tv(route.id, route.paired);
+    if (route.screen === 'mirror') return s.mirror(route.id);
     if (route.screen === 'tv-pair') return s.tvPair();
     if (route.screen === 'phone') return s.phone(route.id, route.back);
     if (route.screen === 'player') return s.player(route.id);
@@ -256,6 +257,8 @@
     if (joinPath && !hash) return { screen: 'join', code: joinPath[1].toUpperCase() };
     const tv = hash.match(new RegExp(`^#tv-(${ID_RE})$`, 'i'));
     if (tv) return { screen: 'tv', id: tv[1] };
+    const mirror = hash.match(new RegExp(`^#mirror-(${ID_RE})$`, 'i'));
+    if (mirror) return { screen: 'mirror', id: mirror[1] };
     const phone = hash.match(new RegExp(`^#score-(${ID_RE})(?:-(home|board))?$`, 'i'));
     if (phone) return { screen: 'phone', id: phone[1], back: phone[2] || 'board' };
     // Player companion view: what a grid player sees after scanning the QR

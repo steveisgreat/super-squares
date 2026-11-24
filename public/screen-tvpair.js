@@ -140,6 +140,12 @@
       <section class="room-opt room-present" aria-labelledby="room-present-h" hidden>
         <h4 id="room-present-h">Present on an HDMI TV</h4>
       </section>
+      <section class="room-opt room-mirror" aria-labelledby="room-mirror-h" hidden>
+        <h4 id="room-mirror-h">Mirror this phone to the TV</h4>
+        <p>Start Screen Mirroring (iPhone) or Cast / Smart View (Android) first, then turn your phone sideways.</p>
+        <p class="room-mirror-note" id="room-mirror-note" hidden>It opens once the numbers are drawn.</p>
+        <div class="room-row"><button type="button" id="room-mirror">Mirror this phone</button></div>
+      </section>
       <section class="room-opt" aria-labelledby="room-score-h">
         <h4 id="room-score-h">Score from another phone</h4>
         <p>Hand score entry for this board to one phone. It scans a code; no sign-in.</p>
@@ -161,6 +167,22 @@
       presentView = SBS.present.view(game.id, { idle: 'Open the TV view in its own window, on the second screen when this browser can find one. This screen stays your console.' });
       presentSection.appendChild(presentView.el);
       presentSection.hidden = false;
+    }
+
+    // On a phone with no second device: the screen mirrored to the TV (R26). Wide screens have Present.
+    if (SBS.ui.isPhone()) {
+      const mirrorSection = box.querySelector('.room-mirror');
+      const mirrorBtn = box.querySelector('#room-mirror');
+      mirrorSection.hidden = false;
+      if (game.status === 'started' || game.status === 'finished') {
+        mirrorBtn.addEventListener('click', () => {
+          close();
+          SBS.go({ screen: 'mirror', id: game.id });
+        });
+      } else {
+        mirrorBtn.disabled = true;
+        box.querySelector('#room-mirror-note').hidden = false;
+      }
     }
 
     const form = box.querySelector('#room-form');

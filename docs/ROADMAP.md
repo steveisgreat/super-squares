@@ -234,7 +234,8 @@ panel. Laptop: the same wide layouts plus paste-a-list of players, keyboard scor
 shortcuts and "Present on the TV" over HDMI (TV view full screen on the second display).
 *Done:* browser check at 1180×820, 1366 and 1920 px.
 
-**R26. Mirror mode for one phone** — `Sonnet` — Depends on: R20.
+**R26. Mirror mode for one phone** — `Sonnet` — Depends on: R20. ✅ built 2026-11-24 (`#mirror-<id>`,
+from "What's in the room?" on a phone). Not tried with real AirPlay or Cast yet.
 For AirPlay (iPhone) or Cast / Smart View (Android) with no second device: a landscape
 TV view with a tap-to-show score strip, Players blocked while mirroring, and a Do Not
 Disturb tip.
