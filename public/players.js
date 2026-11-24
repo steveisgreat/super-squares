@@ -63,6 +63,8 @@
 
   function renameSquares(game, oldName, newName) {
     game.squares.forEach(sq => { if (sq && sq.name === oldName) sq.name = newName; });
+    // A paid-out record follows the person, or the quarter would read Needs settling (R21).
+    if (game.paidOut) Object.values(game.paidOut).forEach(r => { if (r && r.name === oldName) r.name = newName; });
     const players = ensurePlayers(game);
     if (players[oldName]) {
       players[newName] = players[oldName];

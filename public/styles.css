@@ -927,6 +927,28 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: 1.5rem; }
 .outcome.win { color: var(--good); }
 .outcome.push { color: var(--danger); }
 .outcome.pending { color: var(--muted); font-weight: 500; }
+
+/* Payout tracking (R21): host-only, never on the TV or player views. */
+.qpay {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  margin-top: 10px; padding: 8px 10px; border-radius: var(--radius);
+  border: 1px solid var(--border); font-size: 0.9rem;
+}
+.qpay[hidden] { display: none; }
+.qpay-msg { flex: 1 1 12em; min-width: 0; overflow-wrap: anywhere; }
+.qpay.paid { background: var(--good-soft); border-color: var(--good); color: var(--good); }
+.qpay.settle { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+.who-to-pay { margin-top: 16px; }
+.who-to-pay[hidden] { display: none; }
+.who-to-pay h3 { margin: 0 0 4px; }
+.who-head { margin: 0 0 8px; font-weight: 700; }
+.who-settle { color: var(--warn); margin-left: 6px; }
+.who-list { list-style: none; margin: 0; padding: 0; }
+.who-list li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.who-list li.done { color: var(--muted); }
+.who-name { overflow-wrap: anywhere; min-width: 0; }
+.who-amt { white-space: nowrap; font-weight: 700; }
+.who-note { color: var(--muted); font-size: 0.85rem; margin: 8px 0 0; }
 .outcome.outcome-needs-draw { text-align: center; }
 .qcard-actions-center { display: flex; justify-content: center; }
 

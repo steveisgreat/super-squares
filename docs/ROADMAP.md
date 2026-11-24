@@ -188,7 +188,7 @@ whole 10×10 grid fits a 360 px phone; labeled actions instead of four bare icon
 feed-down banner (s3) with take over and resume.
 *Done:* browser check at 360 and 390 px, TV view unchanged.
 
-**R21. Payout tracking** — `Opus` (money logic, test-first) — Depends on: R20.
+**R21. Payout tracking** — `Opus` (money logic, test-first) — Depends on: R20 ✅ — ✅ shipped 2026-11-24 (decision 015).
 "Mark paid out" per quarter (the host pays off-app, decision 004); a game-over "who to
 pay" list; correcting a quarter that was already paid out warns and marks it
 "Needs settling" until the host clears it.

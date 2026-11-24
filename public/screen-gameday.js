@@ -4,9 +4,10 @@
   'use strict';
 
   const SBS = window.SBS = window.SBS || {};
-  const { el, escapeHtml, money, topbar, showAlert, applyTeamColors, teamBadge, teamStyle, fitTeamBadges, readableTextColor, isPhone, TV_ICON, PHONE_ICON, PEOPLE_ICON } = SBS.ui;
+  const { el, escapeHtml, money, topbar, showAlert, showConfirm, applyTeamColors, teamBadge, teamStyle, fitTeamBadges, readableTextColor, isPhone, TV_ICON, PHONE_ICON, PEOPLE_ICON } = SBS.ui;
   const { unpaidTotal, openManagePlayersModal } = SBS.players;
-  const { QUARTERS, QLABEL, computeGame, payoutAmount, drawnDigits } = window.GameLogic;
+  const { disturbMessage } = SBS.ui;
+  const { QUARTERS, QLABEL, computeGame, payoutAmount, drawnDigits, payoutStatus, whoToPay, paidQuartersDisturbed } = window.GameLogic;
 
   // Silver Lombardi-style trophy for the NFL quarter-end celebration.
   const TROPHY_NFL_SVG =
@@ -266,11 +267,17 @@
     // collected total (squares sold × price); typing a number overrides it.
     strip.querySelector('#pot-input').addEventListener('change', async (e) => {
       const raw = e.target.value.trim();
+      const before = JSON.parse(JSON.stringify(game));
       if (raw === '') {
         game.potOverride = null;
       } else {
         const num = Math.round(parseFloat(raw));
         game.potOverride = (Number.isFinite(num) && num >= 0) ? num : null;
+      }
+      const disturbed = paidQuartersDisturbed(before, game);
+      if (disturbed.length && !(await showConfirm(disturbMessage(disturbed)))) {
+        renderBoard(before);
+        return;
       }
       try {
         const saved = await SBS.api.saveGame(game);
@@ -468,6 +475,9 @@
         qcard.appendChild(outcome);
         const actionsEl = el('div', '');
         qcard.appendChild(actionsEl);
+        const payEl = el('div', 'qpay');
+        payEl.hidden = true;
+        qcard.appendChild(payEl);
         qgrid.appendChild(qcard);
 
         const inputA = scoreRow.querySelector(`#score-${q}-a`);
@@ -483,12 +493,15 @@
         inputA.addEventListener('blur', () => refreshQuarterCards(computeGame(game)));
         inputB.addEventListener('blur', () => refreshQuarterCards(computeGame(game)));
 
-        qcards[q] = { amtEl: qcard.querySelector('.qamt'), outcome, inputA, inputB, actionsEl };
+        qcards[q] = { amtEl: qcard.querySelector('.qamt'), outcome, inputA, inputB, actionsEl, payEl };
       });
       refreshQuarterCards(computedNow);
     }
 
     function refreshQuarterCards(computedNow) {
+      const pays = payoutStatus(game);
+      QUARTERS.forEach(q => renderPayRow(q, pays[q]));
+      renderWhoToPay();
       QUARTERS.forEach(q => {
         const res = computedNow.results[q];
         const refs = qcards[q];
@@ -553,14 +566,119 @@
       });
     }
 
+    // ---- Payout tracking (R21) ----
+    // A record the host keeps of who they paid off-app (decision 004). The
+    // state is worked out from the results by GameLogic.payoutStatus.
+    const whoCard = el('div', 'who-to-pay');
+    whoCard.hidden = true;
+
+    // paid and settle send the winner and amount shown, so the server refuses
+    // the mark if the result moved since this card drew (decision 015).
+    function payButton(text, cls, op, s) {
+      const b = el('button', cls, text);
+      b.type = 'button';
+      const body = op === 'unpaid' ? { op, quarter: s.quarter } : { op, quarter: s.quarter, name: s.name, amount: s.amount };
+      b.addEventListener('click', () => sendPayout(body, b));
+      return b;
+    }
+
+    function renderPayRow(q, s) {
+      const refs = qcards[q];
+      if (!refs) return;
+      const box = refs.payEl;
+      box.innerHTML = '';
+      box.className = 'qpay';
+      box.hidden = ['unpaid', 'paid', 'needsSettling'].indexOf(s.state) === -1;
+      if (box.hidden) return;
+      const msg = el('div', 'qpay-msg');
+      if (s.state === 'unpaid') {
+        msg.textContent = `Pay ${s.name} ${money(s.amount)}`;
+        box.append(msg, payButton('Mark paid out', 'small', 'paid', s));
+      } else if (s.state === 'paid') {
+        box.classList.add('paid');
+        msg.textContent = `Paid out: ${s.name} ${money(s.amount)}`;
+        box.append(msg, payButton('Undo', 'small secondary', 'unpaid', s));
+      } else {
+        box.classList.add('settle');
+        box.setAttribute('role', 'status');
+        const now = s.name ? `${s.name} is owed ${money(s.amount)}` : 'nobody is owed anything for it';
+        msg.innerHTML = `<strong>Needs settling.</strong> ${escapeHtml(`You paid ${s.paid.name} ${money(s.paid.amount)}; now ${now}. Sort it out with them, then mark it settled.`)}`;
+        box.append(msg, payButton('Settled', 'small', 'settle', s));
+      }
+    }
+
+    // Game over: who still gets paid, per person, plus any quarter to settle.
+    function renderWhoToPay() {
+      const w = whoToPay(game);
+      whoCard.hidden = !(game.status === 'finished' && w.rows.length);
+      if (whoCard.hidden) { whoCard.innerHTML = ''; return; }
+      const head = w.outstanding > 0 ? `${money(w.outstanding)} still to pay`
+        : w.outstanding < 0 ? `${money(-w.outstanding)} overpaid` : 'Everyone is paid out';
+      const owes = p => p.outstanding > 0 ? `${money(p.outstanding)} to pay`
+        : p.outstanding < 0 ? `overpaid ${money(-p.outstanding)}` : `${money(p.total)} paid`;
+      const settle = w.needsSettling ? ` <span class="who-settle">${w.needsSettling} to settle</span>` : '';
+      const people = w.people.map(p => `
+        <li class="${p.outstanding !== 0 ? '' : 'done'}"><span class="who-name">${escapeHtml(p.name)}</span>
+          <span class="who-amt">${owes(p)}</span></li>`).join('');
+      whoCard.innerHTML = `<h3>Who to pay</h3><p class="who-head">${head}${settle}</p><ul class="who-list">${people}</ul>
+        <p class="who-note">You pay winners yourself, outside the app. Mark each quarter paid out as you go.</p>`;
+    }
+
+    let payBusy = false;
+    async function sendPayout(op, btn) {
+      if (payBusy) return;
+      payBusy = true;
+      if (btn) btn.disabled = true;
+      try {
+        // A typed score still waiting on its debounce goes first, so the mark
+        // and the score the host sees are the same one.
+        if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; await doSave(); }
+        const saved = await SBS.api.patchPayout(game.id, op);
+        Object.assign(game, saved);
+        const c = computeGame(game);
+        SBS.board.renderFullBoard(boardHolder, game, c);
+        fitTeamBadges(boardHolder);
+        refreshQuarterCards(c);
+        scorePanel.update();
+      } catch (e) {
+        if (await SBS.handleConflict(e, game.id)) return;
+        showAlert('Could not save the payout: ' + e.message);
+        // A refused mark usually means the result moved: show the current one.
+        try { Object.assign(game, await SBS.api.getGame(game.id)); } catch (e2) { /* keep what we have */ }
+        const c = computeGame(game);
+        SBS.board.renderFullBoard(boardHolder, game, c);
+        fitTeamBadges(boardHolder);
+        refreshQuarterCards(c);
+        scorePanel.update();
+      } finally {
+        payBusy = false;
+      }
+    }
+
     buildQuarterCards(computed);
+    resultsCard.appendChild(whoCard);
+    renderWhoToPay();
     fitTeamBadges(app);
 
-    function onScoreChange(q, side, val) {
-      if (!game.results[q]) game.results[q] = {};
+    // The keypad warns before it unsettles a paid quarter. Once the first
+    // keystroke is confirmed the quarter already reads Needs settling, so the
+    // rest of the number does not ask again.
+    async function onScoreChange(q, side, val) {
       // Full score is stored and displayed as entered; only its last digit
       // is used to place the square (see computeGame / lastDigit).
       const num = val === '' ? '' : Math.max(0, parseInt(val, 10) || 0);
+      const after = JSON.parse(JSON.stringify(game));
+      if (!after.results[q]) after.results[q] = {};
+      after.results[q][side] = num;
+      const disturbed = paidQuartersDisturbed(game, after);
+      if (disturbed.length) {
+        const input = qcards[q][side === 'a' ? 'inputA' : 'inputB'];
+        const ok = await showConfirm(disturbMessage(disturbed));
+        if (!ok) { refreshQuarterCards(computeGame(game)); return; }
+        // The modal's blur re-rendered the box with the old score; put the typed one back.
+        if (input) { input.value = num === '' ? '' : String(num); input.focus(); }
+      }
+      if (!game.results[q]) game.results[q] = {};
       game.results[q][side] = num;
       persist(true);
     }
@@ -576,7 +694,9 @@
     async function persist(debounce) {
       if (debounce) {
         clearTimeout(saveTimer);
-        saveTimer = setTimeout(doSave, 500);
+        // Cleared when it fires: pollLive skips while a save is pending, and a
+        // timer left set stopped live updates for good after the first edit.
+        saveTimer = setTimeout(() => { saveTimer = null; doSave(); }, 500);
       } else {
         await doSave();
       }

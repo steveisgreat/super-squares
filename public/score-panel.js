@@ -38,11 +38,17 @@
 
     // Serialized: taps queue behind one another so the server sees them in
     // order and a fast double-tap never races itself into a conflict.
-    function send(op) {
+    async function send(op, confirmed) {
       // On a Live board the host's tap takes the score over from the feed (section 6).
       if (GL.scoringMode(game()) === 'live' && op.op !== 'resume') op = Object.assign({ override: true }, op);
       const local = GL.applyScoreOp(game(), op);
-      if (local.error) { showAlert(local.error); return Promise.resolve(); }
+      if (local.error) { showAlert(local.error); return; }
+      // An edit or undo that changes a quarter marked paid out warns first (R21).
+      const disturbed = GL.paidQuartersDisturbed(game(), local.game);
+      if (disturbed.length && !confirmed) {
+        if (await showConfirm(SBS.ui.disturbMessage(disturbed))) return send(op, true);
+        return;
+      }
       opts.setGame(local.game);
       draw();
       pending++;

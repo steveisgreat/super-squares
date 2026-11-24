@@ -228,8 +228,15 @@
       setScore(side, next === '' ? '' : Number(next));
     }
 
+    // Warns before a correction unsettles a quarter marked paid out (R21).
+    // After the first confirmed digit the quarter reads Needs settling, so the
+    // rest of the number does not ask again.
     async function setScore(side, value) {
       if (saving) return;
+      const after = JSON.parse(JSON.stringify(game));
+      window.GameLogic.setQuarterScore(after, activeQ, side, value);
+      const disturbed = window.GameLogic.paidQuartersDisturbed(game, after);
+      if (disturbed.length && !(await SBS.ui.showConfirm(SBS.ui.disturbMessage(disturbed)))) return;
       window.GameLogic.setQuarterScore(game, activeQ, side, value);
       draw(); // optimistic: the tap feels instant, the save follows
       await save();

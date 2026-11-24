@@ -75,6 +75,13 @@
   const showConfirm = (message) => showModal({ message, okText: 'Confirm', cancelText: 'Cancel' });
   const showAlert = (message) => showModal({ message, okText: 'OK', cancelText: null });
 
+  // Confirm text before a change that would unsettle quarters marked paid out
+  // (R21, decision 015). `labels` comes from GameLogic.paidQuartersDisturbed.
+  function disturbMessage(labels) {
+    const list = labels.join(' and ');
+    return `${list} ${labels.length > 1 ? 'are' : 'is'} marked paid out. This change moves that money, so ${list} will show Needs settling until you sort it out with the players. Continue?`;
+  }
+
   // Host sign-in prompt. Resolves with the typed password, or null if the
   // host dismissed it — a dismissal is a real answer ("I'm just watching"),
   // not an error, so callers fall back to read-only rather than retrying.
@@ -846,7 +853,7 @@
 
   SBS.ui = {
     el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake,
-    showModal, showConfirm, showAlert, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin,
+    showModal, showConfirm, showAlert, disturbMessage, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin,
     topbar, statusLabel, leagueLabel, leagueBadge, isTvBrowser, isPhone,
     formatKickoffTime, kickoffNotice,
     teamMeta, teamStyle, applyTeamColors, resetTeamColors, teamLogoTag,

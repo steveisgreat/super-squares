@@ -242,6 +242,135 @@
     return { y: game.axisY[res.row], x: game.axisX[res.col] };
   }
 
+  // ---------- Payout tracking (R21) ----------
+  // "Paid out" is a note the host keeps; the app never holds or moves money
+  // (decision 004). game.paidOut[q] = { name, amount, at } records who the host
+  // paid and how much. Whether that still holds is worked out here from the
+  // current results, never stored: a score correction, a change to the pot or
+  // an earlier quarter's carry that changes a paid quarter's winner or amount
+  // turns it to 'needsSettling' until the host settles it (decision 015).
+  //
+  // States: pending (not scored), pushed (rolled forward, nothing to pay),
+  // needsDraw (final on an empty square), unpaid, paid, needsSettling.
+  function payoutStatus(game) {
+    const results = computeGame(game).results;
+    const paidOut = isRecord(game.paidOut) ? game.paidOut : {};
+    const out = {};
+    QUARTERS.forEach(q => {
+      const r = results[q];
+      const rec = isRecord(paidOut[q]) ? paidOut[q] : null;
+      const payable = r.resolved && !r.pushed && !!r.winnerName;
+      const s = {
+        quarter: q, label: QLABEL[q],
+        name: payable ? r.winnerName : null,
+        amount: payable ? payoutAmount(r) : 0,
+        paid: rec ? { name: rec.name, amount: rec.amount, at: rec.at || null } : null
+      };
+      if (payable) {
+        if (!rec) s.state = 'unpaid';
+        else s.state = (rec.name === s.name && rec.amount === s.amount) ? 'paid' : 'needsSettling';
+      } else if (rec) s.state = 'needsSettling';
+      else if (r.needsDraw) s.state = 'needsDraw';
+      else if (r.pushed) s.state = 'pushed';
+      else s.state = 'pending';
+      out[q] = s;
+    });
+    return out;
+  }
+
+  // One payout operation, as a pure function like applyScoreOp: returns
+  // { game } (a fresh copy) or { error, code } with code 'invalid' (HTTP 400)
+  // or 'illegal' (HTTP 409).
+  //   paid    unpaid -> paid: record the current winner and amount.
+  //   unpaid  paid -> unpaid: undo a mark made by mistake.
+  //   settle  needsSettling -> paid to the current winner, or no record when
+  //           the quarter owes nothing now. The host has sorted it out off-app.
+  function applyPayoutOp(game, op) {
+    if (!isRecord(op)) return failure('invalid', 'Payout operation must be an object.');
+    if (['paid', 'unpaid', 'settle'].indexOf(op.op) === -1) return failure('invalid', 'Unknown payout operation.');
+    if (QUARTERS.indexOf(op.quarter) === -1) return failure('invalid', 'Quarter must be q1, q2, q3 or final.');
+    // paid and settle carry the winner and amount the host was shown, so a
+    // result that changed after the screen drew (a feed update, another
+    // device) is refused instead of recorded against someone the host didn't pay.
+    const marks = op.op !== 'unpaid';
+    if (marks && (!(op.name === null || typeof op.name === 'string') || !isAmount(op.amount, 1e9))) {
+      return failure('invalid', 'Say which winner and amount you paid.');
+    }
+    if (game.status !== 'started' && game.status !== 'finished') return failure('illegal', 'Payouts open once the board is locked.');
+
+    const q = op.quarter;
+    const label = QLABEL[q];
+    const s = payoutStatus(game)[q];
+    if (marks && (op.name !== s.name || op.amount !== s.amount)) {
+      return failure('illegal', `${label} changed since your screen updated. Check it and try again.`);
+    }
+    const g = JSON.parse(JSON.stringify(game));
+    if (!isRecord(g.paidOut)) g.paidOut = {};
+    const record = () => { g.paidOut[q] = { name: s.name, amount: s.amount, at: new Date().toISOString() }; };
+
+    if (op.op === 'paid') {
+      if (s.state === 'paid') return failure('illegal', `${label} is already marked paid out.`);
+      if (s.state === 'needsSettling') return failure('illegal', `${label} needs settling first.`);
+      if (s.state !== 'unpaid') return failure('illegal', `${label} has no winner to pay yet.`);
+      record();
+    } else if (op.op === 'unpaid') {
+      if (s.state !== 'paid') return failure('illegal', `${label} is not marked paid out.`);
+      delete g.paidOut[q];
+    } else {
+      if (s.state !== 'needsSettling') return failure('illegal', `${label} does not need settling.`);
+      if (s.name) record();
+      else delete g.paidOut[q];
+    }
+    // An emptied record stays as {}: screens merge the saved game into theirs
+    // with Object.assign, which would keep a stale paidOut if the key vanished.
+    return { game: g };
+  }
+
+  // Labels of quarters marked paid out that `after` would turn to needs
+  // settling: the UI warns with these before it saves a correction.
+  function paidQuartersDisturbed(before, after) {
+    const b = payoutStatus(before);
+    const a = payoutStatus(after);
+    return QUARTERS.filter(q => b[q].state === 'paid' && a[q].state === 'needsSettling').map(q => QLABEL[q]);
+  }
+
+  // The game-over "who to pay" list: one row per quarter with someone to pay
+  // or a record to settle, totals per current winner, and what is still owed.
+  function whoToPay(game) {
+    const status = payoutStatus(game);
+    const rows = QUARTERS.map(q => status[q]).filter(s => ['unpaid', 'paid', 'needsSettling'].indexOf(s.state) !== -1);
+    const byName = new Map();
+    let outstanding = 0;
+    rows.forEach(r => {
+      // The same winner already paid part of a changed amount owes only the
+      // difference; below zero means they were paid too much.
+      const samePerson = r.state === 'needsSettling' && r.paid && r.name && r.paid.name === r.name;
+      const owed = r.state === 'paid' ? 0 : samePerson ? r.amount - r.paid.amount : r.amount;
+      outstanding += owed;
+      if (!r.name) return;
+      const p = byName.get(r.name) || { name: r.name, total: 0, outstanding: 0 };
+      p.total += r.amount;
+      p.outstanding += owed;
+      byName.set(r.name, p);
+    });
+    return {
+      rows, people: Array.from(byName.values()), outstanding,
+      needsSettling: rows.filter(r => r.state === 'needsSettling').length
+    };
+  }
+
+  function invalidPaidOut(paidOut) {
+    const bad = 'The paid-out record is not valid.';
+    if (!isRecord(paidOut)) return bad;
+    for (const q of Object.keys(paidOut)) {
+      const r = paidOut[q];
+      if (QUARTERS.indexOf(q) === -1 || !isRecord(r)) return bad;
+      if (!isPlayerName(r.name) || !isAmount(r.amount, 1e9)) return bad;
+      if (!isUnset(r.at) && !(typeof r.at === 'string' && DATETIME_RE.test(r.at))) return bad;
+    }
+    return null;
+  }
+
   function isDigitPermutation(a) {
     if (!Array.isArray(a) || a.length !== 10) return false;
     const seen = new Set(a);
@@ -392,6 +521,7 @@
       || (game.players !== undefined && invalidPlayers(game.players))
       || (!isUnset(game.liveScore) && invalidLiveScore(game.liveScore))
       || (!isUnset(game.simPlan) && invalidSimPlan(game.simPlan))
+      || (!isUnset(game.paidOut) && invalidPaidOut(game.paidOut))
       || null;
   }
 
@@ -697,6 +827,7 @@
     scoringMode, manualEntry, applyScoreOp, setQuarterScore, belowEndedQuarter, manualState, hasResult,
     shuffle, shuffledDigits, emptyGrid,
     potOf, actualPotOf, findCol, findRow, computeGame, computeLiveHighlight, payoutAmount, drawnDigits,
+    payoutStatus, applyPayoutOp, paidQuartersDisturbed, whoToPay,
     validateGame, isPlayerName, isColor, isDigitPermutation, syncStatus,
     cutoffPassed, lockGame,
     SIM_QUARTER_MS, buildSimPlan, simLiveState, simCumulativeThroughQuarter
