@@ -36,8 +36,23 @@ BDL `"End of 1st"` 01:49:47 (+30 s) → BDL `"15:00 - 2nd"` 01:50:03 → BDL `q2
 appears 01:50:35 (+78 s). Q1 result 0–0 in both, matching totals. Steve's TV still showed
 0:05 when ESPN reported the quarter over.
 
+## Score latency (UTC; one game, three scores)
+| Event | ESPN | BALLDONTLIE | BALLDONTLIE behind |
+|---|---|---|---|
+| Field goal 3–0 | 02:06:50 | 02:07:06 | 16 s |
+| Touchdown 9–0 | 02:24:06 | 02:24:48 | 42 s |
+| Extra point 10–0 | 02:24:27 | 02:25:19 | 52 s |
+
+The field goal is from the 15 s poller on both feeds. For the other two, ESPN was checked
+every 2 s and BALLDONTLIE by the poller, so its times can be up to 15 s late; its
+`updated_at` stamps (02:24:45.7, 02:25:15.5) show most of the lag is in its feed. Steve's
+"score" message came at least 23 s before ESPN showed the touchdown, so ESPN is not
+always ahead of the broadcast.
+
+**Outcome:** ESPN primary, BALLDONTLIE secondary (decision 001 §2).
+
 ## Not yet observed (check raw.jsonl after the game)
-First score latency per feed; halftime text; end of Q3; final (`STATUS_FINAL` vs
+Halftime text; end of Q3; final (`STATUS_FINAL` vs
 BDL `status_state: final`, `"Final"`); overtime if any.
 
 ## Implications for decision 001 §5 (quarter-end detection)

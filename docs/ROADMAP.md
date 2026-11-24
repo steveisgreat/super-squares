@@ -18,7 +18,8 @@ There is no BRD yet, so items cite this roadmap's IDs instead of FR IDs.
 - **No NFL marks.** No team logos, and marketing says "the Big Game", never
   "Super Bowl". Team names and colors stay.
 - **Manual scoring is the launch default; Live mode uses two providers.** A
-  primary and a secondary score API (not yet chosen) feed one shared cache, so
+  primary and a secondary score API (ESPN, with BALLDONTLIE
+  as backup) feed one shared cache, so
   call volume doesn't grow with the number of boards
   ([decision 001](decisions/001-score-providers.md)).
 
@@ -84,14 +85,15 @@ grid and setup.
 **R4a. Score provider layer and shared cache** — `Sonnet` (design done in
 [decision 001](decisions/001-score-providers.md)) — Depends on: R3 ✅ (the
 `scoring` field, `GameLogic.scoringMode`), probe fixtures.
-Adapters for ESPN and BALLDONTLIE behind one `LiveGame` shape;
+Adapters for ESPN (primary) and BALLDONTLIE (secondary) behind one `LiveGame` shape;
 `SCORE_PRIMARY` / `SCORE_SECONDARY` with failover; `live_slates` table and
 fs equivalent; one claimed refresh per league and date every 15 s; boards merge
 the slate into `liveScore` on read and write only on quarter completion; the
 "live feed unavailable" fallback to the manual panel; `/api/todays-games` reads
 the slate. Probe findings and API call details:
 `docs/research/2026-11-23-score-feed-probe.md`.
-*Done:* fixture tests from the 2026-11-23 probe for both adapters, failover,
+*Done:* fixture tests from the 2026-11-23 probe for both adapters, failover (with no
+backward step on a provider switch),
 quarter-end detection with and without `period`, host-wins, and claim
 concurrency in both stores; `/code-review medium` clean; a simulated 50-board
 run makes ≤4 provider calls a minute.

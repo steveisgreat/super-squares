@@ -1,6 +1,7 @@
 # 001 — Live scores: two pluggable providers behind one shared cache
 
-**Date:** 2026-11-23 · **Status:** accepted (design); providers not yet chosen ·
+**Date:** 2026-11-23 · **Status:** accepted; **ESPN primary, BALLDONTLIE
+secondary** (Steve, 2026-11-23) ·
 **Roadmap:** R3, R4a, R8
 
 ## Context
@@ -9,14 +10,14 @@ Today each board calls ESPN on its own (`server-livescore.js`): one lookup per
 board every 20 s, three scoreboard fetches per lookup, and a database write on
 every check. At Super Bowl scale (about 3,000 boards) that is about 450 ESPN
 requests a second, and a write per board per check. ESPN is also unofficial and
-unlicensed. We will use **two paid or free score APIs, a primary and a
-secondary**, chosen later (candidates: BALLDONTLIE, ESPN, Goalserve,
-Highlightly). The design must not depend on which ones win.
+unlicensed. We use **two score APIs, a primary and a secondary** (chosen in §2;
+also considered: Goalserve, Highlightly). The design must not depend on which
+ones they are.
 
 What the 2026-11-23 probe (`scripts/poll-scores.js`) established so far:
 - ESPN and BALLDONTLIE both return **every game for a date in one call**.
-- BALLDONTLIE has per-quarter scores and a status, but **no period and no
-  clock**. Scores are `null` (not 0) before kickoff, and a late game appears
+- BALLDONTLIE has per-quarter scores, and its period and clock only inside the
+  `status` text (§5). Scores are `null` (not 0) before kickoff, and a late game appears
   under the next UTC date.
 - At most about 10 NFL games run at once. One call per 15 s covers them all.
 
@@ -45,6 +46,11 @@ WSH and WAS are the same team) and turns null pre-game scores into 0 only when
 nothing else.
 
 ### 2. Primary and secondary by configuration
+**Choice: `SCORE_PRIMARY=espn`, `SCORE_SECONDARY=balldontlie`.** ESPN was faster
+in every comparison on 2026-11-23 (16–52 s on scores, 30 s on the end of Q1; table
+in `docs/research/2026-11-23-score-feed-probe.md`), and as a primary it needs no key
+or rate budget. BALLDONTLIE is good enough to carry a board through an ESPN outage.
+
 Set `SCORE_PRIMARY` and `SCORE_SECONDARY` to adapter names, and keep keys in
 env vars (`BALLDONTLIE_API_KEY`, …). If they are unset, the LAN default is
 `espn` with no secondary, and the cloud default is none (Live mode hidden).
@@ -52,6 +58,12 @@ Failover happens **per refresh**: primary first, with a 4 s timeout; if it
 errors, times out, fails to parse, or lacks a game the slate should contain,
 the secondary is tried in the same request. A healthy secondary is never
 called, which keeps a free secondary tier (5 calls/min) usable.
+
+**A switch must not move a game backward.** BALLDONTLIE runs up to about a minute
+behind, so a failover could turn 10–0 back into 3–0. When the provider of a game
+changes, keep the stored `LiveGame` until the new provider's period and clock reach
+it, for at most 120 s. Within one provider, a lower score is a real correction and
+is accepted.
 
 ### 3. One shared cache row per league and date
 New table (fs backend: same contract, in memory):
@@ -108,7 +120,8 @@ current-score panel then works on a `live` game. A host entry sets
 
 ### 7. Display
 The live bar shows `LIVE` plus the period and clock **only when the provider
-has them**. With BALLDONTLIE it shows the score and "updated N s ago".
+has them** (BALLDONTLIE's come from its status text). Otherwise it shows the score
+and "updated N s ago".
 
 ## Consequences
 - `server-livescore.js` is reduced to the slate refresh plus the
@@ -120,9 +133,14 @@ has them**. With BALLDONTLIE it shows the score and "updated N s ago".
   2026-11-23 probe's `raw.jsonl`, trimmed), failover, quarter-end detection for
   both capability sets, host-wins, and claim concurrency in both stores.
 
+- **Accepted risk:** ESPN's feed is unofficial, with no published commercial terms, and
+  could block or change without notice. The secondary and the manual panel (§6) are
+  the cover, and swapping the primary is a setting, not a code change.
+- Before launch: ask BALLDONTLIE for its commercial terms, and set
+  `BALLDONTLIE_API_KEY`, `SCORE_PRIMARY` and `SCORE_SECONDARY` in Vercel (R4a).
+
 ## Open questions
-1. Which providers? This depends on the probe results, commercial terms, and
-   Steve's call.
+1. ~~Which providers?~~ Answered 2026-11-23 (§2).
 2. Should stale data trigger failover, for example when the primary's score
    hasn't moved for 5 min while the secondary's has? That would cost secondary
    calls. Decide after the probe.
