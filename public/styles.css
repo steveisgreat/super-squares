@@ -581,7 +581,9 @@ button.paid-pill:hover { filter: brightness(1.2); }
   background: rgba(255,255,255,0.85);
   padding: 2px;
 }
-.team-badge-name { white-space: nowrap; }
+/* Most team fonts come in one weight. Without this the browser fakes the badge's bold by smearing
+   the letters, which reads as blurry; a font that has a real bold still uses it. */
+.team-badge-name { white-space: nowrap; font-synthesis: none; }
 .team-badge-sm { padding: 2px 9px 2px 2px; font-size: 0.78rem; }
 .team-badge-sm .team-logo { padding: 1px; }
 
