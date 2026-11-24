@@ -71,7 +71,7 @@ host check for an owner check.
 *Done:* tests for the quarter-end, undo, edit and overtime state transitions
 (money logic, so test-first); browser check of TV, phone and My Squares views.
 
-**R4. Remove NFL logos** — `Haiku` — Depends on: none.
+**R4. Remove NFL logos** — `Haiku` — ✅ shipped 2026-11-23.
 Drop the ESPN logo CDN; keep team colors and abbreviations with the generic
 badge.
 *Done:* no request to any logo CDN during a full game; browser check of TV,
@@ -169,6 +169,8 @@ office-pool groups.
 
 ## Recently shipped
 
+- R4: NFL and NBA team and league logos removed (ESPN logo CDN gone); badges show
+  names and abbreviations in team colors (2026-11-23)
 - R3: manual current score: Manual/Live/Simulation per game, score panel on phone and
   Game Day, `PATCH /api/game/:id/score`, 43 transition tests (2026-11-23)
 - R0: ported to the RileySoft model: `CLAUDE.md`, `ARCHITECTURE.md`, runbook,

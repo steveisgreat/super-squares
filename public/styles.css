@@ -247,7 +247,6 @@ h3 { font-family: var(--serif); font-size: 1.15rem; color: var(--text); font-wei
   color: var(--muted);
 }
 .league-badge.league-other { background: var(--good-soft); color: var(--good); padding: 4px 12px; border-radius: 999px; }
-.league-badge-logo { height: 20px; width: auto; display: block; }
 
 .archive-wrap { margin-top: 4px; }
 .archive-toggle {
@@ -594,7 +593,6 @@ input[type=color] {
   padding: 14px 6px;
   border-radius: var(--radius);
 }
-.teamA-label .team-logo { flex-shrink: 0; transform: rotate(-90deg); }
 .teamA-label-text {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
@@ -603,40 +601,24 @@ input[type=color] {
   text-align: center;
   letter-spacing: 1px;
 }
-/* A light backdrop behind each team's logo so it reads against any badge
-   color, since logos aren't guaranteed to have their own contrast. */
-.teamA-label .team-logo, .teamB-label .team-logo {
-  background: rgba(255,255,255,0.85);
-  border-radius: 6px;
-  padding: 3px;
-}
-
 /* The one consistent way a team name appears anywhere in the app: a pill in
-   the team's own color with a logo and an auto-picked readable text color
+   the team's own color with an auto-picked readable text color
    (computed in ui.js) — see teamBadge(). Background/text color come from
    inline style per instance since they vary per team, not per class. */
 .team-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 12px 3px 3px;
+  padding: 3px 12px;
   border-radius: 999px;
   font-weight: 700;
   line-height: 1.3;
   white-space: nowrap;
 }
-.team-badge .team-logo {
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.85);
-  padding: 2px;
-}
 .team-badge-name { white-space: nowrap; }
-.team-badge-sm { padding: 2px 9px 2px 2px; font-size: 0.78rem; }
-.team-badge-sm .team-logo { padding: 1px; }
+.team-badge-sm { padding: 2px 9px; font-size: 0.78rem; }
 
 /* Space-driven fallback: fitTeamBadges() (ui.js) measures each .badge-fit
-   container and adds mode-abbr / mode-nologo to its badges when the full
+   container and adds mode-abbr to its badges when the full
    name (or the abbreviation) doesn't fit. min-width:0 lets a flex-item
    container (e.g. the topbar h1) actually shrink below its nowrap content's
    natural width instead of just overflowing unnoticed; overflow:hidden makes
@@ -648,7 +630,6 @@ input[type=color] {
 .team-badge .badge-abbr { display: none; }
 .team-badge.mode-abbr .badge-full { display: none; }
 .team-badge.mode-abbr .badge-abbr { display: inline; }
-.team-badge.mode-nologo .team-logo { display: none; }
 /* 2x2 grid: teamB's bar over the numbered columns (top-right), teamA's bar
    beside the numbered rows (bottom-left) starting flush with the top of the
    grid's own corner cell rather than stretched up alongside teamB's bar. The
@@ -955,14 +936,7 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: 1.5rem; }
   .cell .name-txt { font-size: 0.9rem; }
 }
 
-/* --- Team logos / color preview --- */
-.team-logo {
-  width: var(--logo-size, 28px);
-  height: var(--logo-size, 28px);
-  object-fit: contain;
-  vertical-align: middle;
-  flex-shrink: 0;
-}
+/* --- Color preview --- */
 .legend-team { display: inline-flex; align-items: center; gap: 6px; }
 .team-preview {
   display: flex;
@@ -1094,7 +1068,7 @@ body.tv-fullscreen .tv-kickoff-clock { font-size: 2rem; }
 .tv-screen.chrome-hidden { cursor: none; }
 
 /* Compact, read-only quarterly summary above the board — a single thin row
-   (abbreviations + score + status, no logos, no inputs) so it costs the
+   (abbreviations + score + status, no inputs) so it costs the
    board almost no vertical space. */
 .tv-quarters {
   flex: 0 0 auto;
@@ -1180,7 +1154,7 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
 .tv-screen .cell.winner .badge { background: #ff2e88; color: #fff; }
 /* Team-color gradient fade (set inline by board.js's badgeStyle()) stays
    underneath — a light translucent dark wash (inset box-shadow, painted
-   above the background but below the label's own text/logo) takes it down
+   above the background but below the label's own text) takes it down
    a notch, plus a neon edge glow layered on top. Kept light rather than a
    full 25% dim: an already-dark team color (e.g. navy) crushes to
    near-invisible against the dark TV background at a heavier dim. */
@@ -1218,10 +1192,9 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
 
 /* Axis team panels (teamA's vertical bar along the rows, teamB's
    horizontal bar along the columns) 25% thinner: the shared board.js
-   markup sizes both from padding + a 32px logo + the label text, none of
+   markup sizes both from padding + the label text, none of
    which is reachable except through CSS here, so all three are scaled to
-   75% together (logo needs !important — its size is an inline style set
-   per-render by teamLogoTag()). teamA's *horizontal* padding is its
+   75% together. teamA's *horizontal* padding is its
    thickness (the bar runs vertically); teamB's *vertical* padding is its
    thickness (the bar runs horizontally) — only that dimension is touched
    on each, so neither bar's length shrinks, only its depth. */
@@ -1231,21 +1204,14 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
 .tv-screen .teamB-label {
   font-size: 0.975rem;
 }
-.tv-screen .teamA-label .team-logo,
-.tv-screen .teamB-label .team-logo {
-  --logo-size: 24px !important;
-}
 /* The TV board actually renders through .tv-board-wrap, whose own
-   responsive rules (further down this file) size the label text/logo off
+   responsive rules (further down this file) size the label text off
    viewport width and outrank the plain .tv-screen rules just above on
    specificity — so the 75% scaling has to be repeated here, against those
    exact selectors, or it's invisible in the real TV view. */
 .tv-screen .tv-board-wrap .teamA-label-text,
 .tv-screen .tv-board-wrap .teamB-label span {
   font-size: clamp(0.975rem, 1.95vw, 2.1rem);
-}
-.tv-screen .tv-board-wrap .team-logo {
-  --logo-size: clamp(24px, 3.375vw, 48px) !important;
 }
 
 /* Score-change axis ripple — five staggered rings pulse on the axis
@@ -1761,9 +1727,6 @@ body.tv-fullscreen .tv-meta { font-size: 1.5rem; }
 .tv-board-wrap .teamA-label-text,
 .tv-board-wrap .teamB-label span {
   font-size: clamp(1.3rem, 2.6vw, 2.8rem);
-}
-.tv-board-wrap .team-logo {
-  --logo-size: clamp(32px, 4.5vw, 64px) !important;
 }
 
 /* --- Manage Players & Payments modal --- */

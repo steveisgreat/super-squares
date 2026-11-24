@@ -1,8 +1,7 @@
 // Public team facts (names, brand colors, official abbreviations) used to
-// auto-detect a matching team logo/colors from free-text team name input.
+// auto-detect matching team colors and abbreviations from free-text team name input.
 // Colors/abbreviations are factual data widely published in team brand guides.
-// Logos are fetched at runtime from ESPN's public logo CDN by abbreviation —
-// no logo images are bundled with this app.
+// No logos or logo URLs are used anywhere (decision 005).
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -85,7 +84,7 @@
   ];
 
   // Which ESPN "sport" family each supported league belongs to, needed to
-  // build the scoreboard/logo CDN URLs (`.../sports/{sport}/{league}/...`).
+  // build the scoreboard CDN URLs (`.../sports/{sport}/{league}/...`).
   const LEAGUE_SPORT = { nfl: 'football', nba: 'basketball' };
 
   const LEAGUES = {
@@ -122,10 +121,5 @@
     return best;
   }
 
-  function logoUrl(team, league) {
-    if (!team || !LEAGUES[league]) return null;
-    return `https://a.espncdn.com/i/teamlogos/${league}/500/${team.abbr}.png`;
-  }
-
-  return { NFL_TEAMS, NBA_TEAMS, LEAGUE_SPORT, findTeamMeta, logoUrl };
+  return { NFL_TEAMS, NBA_TEAMS, LEAGUE_SPORT, findTeamMeta };
 });

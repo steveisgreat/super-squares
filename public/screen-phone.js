@@ -51,9 +51,9 @@
 
       header.innerHTML = `
         <div class="phone-matchup badge-fit">
-          ${teamBadge(game, 'A', { logoSize: 22 })}
+          ${teamBadge(game, 'A')}
           <span class="pm-vs">vs</span>
-          ${teamBadge(game, 'B', { logoSize: 22 })}
+          ${teamBadge(game, 'B')}
         </div>
         <div class="phone-sub">${SBS.ui.leagueBadge(game.league)} ${game.description ? escapeHtml(game.description) + ' &middot; ' : ''}Pot ${money(computed.pot)}</div>
       `;
@@ -185,7 +185,7 @@
     function keypadFor(side, current, cls) {
       const box = el('div', 'phone-keypad ' + cls);
       const head = el('div', 'pk-head badge-fit');
-      head.innerHTML = `${teamBadge(game, side === 'a' ? 'A' : 'B', { logoSize: 18, cls: 'team-badge-sm' })}<span class="pk-current">${current === null || current === '' ? '–' : current}</span>`;
+      head.innerHTML = `${teamBadge(game, side === 'a' ? 'A' : 'B', { cls: 'team-badge-sm' })}<span class="pk-current">${current === null || current === '' ? '–' : current}</span>`;
       box.appendChild(head);
 
       // Full numeric keyboard (phone dialer layout) so multi-digit scores can

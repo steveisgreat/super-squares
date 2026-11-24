@@ -1,5 +1,5 @@
 // Shared DOM helpers: element building, escaping, money formatting, the modal
-// stack, the top bar, and the team colour/logo theming.
+// stack, the top bar, and the team colour theming.
 (function () {
   'use strict';
 
@@ -261,28 +261,12 @@
   const LEAGUE_LABELS = { nfl: 'NFL', nba: 'NBA', other: 'Other' };
   function leagueLabel(league) { return LEAGUE_LABELS[league] || 'Other'; }
 
-  // League-level (not team-level) logos, from the same ESPN CDN as the team
-  // logos above. 'other' has no logo at all — its badge is just the word.
-  const LEAGUE_LOGO_URL = {
-    nfl: 'https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png',
-    nba: 'https://a.espncdn.com/i/teamlogos/leagues/500/nba.png'
-  };
-
   function leagueBadge(league) {
     const cls = `league-badge league-${league || 'other'}`;
-    const label = leagueLabel(league);
-    const logo = LEAGUE_LOGO_URL[league];
-    if (!logo) return `<span class="${cls}">${label}</span>`;
-    // If the CDN logo 404s, hide it and reveal the text fallback that's
-    // already sitting there — same "never show a broken image" rule the
-    // team logos follow, just swapping visibility instead of swapping src.
-    return `<span class="${cls}" title="${label}">`
-      + `<img src="${logo}" class="league-badge-logo" alt="${label}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline';">`
-      + `<span class="league-badge-text" style="display:none;">${label}</span>`
-      + `</span>`;
+    return `<span class="${cls}">${leagueLabel(league)}</span>`;
   }
 
-  // ---------- Team colours / logos ----------
+  // ---------- Team colours ----------
   // NFL/NBA colors are auto-detected from free-text team names; 'other' has no
   // team database at all, so its colors always come from the host's own
   // color-picker choice on the game (teamAColor/teamBColor).
@@ -344,31 +328,7 @@
     ['--teamA', '--teamA-alt', '--teamB', '--teamB-alt'].forEach(p => root.style.removeProperty(p));
   }
 
-  const HELMET_SVG = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>
-    <ellipse cx='33' cy='28' rx='25' ry='21' fill='%237b8794'/>
-    <path d='M9 32 Q7 48 25 53 L26 44 Q15 40 13 30 Z' fill='%237b8794'/>
-    <ellipse cx='33' cy='28' rx='25' ry='21' fill='none' stroke='%234a5773' stroke-width='2'/>
-    <path d='M29 39 L47 39 M28 45 L45 45 M30 51 L40 51' stroke='%232a3346' stroke-width='3' stroke-linecap='round'/>
-  </svg>`;
-  const HELMET_DATA_URI = 'data:image/svg+xml,' + HELMET_SVG.replace(/\s+/g, ' ').trim();
-
-  // Logos come from ESPN's CDN at runtime; the helmet is the offline fallback
-  // so the TV layout never shows a broken image — and also what renders for a
-  // free-text team name that doesn't match a real team (or for the 'other'
-  // league, which has no logos at all), so a logo icon is always present
-  // rather than sometimes missing.
-  function teamLogoTag(game, side, size) {
-    const style = teamStyle(game, side);
-    const s = size || 28;
-    if (!style.matched || !window.TeamData) {
-      return `<img src="${HELMET_DATA_URI}" class="team-logo" style="--logo-size:${s}px;" alt="">`;
-    }
-    const url = window.TeamData.logoUrl(style.meta, style.league);
-    const name = side === 'A' ? game.teamA : game.teamB;
-    return `<img src="${url}" class="team-logo" style="--logo-size:${s}px;" onerror="this.onerror=null;this.src='${HELMET_DATA_URI}';" alt="${escapeHtml(name)}">`;
-  }
-
-  // ---------- Team badge (colored pill: team color as background, logo, and
+  // ---------- Team badge (colored pill: team color as background, and
   // an auto-picked readable text color) ----------
   // Every place a team name is displayed uses this, so a dark brand color
   // (navy, purple, black...) never becomes low-contrast text on our dark
@@ -402,22 +362,21 @@
   }
 
   // Renders full name and abbreviation together; fitTeamBadges() below picks
-  // which one is visible (and whether the logo shows) based on available space.
+  // which one is visible based on available space.
   function teamBadge(game, side, opts) {
     opts = opts || {};
     const name = side === 'A' ? game.teamA : game.teamB;
     const style = teamStyle(game, side);
     const bg = style.primary;
     const fg = readableTextColor(bg);
-    const logo = teamLogoTag(game, side, opts.logoSize || 20);
     const cls = 'team-badge' + (opts.cls ? ' ' + opts.cls : '');
     const fontStyle = style.font ? ` font-family:${style.font}, var(--sans);` : '';
-    return `<span class="${cls}" style="background:${bg}; color:${fg};">${logo}<span class="team-badge-name" style="${fontStyle}"><span class="badge-full">${escapeHtml(name)}</span><span class="badge-abbr">${escapeHtml(style.abbr)}</span></span></span>`;
+    return `<span class="${cls}" style="background:${bg}; color:${fg};"><span class="team-badge-name" style="${fontStyle}"><span class="badge-full">${escapeHtml(name)}</span><span class="badge-abbr">${escapeHtml(style.abbr)}</span></span></span>`;
   }
 
   // Downgrades team-badge display within each `.badge-fit` container, in
-  // order, until its content stops overflowing: full name -> abbreviation ->
-  // abbreviation with no logo. All badges sharing a container downgrade
+  // order, until its content stops overflowing: full name -> abbreviation.
+  // All badges sharing a container downgrade
   // together so e.g. a matchup header reads consistently on both sides.
   // A few px of slack rather than bare `> 0` — sub-pixel layout rounding
   // (varies by browser/OS/DPI) can put a badge that truly just fits a
@@ -445,13 +404,10 @@
     groups.forEach(group => {
       const badges = group.flatMap(wrap => Array.from(wrap.querySelectorAll('.team-badge')));
       if (!badges.length) return;
-      badges.forEach(b => b.classList.remove('mode-abbr', 'mode-nologo'));
+      badges.forEach(b => b.classList.remove('mode-abbr'));
       const overflows = () => group.some(wrap => wrap.scrollWidth > wrap.clientWidth + FIT_SLACK_PX);
       if (overflows()) {
         badges.forEach(b => b.classList.add('mode-abbr'));
-      }
-      if (overflows()) {
-        badges.forEach(b => b.classList.add('mode-nologo'));
       }
     });
   }
@@ -542,7 +498,7 @@
     showModal, showConfirm, showAlert, showChoice, showPasswordPrompt,
     topbar, statusLabel, leagueLabel, leagueBadge, isTvBrowser, isPhone,
     formatKickoffTime, kickoffNotice,
-    teamMeta, teamStyle, applyTeamColors, resetTeamColors, teamLogoTag,
+    teamMeta, teamStyle, applyTeamColors, resetTeamColors,
     teamColor, readableTextColor, teamBadge, fitTeamBadges, teamAbbr, shadeColor,
     TV_ICON, PHONE_ICON, PEOPLE_ICON
   };
