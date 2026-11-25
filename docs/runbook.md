@@ -120,6 +120,9 @@ needs a change there. On previews it blocks the Vercel toolbar, which is expecte
   answers 502.
 - Check a preview on a phone over cellular data, not WiFi. The version in the Home footer
   shows `+<short hash>` on preview builds; production shows the plain version.
+- **Preview deployments use the production database.** Vercel's Preview `DATABASE_URL` has
+  the same host as Production (checked 2026-11-25). To test writes or load, deploy a clean
+  copy with `vercel deploy -e DATABASE_URL=<ci-tests pooled string>`, never printing it.
 - Vercel Hobby forbids commercial use; the paid launch needs Pro (roadmap R7).
 
 ## Smoke check after a deploy
@@ -138,7 +141,46 @@ Vercel dashboard (or `vercel rollback`): promote the previous production deploym
 Database changes only add, so the previous code runs against the newer schema. The
 pre-cloud LAN version is tagged `local-lan-v1`.
 
+## Status check (R11)
+
+`GET /api/health` answers `{"ok":true,"version":"…"}` from the function alone: it proves
+Vercel and the code are up and costs no database time. `GET /api/health?db=1` also runs
+`select 1` and adds `"db":"ok","dbMs":<n>`; a database failure answers 503 and logs
+`health: database check failed`. **`?db=1` wakes a suspended Neon compute, so run it by
+hand or from an alert, never from an uptime monitor on a timer** (that would be a keepalive).
+An external monitor may poll the plain form only.
+
+## Monitoring and alerts (R11, to set up)
+
+Steve's steps, in the Vercel and Neon dashboards (confirm what the plan offers before relying
+on it):
+
+- Vercel: an alert or drain on function errors and 5xx rate; watch `?fresh=1` request volume
+  (it skips the edge cache, decision 023).
+- Vercel and Neon: spend limits and usage emails (below).
+- Logs: `vercel logs`, or Project > Logs; search `health:`, `error`.
+
+## Spending limits (R11, to set up)
+
+Free use brings load with no income (decision 022). Before launch, Steve sets in the
+dashboards: a Vercel spend limit (Pro, Settings > Billing > Spend Management) with an email
+at about 50% and 80%; Neon usage alerts. Hobby has no overage, so a limit pauses the whole
+account; Pro bills on demand until the limit. Neon free suspends compute when CU-hours or
+egress run out, which takes the site down for the month.
+
+## Game-day checklist (R11)
+
+A week before: Pro plan on and spend limit set; run the load test (roadmap R9) and record the
+result here; confirm `TEST_DATABASE_URL`-style branches are not the production string.
+The day before:
+1. Neon: raise the compute size/minimum for the day (never a ping). Note the old setting.
+2. `GET /api/health?db=1` on production: `ok`, `dbMs` under about 500 once awake.
+3. Smoke check above; open a `#tv-<id>` view and a phone `#player-<id>` link.
+4. Confirm the last deploy is the one you intend to run on; no pushes to `master` on game day.
+During: watch Vercel errors and Neon connections; if the site misbehaves, roll back (below)
+before debugging.
+After: lower Neon compute again; record peak load and cost here.
+
 ## Not yet written
 
-Monitoring and alerts, the game-day checklist, Neon compute scaling before game day,
-and the load-test results (roadmap R8–R11).
+Load-test results (R9, deferred to near launch); the alert rules themselves once set up.

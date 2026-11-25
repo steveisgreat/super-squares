@@ -341,6 +341,11 @@ A dependency-free Node script simulating 25,000 screens across 3,000 boards
 (5× the estimate) against a preview deploy and a Neon branch.
 *Done:* p95 under 500 ms and error rate under 0.5% at target; results and cost
 estimate recorded in the runbook.
+*Deferred (2026-11-25):* run it near launch, after Steve upgrades Vercel to Pro (Hobby's
+4 h Fluid Active CPU was 41% used and an overage pauses every project on the account).
+Set a Pro spend limit first. Deploy from a clean copy with `DATABASE_URL` overridden to
+the `ci-tests` branch (`vercel deploy -e`): Preview's `DATABASE_URL` is the production host.
+Measure CPU per function run with a small step, then size the ramp.
 
 **R10. Sign-in rate limit** — `Sonnet` — ✅ live 2026-11-24 (runbook, "Sign-in rate limit").
 Vercel Firewall rule on `/api/login` and `/api/login/verify`.
