@@ -126,7 +126,9 @@ lawyer.
 Also: first sign-in asks the host to accept the Terms ("By signing in you agree to the
 Terms and Privacy Policy", with links), and we record which version they accepted and
 when (a column on `hosts`, migration). Wording follows the lawyer review. Auth code:
-Opus review.
+Opus review. The notice and the record are built (2026-11-25, with R34,
+[decision 024](decisions/024-consent-at-sign-in.md)); left: the reviewed wording, then set
+`TERMS_VERSION` in `lib/auth.js` (a `draft-` version today).
 *Done:* pages live on preview; lawyer review booked (Steve).
 
 **R7. Accounts and plans** — `Steve` — Depends on: none.
@@ -381,19 +383,25 @@ main growth item for the free season (decision 022).
 "Host your own board" on the player and TV views, with a referral code
 tracked to sign-ups.
 *Done:* referral attribution visible in the database.
-*Built 2026-11-25, not pushed:* the referral is the board's join code. The player view links to
+*Built 2026-11-25, pushed:* the referral is the board's join code. The player view links to
 `/?ref=<code>` ("Running your own pool? Host your own board"); the TV's join panel prints the same
 address while a board is filling (not after it locks). The app keeps the code in the browser,
 sends it with the sign-in request, and it lands in `hosts.referred_by` only when the account is
 first created (migration 008; an existing host is never re-attributed). Checked on `ci-tests` with
 throwaway rows, and in the preview. Not tried: a real email sign-in (needs R16), a real phone.
-**Before the push:** apply migration 008 to production, or sign-in fails (runbook).
+Migration 008 goes on production with 002 (runbook, "Turn on host accounts").
 
 **R34. Opt-in for next season** — `Sonnet` build, `Opus` review (auth code, migration) —
 Depends on: R2, R6 (wording).
 An unticked "Tell me about next season" checkbox at sign-in, stored on `hosts` with the
 time, and a way to turn it off.
 *Done:* choice recorded and reversible; privacy policy covers it.
+*Built 2026-11-25, not pushed* ([decision 024](decisions/024-consent-at-sign-in.md), migration 009): the box and the
+Terms notice (R6) are on the code step and the emailed-link page, and travel with the sign-in itself;
+"News about next season" in the account menu turns it on or off. Checked on `ci-tests` with throwaway
+rows and end to end in the browser in accounts mode (360, 1366 and 1920 px); `/code-review high` done with its fixes. Not tried: a real email
+sign-in (needs R16), a real phone. Wording waits for the lawyer review. Nothing sends the news yet;
+whatever does needs an unsubscribe link that works signed out.
 
 ### Milestone 3 — Go to market (2027-01-11 → 2027-02-14)
 

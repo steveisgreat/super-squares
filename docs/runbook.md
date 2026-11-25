@@ -62,7 +62,9 @@ start. Do not add a keepalive or scheduled ping.
 Once, after R16 (sending domain). R10's firewall rule is already live (below).
 
 1. Deploy with `AUTH_MODE` unset. Password mode keeps working.
-2. Apply `migrations/002_host_accounts.sql`.
+2. Apply `migrations/002_host_accounts.sql`, then `008_referrals.sql` and `009_host_consent.sql`
+   (both alter the tables 002 makes). **Without 008 and 009 every sign-in fails.** Check that
+   `TERMS_VERSION` in `lib/auth.js` is the reviewed version, not a `draft-` one.
 3. `node --env-file=.env.local scripts/assign-owner.js <email>` prints the database host
    and the counts. Check both, then run it again with `--apply`.
 4. Set `SESSION_SECRET`, `APP_ORIGIN`, `RESEND_API_KEY`, `EMAIL_FROM`, then
@@ -113,10 +115,14 @@ needs a change there. On previews it blocks the Vercel toolbar, which is expecte
   (decision 018). Only the scorer-phone hand-off uses it, so without it only that fails.
 - **R33:** `migrations/007_host_themes.sql` was applied to production on 2026-11-24
   (decision 021). Without it every board shows the default theme and choosing one answers 503.
-- **Before the push that ships R13:** apply `migrations/008_referrals.sql` to production
-  (applied to `ci-tests` 2026-11-25). Unlike the others, the sign-in request writes the new
-  `login_requests.ref` column, so **without it every sign-in fails** once accounts are live. Count
+- **R13:** `migrations/008_referrals.sql` alters the tables of 002, which production doesn't have
+  yet (checked 2026-11-25), so it goes on with it: "Turn on host accounts", step 2. Applied to
+  `ci-tests` 2026-11-25. The sign-in request writes the new `login_requests.ref` column, so
+  **without it every sign-in fails** once accounts are live. Count
   sign-ups per board: `select referred_by, count(*) from hosts where referred_by is not null group by 1 order by 2 desc;`
+- **R34 and R6:** `migrations/009_host_consent.sql` (decision 024) goes on with 002 and 008, in that
+  same step. Applied to `ci-tests` 2026-11-25. Who opted in to news:
+  `select email from hosts where news_opt_in_at is not null;`
 - **Before the first push that ships R4a part 2:** apply `migrations/003_live_slates.sql`
   and set `SCORE_PRIMARY=espn` (plus `SCORE_SECONDARY` and `BALLDONTLIE_API_KEY` if
   wanted) in Vercel production. On Vercel, unset means no provider (decision 001), so

@@ -14,6 +14,7 @@
   const USER_ICON = ic('<path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855"/>', 24);
   const DOWN_ICON = ic('<path d="M6 9l6 6l6 -6"/>', 16);
   const PALETTE_ICON = ic('<path d="M12 21a9 9 0 0 1 0 -18c4.97 0 9 3.582 9 8c0 1.06 -.474 2.078 -1.318 2.828c-.844 .75 -1.989 1.172 -3.182 1.172h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25"/><path d="M8.5 10.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M16.5 10.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/>');
+  const MAIL_ICON = ic('<path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10z"/><path d="M3 7l9 6l9 -6"/>');
   const DOTS_ICON = ic('<path d="M5 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M19 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/>', 22);
   const PENCIL_ICON = ic('<path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/>');
   const LOCK_ICON = ic('<path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/>');
@@ -393,10 +394,12 @@
       return;
     }
 
+    const consent = SBS.ui.signInConsent(); // one for the page, so an error keeps the tick
     function showReady(errText) {
       const btn = el('button', '', 'Sign in');
       btn.type = 'button';
       show('Sign in to Super Squares', 'Tap Sign in to finish signing in on this device.', [btn, homeBtn()]);
+      card.insertBefore(consent.node, card.querySelector('.actions'));
       if (errText) {
         const errBox = el('div', 'error-msg', escapeHtml(errText));
         errBox.setAttribute('role', 'alert');
@@ -405,7 +408,7 @@
       btn.addEventListener('click', async () => {
         btn.disabled = true;
         try {
-          await SBS.api.verifyLogin({ token });
+          await SBS.api.verifyLogin(Object.assign({ token }, consent.values()));
         } catch (e) {
           if (stale()) return;
           if (e.status === 401) {
@@ -433,9 +436,101 @@
     fitTeamBadges(grid);
   }
 
+  // News about next season (R34): on or off, saved by the button. The saved choice is read when the
+  // dialog opens; until then the box is locked.
+  function openNewsDialog(opener) {
+    const overlay = SBS.ui.overlayEl('0.65');
+    const box = el('div', 'card pick-dialog');
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-labelledby', 'news-title');
+    box.innerHTML = `
+      <h3 id="news-title">News about next season</h3>
+      <label class="dialog-row"><span>Tell me about next season<small>We email you before the season starts.</small></span><input type="checkbox" id="news-on" disabled></label>
+      <p class="pick-dialog-sub" role="status" style="margin:0"></p>
+      <div class="error-msg hidden" role="alert"></div>
+      <div class="pick-dialog-actions"><button type="button" class="secondary">Cancel</button><button type="button" disabled>Save</button></div>`;
+    const input = box.querySelector('#news-on');
+    const status = box.querySelector('[role=status]');
+    const err = box.querySelector('.error-msg');
+    const [cancel, save] = box.querySelectorAll('button');
+    const showErr = (m) => { err.textContent = m; err.classList.remove('hidden'); };
+    let saved = null;
+    let saving = false;
+    let hint = null;
+    function busy(text) {
+      status.textContent = text;
+      status.hidden = false;
+      hint = setTimeout(() => { status.textContent = 'Still working, waking the database…'; }, 2000);
+    }
+    function idle() { clearTimeout(hint); status.hidden = true; }
+    // The session ended: Home's own list asks for a sign-in.
+    function failed(e, text) {
+      if (e.authRequired) { close(); SBS.go({ screen: 'home' }); return; }
+      showErr(text + e.message);
+    }
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    cancel.focus();
+
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); dismiss(); return; }
+      if (e.key !== 'Tab') return;
+      const items = Array.from(box.querySelectorAll('button:not([disabled]), input:not([disabled])'));
+      if (!items.length) { e.preventDefault(); return; }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (!box.contains(active)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && active === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
+    }
+    function close() {
+      if (!overlay.isConnected) return; // also runs when the screen changes
+      clearTimeout(hint);
+      document.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+      if (opener.isConnected) opener.focus();
+    }
+    function dismiss() { if (!saving) close(); } // a failed save must be seen
+    document.addEventListener('keydown', onKey, true);
+    overlay.addEventListener('mousedown', e => { if (e.target === overlay) dismiss(); });
+    SBS.onLeaveScreen(close);
+    cancel.addEventListener('click', dismiss);
+
+    busy('Loading your choice…');
+    SBS.api.getNews().then((r) => {
+      saved = r.news;
+      input.checked = saved;
+      input.disabled = save.disabled = false;
+      if (overlay.isConnected) input.focus();
+    }).catch((e) => {
+      if (overlay.isConnected) failed(e, 'Could not load your choice: ');
+    }).finally(idle);
+
+    save.addEventListener('click', async () => {
+      if (input.checked === saved) { close(); return; }
+      err.classList.add('hidden');
+      saving = input.disabled = save.disabled = cancel.disabled = true;
+      busy('Saving…');
+      let error = null;
+      try {
+        await SBS.api.setNews(input.checked);
+      } catch (e) {
+        error = e;
+      }
+      idle();
+      saving = input.disabled = save.disabled = cancel.disabled = false;
+      if (!overlay.isConnected) return;
+      if (!error) { close(); return; }
+      save.focus();
+      failed(error, 'Could not save: ');
+    });
+  }
+
   // The account button in the top bar (only with a host session): Theme, and with sign-in on,
-  // who is signed in, Sign out, Sign out everywhere. With sign-in off it is "Host settings" and
-  // lists only Theme.
+  // who is signed in, News about next season (accounts mode), Sign out, Sign out
+  // everywhere. With sign-in off it is "Host settings" and lists only Theme.
   function buildAccountButton(s) {
     const emailTxt = s.mode === 'accounts' && s.email ? s.email : '';
     const signIn = !!s.authRequired;
@@ -447,6 +542,7 @@
     btn.setAttribute('aria-expanded', 'false');
     btn.addEventListener('click', () => {
       const items = [{ label: 'Theme', icon: PALETTE_ICON, onSelect: () => SBS.go({ screen: 'theme' }) }];
+      if (emailTxt) items.push({ label: 'News about next season', icon: MAIL_ICON, onSelect: () => openNewsDialog(btn) });
       if (signIn) {
         items.push({ divider: true });
         items.push({

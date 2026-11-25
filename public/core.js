@@ -169,6 +169,10 @@
     // Account sign-in. Raw on purpose: a 401 here must never open the prompt.
     requestLoginCode: (email) => rawRequest('/api/login', json('POST', { email, ref: SBS.referral.get() })),
     verifyLogin: (body) => rawRequest('/api/login/verify', json('POST', body)),
+    // News about next season (R34): the signed-in host's own choice. Raw on purpose: a prompt here
+    // could sign in someone else and replay the choice on their account.
+    getNews: () => rawRequest('/api/news'),
+    setNews: (news) => rawRequest('/api/news', json('PUT', { news })),
     revokeAllSessions: () => rawRequest('/api/session/revoke-all', { method: 'POST' }).then((r) => { forgetHostTheme(); return r; }),
     // The board as it is now, straight from the server: for opening a board, acting on it, or
     // recovering from a refused save.

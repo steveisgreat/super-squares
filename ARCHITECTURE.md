@@ -57,6 +57,7 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `POST /api/tv/follow` | owner of `gameId`; moves all the caller's paired TVs to that board |
 | `GET /api/tv/mine` | signed in; `{ count }` of the caller's paired TVs |
 | `GET`, `PUT /api/theme` | host only; the caller's color theme → `{ theme }`; 400 unknown theme (decision 021) |
+| `GET`, `PUT /api/news` | accounts mode, signed in; the caller's own next-season opt-in → `{ news }` (decision 024) |
 | `GET /api/game/:id/theme` | public; the theme of the board's host → `{ theme }`; 404 unknown board |
 | `GET /api/join/:code` | public; a join code resolves to `{ id }` (decision 016); 400 malformed, 404 unknown |
 | `POST /api/game/:id/guest` | anyone with the board id; `{ name }` this device holds, sets `sbs_guest` (180 d, `Path=/api/game/<id>`) if it has none; 409 unless guest picks are on and the board is picking (decision 019) |
@@ -78,7 +79,9 @@ A game is one JSON document (the shape is built by `public/compute.js` and the s
 screen). Postgres: table `games (id uuid pk, doc jsonb, updated_at timestamptz)` with an
 index on `updated_at desc` (`migrations/001_games.sql`, applied by hand, see runbook).
 Accounts (`migrations/002_host_accounts.sql`): `hosts`, `login_requests`, and
-`games.owner_id`, a nullable column that is never copied into `doc`. The store stamps `createdAt` and `updatedAt`.
+`games.owner_id`, a nullable column that is never copied into `doc`. Later columns on `hosts`:
+`referred_by` (migration 008), and the next-season opt-in and accepted Terms version (migration
+009, decision 024). The store stamps `createdAt` and `updatedAt`.
 
 Scorer phones (`migrations/006_scorer_grants.sql`): `scorer_grants`, one row per one-time
 code, which becomes that phone's grant when used (decision 018). Only hashes are stored.

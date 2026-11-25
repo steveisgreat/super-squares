@@ -19,7 +19,7 @@
 </div></header>
 <main>
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated: 2026-11-24</p>
+<p class="updated">Last updated: 2026-11-25</p>
 <p class="draft-banner" role="note">Draft — pending legal review. Not final legal text.</p>
 
 <p>This policy explains what [PRODUCT NAME], operated by [COMPANY], collects and does today, and what is planned. It describes how the software actually works. The sections marked for review cover features that are not live yet.</p>
@@ -41,6 +41,7 @@
 <li><strong>Scorer phone cookie (<code>sbs_scorer</code>).</strong> When a host hands score entry to a phone, that phone gets a cookie for that one board. It lasts up to 24 hours, is HttpOnly, and holds a random value, not personal data. The host can end it at any time. The browser also keeps a note (localStorage) that this phone was a scorer for that board.</li>
 <li><strong>Guest pick cookie (<code>sbs_guest</code>).</strong> Only when a host has allowed guests to pick their own squares, and only after a guest taps Pick squares, their browser gets this cookie for that one board. It lasts up to 180 days, is HttpOnly, and holds a random value, not personal data. It lets the same browser claim and release its own squares and no one else's. Clearing it means the guest can no longer change those squares; the host can.</li>
 <li><strong>Color theme (browser storage).</strong> Your browser remembers the name of a color theme so pages open in it: a host's own (localStorage, until they sign out) and a board's (sessionStorage, until the tab closes). It holds nothing about you.</li>
+<li><strong>Referral code (browser localStorage, <code>sbs-ref</code>).</strong> If you open the app from a board's "Host your own board" link, your browser keeps that board's six-character code. It is sent only if you ask to sign in as a host (see section 9). It stays until you clear it in your browser settings.</li>
 <li>We do not use advertising or tracking cookies.</li>
 </ul>
 
@@ -70,6 +71,9 @@
 <p><strong>For review: not live yet.</strong> This section describes planned features and will be updated before they ship.</p>
 <ul>
 <li><strong>Host accounts</strong> will use email sign-in. We will store a host's email address, when the account was created and last used, a number that lets the host sign out everywhere, and which games belong to the account. There is no password.</li>
+<li><strong>Agreement to the terms.</strong> When a host signs in, we will store which version of the Terms and this policy they agreed to, and when.</li>
+<li><strong>News about next season.</strong> Only if a host ticks the box when they sign in, or turns it on in the account menu, we will store that choice and its time, and use their email address to write to them about next season. It is off unless they turn it on. They can turn it off at any time in the account menu, which deletes the record of the choice, or by using the <a href="contact.html">Contact page</a>.</li>
+<li><strong>Where a new host came from.</strong> If a host first reached the app from a board's "Host your own board" link, we will store that board's code with the sign-in request and, once, with the new account, to count how hosts find us.</li>
 <li><strong>Sign-in requests.</strong> Each time someone asks to sign in, we will store the email address they typed, the time, and scrambled (hashed) copies of the one-time link and code. The link and code stop working after 15 minutes. A request older than 24 hours is deleted when the next person asks to sign in.</li>
 <li><strong>Sign-in emails</strong> will go through an email provider, which will receive the email address and the message. [EMAIL PROVIDER — planned: Resend; confirm.]</li>
 <li><strong>Host session cookie (<code>sbs_session</code>).</strong> Will keep a signed-in host signed in for up to 90 days. It is HttpOnly and signed. It holds a random account number, a session number and an expiry date, not the email address. People who only view boards will not get it.</li>

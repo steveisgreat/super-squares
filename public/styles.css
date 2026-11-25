@@ -553,6 +553,13 @@ input[type=color] {
   cursor: pointer;
 }
 
+/* Above the button that finishes a sign-in: the next-season box and the Terms notice. */
+.signin-consent { margin-top: 14px; }
+.signin-consent .checkbox-label { min-height: 44px; margin: 0; font-weight: 600; }
+.signin-consent .checkbox-label input { flex: none; margin: 0; }
+.signin-consent .signin-terms { margin: 4px 0 0; font-size: 0.85rem; color: var(--muted); }
+.signin-consent .signin-terms a { color: var(--text); text-decoration: underline; }
+
 .row { display: flex; gap: 16px; flex-wrap: wrap; }
 .row > * { flex: 1; min-width: 200px; }
 

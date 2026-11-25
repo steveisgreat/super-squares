@@ -155,6 +155,17 @@
     if (closeOpenPrompt) closeOpenPrompt();
   }
 
+  // What goes above each "Sign in" button that finishes a sign-in: the Terms notice and the
+  // next-season box (decision 024). `values()` is sent with the sign-in. The box starts unticked,
+  // and leaving it so changes nothing for a host who opted in before.
+  function signInConsent() {
+    const node = el('div', 'signin-consent',
+      `<label class="checkbox-label"><input type="checkbox" name="news"> <span>Tell me about next season</span></label>
+      <p class="signin-terms">By signing in you agree to the <a href="terms.html" target="_blank" rel="noopener">Terms</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>`);
+    const box = node.querySelector('input');
+    return { node, values: () => ({ terms: true, news: box.checked }) };
+  }
+
   function showEmailPrompt() {
     return new Promise(resolve => {
       const opener = document.activeElement;
@@ -185,6 +196,7 @@
       let closed = false;
       let checking = false;
       let hintTimer = null;
+      let consent = null; // step 2's box
 
       const showErr = (text) => { err.textContent = text; err.classList.remove('hidden'); note.textContent = ''; };
       const clearMsgs = () => { err.textContent = ''; err.classList.add('hidden'); note.textContent = ''; };
@@ -226,7 +238,7 @@
       function onKey(e) {
         if (e.key === 'Escape') { e.preventDefault(); dismiss(); return; }
         if (e.key !== 'Tab') return;
-        const items = Array.from(box.querySelectorAll('button:not([disabled]), input:not([disabled])'));
+        const items = Array.from(box.querySelectorAll('button:not([disabled]), input:not([disabled]), a[href]'));
         if (!items.length) { e.preventDefault(); return; }
         const first = items[0];
         const last = items[items.length - 1];
@@ -241,7 +253,11 @@
         if (document.visibilityState !== 'visible' || step !== 2 || busy || checking || closed) return;
         checking = true;
         SBS.api.getSession().then(s => {
-          if (!closed && s && s.host) { clearPendingLogin(); finish(true); }
+          if (closed || !s || !s.host) return;
+          // Ticked here, finished there: keep the choice, for the address typed here only.
+          if (consent && consent.values().news && s.email === email.toLowerCase()) SBS.api.setNews(true).catch(() => {});
+          clearPendingLogin();
+          finish(true);
         }).catch(() => {}).finally(() => { checking = false; });
       }
 
@@ -329,7 +345,8 @@
         const again = button('Send a new code', 'ghost small');
         const other = button('Use a different email', 'ghost small');
         more.append(again, other);
-        form.append(label, input, actions, more);
+        consent = signInConsent();
+        form.append(label, input, consent.node, actions, more);
 
         form.addEventListener('submit', async (e) => {
           e.preventDefault();
@@ -337,7 +354,7 @@
           const digits = input.value.replace(/\D/g, '');
           if (digits.length !== 8) { showErr('Enter the 8-digit code from the email.'); input.focus(); return; }
           try {
-            await run(() => SBS.api.verifyLogin({ requestId, code: digits }));
+            await run(() => SBS.api.verifyLogin(Object.assign({ requestId, code: digits }, consent.values())));
           } catch (e2) {
             if (closed) return;
             showErr(e2.status === 401 ? 'That code is wrong or has expired. Check it, or send a new code.' : e2.message);
@@ -978,7 +995,7 @@
 
   SBS.ui = {
     el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake, keepPartyAwake, partyHistory,
-    showModal, showConfirm, showAlert, disturbMessage, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin,
+    showModal, showConfirm, showAlert, disturbMessage, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin, signInConsent,
     shownDescription, topbar, HOME_ICON, statusLabel, leagueLabel, leagueBadge, isTvBrowser, isPhone,
     formatKickoffTime, kickoffNotice,
     teamMeta, teamStyle, applyTeamColors, resetTeamColors, teamLogoTag,
