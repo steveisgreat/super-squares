@@ -273,12 +273,16 @@
     const table = el('div', 'board-table');
 
     table.appendChild(el('div', 'cell head corner', ''));
-    for (let c = 0; c < 10; c++) {
-      table.appendChild(el('div', 'cell head x' + (game.axisX ? '' : ' pending'), game.axisX ? escapeHtml(game.axisX[c]) : '–'));
-    }
+    // --axis and --who carry the team and player colors; the phone grid tints its squares with them.
+    const head = (axis, side, nums, i) => {
+      const h = el('div', `cell head ${axis}` + (nums ? '' : ' pending'), nums ? escapeHtml(nums[i]) : '–');
+      h.style.setProperty('--axis', teamColor(game, side));
+      return h;
+    };
+    for (let c = 0; c < 10; c++) table.appendChild(head('x', 'B', game.axisX, c));
 
     for (let r = 0; r < 10; r++) {
-      table.appendChild(el('div', 'cell head y' + (game.axisY ? '' : ' pending'), game.axisY ? escapeHtml(game.axisY[r]) : '–'));
+      table.appendChild(head('y', 'A', game.axisY, r));
       for (let c = 0; c < 10; c++) {
         const sq = game.squares[r * 10 + c];
         const labels = computed.cellLabels[`${r}-${c}`] || [];
@@ -305,6 +309,8 @@
         const badges = !labels.length ? '' : `<div class="badges">${labels.map(l => `<span class="badge">${l.label === 'FINAL' ? TROPHY_SVG : l.label}</span>`).join('')}</div>`;
 
         const cellEl = el('div', cls, badges + inner);
+        const who = sq && (game.players || {})[sq.name];
+        if (who && isColor(who.color)) cellEl.style.setProperty('--who', who.color);
         if (sq && !document.body.classList.contains('tv-mode')) cellEl.title = sq.name; // full name on tap/hover; TV view stays as it was
         table.appendChild(cellEl);
       }
@@ -363,18 +369,20 @@
     });
   }
 
-  // Phone Party View and the picking board: a name never breaks inside a word. One too wide for its square gets smaller, down
+  // Phone Party View, phone Game Day and the picking board: a name never breaks inside a word. One too wide for its square gets smaller, down
   // to MIN_NAME_PX; past that the CSS cuts it with an ellipsis. Widths are read in one pass and
   // sizes written in another, so 100 squares cost one layout.
   const MIN_NAME_PX = 7;
   function fitNames(root) {
-    const names = Array.prototype.slice.call((root || document).querySelectorAll('.mirror-screen .name-txt, .pick-fill .name-txt, .glass-board .name-txt'));
+    const names = Array.prototype.slice.call((root || document).querySelectorAll('.mirror-screen .name-txt, .pick-fill .name-txt, .glass-board .name-txt, .gd-phone .name-txt'));
     if (!names.length) return;
     names.forEach(n => { n.style.fontSize = ''; });
     const sizes = names.map(n => {
       // 1 px off each: the browser rounds these. Height matters for two words in a short square.
       const room = n.parentElement.clientHeight;
-      const w = n.scrollWidth > n.clientWidth ? (n.clientWidth - 1) / n.scrollWidth : 1;
+      // A name that just fills its square counts as too wide: the rounding can hide a cut letter.
+      const full = n.scrollWidth > n.clientWidth || n.clientWidth >= n.parentElement.clientWidth - 2;
+      const w = full ? (n.clientWidth - 1) / n.scrollWidth : 1;
       const h = room && n.offsetHeight > room ? (room - 1) / n.offsetHeight : 1;
       if (!n.clientWidth || (w === 1 && h === 1)) return 0;
       const px = parseFloat(window.getComputedStyle(n).fontSize) * Math.min(w, h);

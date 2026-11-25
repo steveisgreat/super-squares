@@ -3578,3 +3578,75 @@ label.theme-card.is-chosen .theme-check { display: inline-flex; }
   #app.fit-screen { height: auto; overflow: visible; }
   .main.gd-main, #app.fit-screen .main.pick-main { min-height: 560px; }
 }
+
+/* ==========================================================================
+   Phone grids: thin light lines
+   Host picking (.is-tabbed), Game Day on a phone (.gd-phone), and the guest's pick board and mini
+   grid share one look: a flat sheet, one 1 px light line between squares, no rounded corners. The
+   line is the table's own background showing through a 1 px gap, so every square's fill is opaque.
+   ========================================================================== */
+.is-tabbed, .gd-phone, .gp-board, .mini-grid {
+  --g-line: #75808b;
+  --g-taken: var(--panel3);
+  --g-mine: var(--panel3);
+  --g-hover: var(--panel3);
+}
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .is-tabbed, .gd-phone, .gp-board, .mini-grid {
+    --g-line: color-mix(in srgb, var(--muted) 62%, var(--panel));
+    --g-taken: color-mix(in srgb, var(--muted) 24%, var(--panel));
+    --g-mine: color-mix(in srgb, var(--accent) 34%, var(--panel));
+    --g-hover: color-mix(in srgb, var(--accent) 16%, var(--panel2));
+  }
+}
+.pick-fill.is-tabbed .board-table, .gd-phone .board-table {
+  gap: 1px; padding: 0; background: var(--g-line); border: 1px solid var(--g-line); border-radius: 3px; overflow: hidden;
+}
+.pick-fill.is-tabbed .cell, .pick-fill.is-tabbed .cell.empty-pick[role=button], .gd-phone .cell { background: var(--panel2); border-radius: 0; box-shadow: none; }
+.pick-fill.is-tabbed .cell.head, .gd-phone .cell.head { background: var(--panel3); color: var(--text); text-shadow: none; }
+.pick-fill.is-tabbed .cell.head.corner, .gd-phone .cell.head.corner { background: var(--panel); }
+.pick-fill.is-tabbed .cell.filled, .gd-phone .cell.filled { background: var(--panel3); box-shadow: none; }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .pick-fill.is-tabbed .cell.head:not(.corner), .gd-phone .cell.head:not(.corner) { background: color-mix(in srgb, var(--axis, var(--panel3)) 45%, var(--panel2)); color: var(--text); }
+  .pick-fill.is-tabbed .cell.filled, .gd-phone .cell.filled { background: color-mix(in srgb, var(--who, var(--muted)) 24%, var(--panel)); }
+  .is-tabbed .cell .name-txt, .gd-phone .cell .name-txt { color: color-mix(in srgb, var(--nc, var(--text)) 60%, #fff); }
+}
+.gd-phone .cell.pushed { background: #2b1515; }
+.pick-fill.is-tabbed .cell.empty-pick:hover, .pick-fill.is-tabbed .cell.is-tappable:hover { box-shadow: inset 0 0 0 2px var(--pick-color, var(--accent)); }
+.pick-fill.is-tabbed .cell.empty-pick[role=button].selected { background: var(--pick-color, var(--accent)); box-shadow: none; }
+.pick-fill.is-tabbed .cell.filled.is-unpaid, .gd-phone .cell.filled.is-unpaid { box-shadow: inset 0 0 0 2px var(--danger); }
+.gd-phone .cell.winner, .gd-phone .cell.filled.winner, .gd-phone .cell.filled.is-unpaid.winner { box-shadow: inset 0 0 0 2px #f4c542; }
+.gd-phone .cell.is-unpaid.winner { outline-offset: -4px; }
+.gd-phone .cell .name-txt { padding-top: 0; font-size: 0.6rem; line-height: 1.1; font-weight: 600; }
+.gd-phone .cell.winner .name-txt, .gd-phone .cell.pushed .name-txt { padding-top: 8px; }
+.gd-phone .legend-chip { background: transparent; box-shadow: none; border: 2px solid var(--danger); box-sizing: border-box; }
+/* Game Day's team bars are solid, as on the picking board. */
+.gd-phone .board-grid-outer { gap: 2px; }
+.gd-phone .board-scroll { overflow: visible; padding-bottom: 0; }
+.gd-phone .teamA-label, .gd-phone .teamB-label { border-radius: 6px; background: var(--team) padding-box !important; box-shadow: inset 0 0 0 1px var(--edge, transparent); }
+.gd-phone .teamB-label { padding: 1px 8px; font-size: 0.9rem; }
+.gd-phone .teamA-label { padding: 6px 1px; }
+.gd-phone .teamA-label-text { font-size: 0.9rem; }
+.gd-phone .teamA-label .team-logo, .gd-phone .teamB-label .team-logo { --logo-size: 22px !important; padding: 2px; }
+@media (max-width: 699px) {
+  .main.gd-phone { padding: 10px 10px calc(16px + var(--sab)); }
+  .gd-phone .card { padding: 10px 8px; }
+}
+
+.gp-board { gap: 1px; background: var(--g-line); border: 1px solid var(--g-line); border-radius: 3px; overflow: hidden; }
+.gp-cell { border: 0; border-radius: 0; background: var(--panel2); }
+.gp-cell:hover:not(:disabled) { background: var(--g-hover); }
+.gp-cell.is-other { background: var(--g-taken); }
+.gp-cell.is-mine, .gp-cell.is-mine:hover:not(:disabled) { background: var(--g-mine); color: #fff; }
+.gp-cell.is-sel, .gp-cell.is-sel:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
+.gp-cell.is-sel::after { content: "\2713"; font-size: 0.9rem; font-weight: 800; }
+.gp-cell.is-rel, .gp-cell.is-rel:hover:not(:disabled) { background: var(--danger-soft); color: var(--text); box-shadow: inset 0 0 0 2px var(--danger); }
+.gp-cell:disabled, .gp-cell.is-open:disabled { opacity: 1; }
+.gp-cell.is-open:disabled { background: var(--panel); }
+.gp-cell:focus-visible { outline: 3px solid var(--accent-hi); outline-offset: -3px; }
+
+/* The mini grid's axis numbers sit in the same grid, so each square draws its own line. */
+.mini-grid { gap: 1px; }
+.mg-cell { border: 0; border-radius: 0; background: var(--panel2); box-shadow: 0 0 0 1px var(--g-line); }
+.mg-cell.is-filled { background: var(--g-taken); }
+.mg-cell.is-mine { background: var(--accent); box-shadow: 0 0 0 1px var(--g-line); }
