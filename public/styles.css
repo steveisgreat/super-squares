@@ -469,7 +469,7 @@ button.fill-player-info {
 button.fill-player-info:hover .player-name { color: var(--accent-hi); }
 .fill-player-info .player-name { display: block; overflow-wrap: anywhere; font-size: 1rem; font-weight: 600; }
 .fill-player-info .player-sub { display: block; font-size: 0.82rem; }
-.fill-player-info.is-part .player-sub { color: #a5d0f7; }
+.fill-player-info.is-part .player-sub { color: #f4d35e; }
 .players-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .players-head h3 { margin: 0; }
 .players-n { color: var(--muted); font-size: 0.9rem; }
@@ -484,8 +484,8 @@ button.fill-player-info:hover .player-name { color: var(--accent-hi); }
 .players-foot button { width: 100%; min-height: 44px; }
 button.paid-pill { min-width: 86px; min-height: 44px; border-radius: 22px; padding: 6px 8px; font-size: 0.86rem; flex-shrink: 0; }
 button.paid-pill.is-paid { background: var(--good-soft); color: var(--good); border-color: var(--good); }
-button.paid-pill.is-part { background: #16273a; color: #a5d0f7; border-color: #a5d0f7; }
-button.paid-pill.is-unpaid { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+button.paid-pill.is-part { background: #2e280f; color: #f4d35e; border-color: #f4d35e; }
+button.paid-pill.is-unpaid { background: var(--danger-soft); color: #ff8a80; border-color: var(--danger); }
 button.paid-pill:hover { filter: brightness(1.2); }
 
 .manual-banner {
@@ -1803,6 +1803,8 @@ body.tv-fullscreen .tv-meta { font-size: 1.5rem; }
 }
 .paid-toggle input { width: 18px; height: 18px; accent-color: var(--good); cursor: pointer; }
 .paid-toggle.is-paid { background: var(--good-soft); color: var(--good); }
+.paid-toggle.is-part { background: #2e280f; color: #f4d35e; }
+.paid-toggle.is-unpaid { background: var(--danger-soft); color: #ff8a80; }
 
 .unpaid-summary {
   margin-top: 16px;
@@ -2607,7 +2609,7 @@ button.gd-onair {
 .gd-topbar-phone button.gd-bar-btn.gd-connect { padding: 0 12px; }
 
 /* ---- Picking screen (redesign of R25) ----
-   Two columns from 1024 px (the board, then one panel with Add squares and Players tabs), one
+   Two columns from 1024 px (one panel with Add squares and Players tabs, then the board), one
    below that (that panel, the board, then player picks and the lock). A phone, or a window under
    700 px, has three tabs under what is sold: Squares, Grid (it fits the width) and Players. In
    the wide layout the board sets the height: its cell comes from both the width and the height, so the grid shows
@@ -2630,6 +2632,10 @@ button.gd-onair {
 .pick-seg button[aria-pressed="true"] { background: var(--panel3); color: var(--text); }
 .pick-fields { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }
 .pick-form label, .paste-card label { margin-top: 0; }
+.pick-total { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 10px; padding: 8px 12px; border-radius: 8px; background: var(--panel2); color: var(--muted); }
+.pick-total:empty { display: none; }
+.pick-total strong { font-size: 1.35rem; line-height: 1.15; color: var(--text); font-variant-numeric: tabular-nums; }
+.add-sec.is-claiming .pick-total, .claim-slot .pick-total { display: none; }
 .pick-form .checkbox-label { min-height: 44px; margin: 6px 0; font-weight: 600; font-size: 1rem; }
 button.add-btn, button.lock-btn { min-height: 48px; padding-left: 6px; padding-right: 6px; font-size: 1rem; font-weight: 800; white-space: nowrap; }
 .tap-hint { margin: 10px 0 0; text-align: center; color: var(--muted); font-size: 0.9rem; }
@@ -2743,7 +2749,7 @@ button.grid-btn { display: none; min-height: 48px; margin-top: 8px; font-size: 1
     gap: 18px;
     --side-w: clamp(330px, 31vw, 440px);
     --cell: clamp(var(--cell-min), min(calc((100vw - 48px - 18px - 100px - var(--side-w)) / 11), var(--cell-h)), 100px);
-    grid-template-columns: max-content var(--side-w);
+    grid-template-columns: var(--side-w) max-content;
   }
   .pick-fill.is-wide > .card { min-width: 0; }
   .pick-fill.is-wide > .pick-side { display: flex; flex-direction: column; height: 0; min-height: 100%; }
@@ -2781,7 +2787,9 @@ button.grid-btn { display: none; min-height: 48px; margin-top: 8px; font-size: 1
   .players-foot { margin-top: 8px; }
   .pick-form .checkbox-label { margin: 0; }
   button.add-btn, button.lock-btn { min-height: 44px; padding-top: 6px; padding-bottom: 6px; }
-  .tap-hint { margin-top: 6px; }
+  .tap-hint { margin-top: 4px; }
+  .pick-total { margin-top: 6px; padding: 3px 12px; }
+  .pick-total strong { font-size: 1.1rem; }
   .pick-sec > p:not(.tap-hint) { margin-bottom: 8px; font-size: 0.85rem; line-height: 1.35; }
 }
 /* A mouse needs less than a finger, so a short laptop window still shows the whole grid. */

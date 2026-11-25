@@ -178,7 +178,7 @@
 
   // 'paid', 'part' or 'none', and the word the host sees for it.
   const payState = (p) => (p.paid ? 'paid' : p.paidCount > 0 ? 'part' : 'none');
-  const PAY_WORD = { paid: 'Paid', part: 'Part paid', none: 'Unpaid' };
+  const PAY_WORD = { paid: 'Paid', part: 'Partial', none: 'Unpaid' };
 
   // How many of one player's squares are paid for: a stepper, saved once on Done (or at once by
   // Paid in full). `p` is the summary the host tapped; `apply(n)` saves and resolves to a message
@@ -254,9 +254,9 @@
   }
 
   // The Players card of a wide screen (the picking screen and Game Day share it): what is
-  // collected and still owed, then each name, its squares, what it owes, a Paid, Part paid or
+  // collected and still owed, then each name, its squares, what it owes, a Paid, Partial or
   // Unpaid pill, and the Manage Players button. The pill makes the same guarded save as Manage
-  // Players (paidCountChange); a name, or a Part paid pill, opens the payment box.
+  // Players (paidCountChange); a name, or a Partial pill, opens the payment box.
   // opts: { getGame(), save(change, showErr) -> result or null, onSaved(result), manage(), cls?,
   //         busy?(), setBusy?(bool), emptyText? }. `save` is the screen's own saver (it knows how
   //         to handle a conflict there); null means it dealt with the failure. `onSaved` redraws.
@@ -418,7 +418,7 @@
               <div class="player-sub">${ownedLine(p)}</div>
               ${isGuest ? `<div class="player-sub player-guest-line">${guestLine(game, p.name)}</div>` : ''}
             </div>
-            <label class="paid-toggle ${p.paid ? 'is-paid' : ''}">
+            <label class="paid-toggle is-${payState(p) === 'none' ? 'unpaid' : payState(p)}">
               <input type="checkbox" ${p.paid ? 'checked' : ''}>
               <span>${PAY_WORD[payState(p)]}</span>
             </label>

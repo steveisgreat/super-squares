@@ -302,9 +302,10 @@ still returns Home after a reload. Not tried: a real TV remote and TV browser.
 **R31. Picking screen redesign and part payments** — `Opus` — ✅ built 2026-11-24 (Steve approved
 the mock, then dropped its three-column layout for two). Depends on: R25, R28, R29. Centered matchup with the
 join chip and Connect; the board in a team-colored frame with "?" until the lock; two columns
-from 1024 px (the board; one panel with Add squares and Players tabs, Player picks and the lock),
+from 1024 px (one panel with Add squares and Players tabs, Player picks and the lock; the board),
 one below that; a phone has Squares, Grid and Players tabs with the grid fitted to the width, like
-phone Game Day. Manual pick is a tap on the board, and paste a
+phone Game Day. The number of squares is required and shows its total, Already paid starts off, and pills are
+green Paid, yellow Partial and red Unpaid. Manual pick is a tap on the board, and paste a
 list works on every size. Player picks settings open in a dialog, and the screen's join card and
 Connect's Scoring section (before the lock) are gone. "Guest picks" is now "Player picks: Allow
 picks in Player View"; the guest page is Player View. Part payments:

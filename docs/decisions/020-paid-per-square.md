@@ -12,7 +12,7 @@ someone owing for 4 who got 2 paid ones also showed as paid for 6. Players also 
 - **One rule for every name.** Adding squares never pays for, or un-pays, the ones a name already
   had: "Already paid" speaks only for the squares being added (`GameLogic.hostAddSquares`).
 - **The host can set how many squares are paid for** (`GameLogic.setPaidCount`): a name or its
-  Part paid pill opens a stepper; the Paid and Unpaid pills still settle all or none. The save is
+  Partial pill opens a stepper; the Paid and Unpaid pills still settle all or none. The save is
   refused when that name's squares changed since the host looked.
 - **Whole squares only.** No dollar amounts; $15 at $10 a square cannot be recorded.
 - The stored shape is 019's: `paid: true` alone for paid in full, `paidSquares` only for a

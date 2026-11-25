@@ -163,7 +163,7 @@
       });
     }
 
-    // From 1024 px: the board, then one panel with Add squares and Players tabs. Below that one
+    // From 1024 px: one panel with Add squares and Players tabs, then the board. Below that one
     // column: that panel, the board, then player picks and the lock. A phone (or a window as narrow)
     // shows one thing at a time, like Game Day: what is sold, then Squares, Grid and Players tabs.
     const layout = el('div', 'pick-fill' + (phone ? ' is-phone' : ''));
@@ -270,12 +270,41 @@
     const formWrap = el('div', 'pick-form');
     formWrap.innerHTML = `
       <div class="pick-fields">
-        <div><label for="p-name">Name</label><input type="text" id="p-name" placeholder="Enter name" maxlength="10" autocomplete="off"></div>
-        <div><label for="p-count">Squares</label><input type="number" id="p-count" min="1" max="100"></div>
+        <div><label for="p-name">Name</label><input type="text" id="p-name" placeholder="Enter name" maxlength="10" autocomplete="off" required></div>
+        <div><label for="p-count">Squares</label><input type="number" id="p-count" min="1" max="100" step="1" inputmode="numeric" required></div>
       </div>
-      <label class="checkbox-label"><input type="checkbox" id="p-paid" checked> <span>Already paid</span></label>
+      <div class="pick-total" role="status"></div>
+      <label class="checkbox-label"><input type="checkbox" id="p-paid"> <span>Already paid</span></label>
     `;
     onePane.append(manualBanner, formWrap, manualBtns);
+    const nameInput = formWrap.querySelector('#p-name');
+    const countInput = formWrap.querySelector('#p-count');
+    const paidInput = formWrap.querySelector('#p-paid');
+    // What the squares typed in come to, so the host can say it as the player pays.
+    const totalRow = formWrap.querySelector('.pick-total');
+    function drawTotal() {
+      const n = Number(countInput.value);
+      const price = parseFloat(game.squarePrice) || 0;
+      const show = Number.isInteger(n) && n > 0 && price > 0;
+      totalRow.innerHTML = show ? `<span>${paidInput.checked ? 'Total paid' : 'Total owed'}</span><strong>${money(n * price)}</strong>` : '';
+    }
+    countInput.addEventListener('input', () => { drawTotal(); clearErr(); });
+    nameInput.addEventListener('input', clearErr);
+    paidInput.addEventListener('change', drawTotal);
+    // The name and the number of squares, both required, or null with the reason shown.
+    function readForm(noName) {
+      const refuse = (msg, input) => { setMode('one'); showErr(msg); input.focus(); return null; };
+      const name = nameInput.value.trim();
+      if (!name) return refuse(noName, nameInput);
+      if (!isPlayerName(name)) return refuse('That name is not allowed. Choose a different name.', nameInput);
+      const raw = countInput.value.trim();
+      const count = Number(raw);
+      if (!raw) return refuse('Enter how many squares.', countInput);
+      if (!Number.isInteger(count) || count < 1) return refuse('Enter a whole number of squares.', countInput);
+      const open = openSquares().length;
+      if (count > open) return refuse(`Only ${open} square${open === 1 ? ' is' : 's are'} open.`, countInput);
+      return { name, count, paid: paidInput.checked };
+    }
 
     // Tapping open squares claims them in manual and both modes; in auto they stay inert.
     const tapToClaim = game.pickMode !== 'auto';
@@ -307,7 +336,6 @@
     let manualHadName = false;
     let saving = false;
 
-    // manualTarget 0 means no target (the # of squares was left blank): "3 picked".
     const playerPrice = () => parseFloat(game.squarePrice) || 0;
     const openSquares = () => game.squares.map((s, i) => s ? -1 : i).filter(i => i >= 0);
 
@@ -333,7 +361,7 @@
       placeClaim();
       if (!manualSelecting) return;
       const n = manualSelected.length;
-      const count = manualTarget ? `${n} of ${manualTarget} picked` : `${n} picked`;
+      const count = `${n} of ${manualTarget} picked`;
       const amount = money(n * playerPrice());
       manualBanner.appendChild(el('div', 'manual-for', 'Claiming for'));
       manualBanner.appendChild(el('div', 'manual-name', escapeHtml(manualName)));
@@ -343,7 +371,7 @@
       manualBanner.appendChild(el('div', 'manual-paid', `${escapeHtml(manualName)} ${manualPaid ? 'paid' : 'owes'} ${escapeHtml(amount)}`));
       const btns = manualBtns;
       const other = manualTarget - n;
-      if (game.pickMode === 'both' && manualTarget && other > 0) {
+      if (game.pickMode === 'both' && other > 0) {
         const autoBtn = el('button', 'secondary', `Auto-pick the other ${other}`);
         autoBtn.type = 'button';
         autoBtn.dataset.act = 'auto';
@@ -374,7 +402,7 @@
 
     // Adds random open squares to the selection until it reaches the target. Done still saves once.
     function autoPickRest() {
-      if (!manualSelecting || !manualTarget || saving) return;
+      if (!manualSelecting || saving) return;
       const free = shuffle(openSquares().filter(i => manualSelected.indexOf(i) < 0));
       manualSelected = manualSelected.concat(free.slice(0, manualTarget - manualSelected.length));
       refreshPreview();
@@ -423,15 +451,9 @@
 
     if (actionBtn) actionBtn.addEventListener('click', async () => {
       clearErr();
-      const rawName = formWrap.querySelector('#p-name').value.trim();
-      const count = parseInt(formWrap.querySelector('#p-count').value, 10);
-      const paidChecked = formWrap.querySelector('#p-paid').checked;
-      if (!rawName) return showErr('Please enter a player name.');
-      if (!isPlayerName(rawName)) return showErr('That name is not allowed. Choose a different name.');
-      if (!count || count < 1) return showErr('Please enter a valid number of squares.');
-      const open = openSquares().length;
-      if (count > open) return showErr(`Only ${open} squares remain.`);
-
+      const form = readForm('Enter a name.');
+      if (!form) return;
+      const { name: rawName, count, paid: paidChecked } = form;
       const out = {};
       const hadName = collectNameGroups(game).has(rawName.toLowerCase());
       const name = await resolveNameForPick(game, rawName, out);
@@ -451,7 +473,7 @@
       SBS.go({ screen: 'picking', game: r.game });
     });
 
-    formWrap.querySelector('#p-paid').addEventListener('change', (e) => {
+    paidInput.addEventListener('change', (e) => {
       if (!manualSelecting) return;
       manualPaid = e.target.checked;
       updateManualBanner();
@@ -468,7 +490,7 @@
           manualSelected.splice(pos, 1);
         } else {
           if (game.squares[idx]) return;
-          if (manualTarget && manualSelected.length >= manualTarget) return showErr(`All ${manualTarget} are picked. Tap Done, or tap a picked square to undo.`);
+          if (manualSelected.length >= manualTarget) return showErr(`All ${manualTarget} are picked. Tap Done, or tap a picked square to undo.`);
           manualSelected.push(idx);
         }
         clearErr();
@@ -482,19 +504,9 @@
     async function startManual(idx) {
       if (saving || starting || manualSelecting) return;
       clearErr();
-      const nameInput = formWrap.querySelector('#p-name');
-      const rawName = nameInput.value.trim();
-      if (!rawName) { setMode('one'); showErr(tabbed ? 'Type a name first, then pick on the grid.' : 'Type a name first, then tap squares.'); nameInput.focus(); return; }
-      if (!isPlayerName(rawName)) return showErr('That name is not allowed. Choose a different name.');
-      // The # of squares is optional here: blank means no target.
-      const countRaw = formWrap.querySelector('#p-count').value.trim();
-      let target = 0;
-      if (countRaw) {
-        target = Number(countRaw);
-        if (!Number.isInteger(target) || target < 1) return showErr('Enter a whole number of squares, or leave it blank.');
-        const open = openSquares().length;
-        if (target > open) return showErr(`Only ${open} squares remain.`);
-      }
+      const form = readForm(tabbed ? 'Enter a name first, then pick on the grid.' : 'Enter a name first, then tap squares.');
+      if (!form) return;
+      const rawName = form.name;
       const out = {};
       const hadName = collectNameGroups(game).has(rawName.toLowerCase());
       starting = true;
@@ -503,10 +515,10 @@
       if (!name) return; // host cancelled at the duplicate-name prompt
       if (idx !== null && game.squares[idx]) return showErr('That square was just taken.');
       manualSelecting = true;
-      manualTarget = target;
+      manualTarget = form.count;
       manualSelected = idx === null ? [] : [idx];
       manualName = name;
-      manualPaid = formWrap.querySelector('#p-paid').checked;
+      manualPaid = paidInput.checked;
       manualRename = out.rename || null;
       manualHadName = hadName;
       setMode('one');
@@ -810,7 +822,7 @@
       } else {
         boardCard.prepend(boardHead);
         side.prepend(tabBar);
-        (wide ? [boardCard, side] : [side, boardCard, foot]).forEach(n => layout.appendChild(n));
+        (wide ? [side, boardCard] : [side, boardCard, foot]).forEach(n => layout.appendChild(n));
       }
       labelTabs();
       placeClaim();
@@ -877,7 +889,7 @@
       if (document.querySelector('.pick-dialog, .connect-layer')) return true;
       const a = document.activeElement;
       if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && a.type !== 'checkbox' && main.contains(a)) return true;
-      return !!formWrap.querySelector('#p-name').value || !!formWrap.querySelector('#p-count').value || !!(pasteBox && pasteBox.value);
+      return !!nameInput.value || !!countInput.value || !!(pasteBox && pasteBox.value);
     }
 
     // Poll for changes made on another device (the iPad and the PC are often
