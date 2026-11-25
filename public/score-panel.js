@@ -7,7 +7,7 @@
   'use strict';
 
   const SBS = window.SBS = window.SBS || {};
-  const { el, textEl, escapeHtml, money, showAlert, showConfirm, overlayEl, teamBadge, fitTeamBadges, isPhone } = SBS.ui;
+  const { el, textEl, escapeHtml, money, showAlert, showConfirm, openSheet, teamBadge, fitTeamBadges, isPhone } = SBS.ui;
   const GL = window.GameLogic;
   const { QUARTERS, QLABEL } = GL;
 
@@ -64,40 +64,6 @@
     return copy;
   }
 
-  // A small dialog on top of everything. `build(box, close)` fills it. Escape and a tap outside
-  // close it. Nothing in it has focus unless build says so, so a stray Enter confirms nothing.
-  function openSheet(title, build) {
-    const back = document.activeElement;
-    const overlay = overlayEl('0.72');
-    overlay.classList.add('sp-overlay');
-    const box = el('div', 'card sp-sheet');
-    box.setAttribute('role', 'dialog');
-    box.setAttribute('aria-modal', 'true');
-    box.setAttribute('aria-label', title);
-    box.tabIndex = -1;
-    box.appendChild(textEl('h3', '', title));
-    const close = () => {
-      if (!overlay.parentNode) return;
-      overlay.remove();
-      if (back && document.body.contains(back) && back.focus) back.focus();
-    };
-    overlay.addEventListener('click', (e) => { e.stopPropagation(); if (e.target === overlay) close(); });
-    overlay.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
-      if (e.key !== 'Tab') return;
-      const all = Array.from(box.querySelectorAll('button, input')).filter(n => !n.disabled);
-      const first = all[0];
-      const last = all[all.length - 1];
-      if (e.shiftKey && (document.activeElement === first || document.activeElement === box)) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-    });
-    SBS.onLeaveScreen(close);
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-    box.focus();
-    build(box, close);
-    return close;
-  }
   function sheetButtons(noText, yesText, onNo, onYes) {
     const row = el('div', 'sp-sheet-actions');
     const no = textEl('button', 'sp-btn', noText);

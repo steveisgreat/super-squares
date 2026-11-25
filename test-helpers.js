@@ -364,6 +364,9 @@ function standIn() {
 }
 
 const TAP = { op: 'add', side: 'a', points: 7 };
+const PAY = { op: 'paid', name: 'Ann', paidSquares: 100, have: 100, was: 0 };
+const SQUARES_OPS = [PAY, { op: 'claim', name: 'Eve', squares: [1], have: 0 }, { op: 'claim', name: 'Eve', count: 1, have: 0 },
+  { op: 'removeUnpaid', name: 'Ann', have: 100, unpaid: 100 }, { op: 'picks', on: true, max: 9 }];
 const refused = 'That code is wrong, used or expired. Ask the host for a new one.';
 
 async function accountsRoutes() {
@@ -428,6 +431,7 @@ async function accountsRoutes() {
     ['POST', '/api/tv/pair', { code: 'ABCDEF', gameId: GAME_A }], ['POST', '/api/tv/follow', { gameId: GAME_A }], ['GET', '/api/tv/mine'],
     ['GET', '/api/theme'], ['PUT', '/api/theme', { theme: 'x' }], ['GET', '/api/news'], ['PUT', '/api/news', { news: true }],
     ['POST', '/api/session/revoke-all'],
+    ...[GAME_A2, GAME_B, GAME_NONE].flatMap(g => SQUARES_OPS.map(op => ['PATCH', `/api/game/${g}/squares`, op])),
     ['PATCH', `/api/game/${GAME_A2}/score`, TAP], ['PATCH', `/api/game/${GAME_B}/score`, TAP], ['PATCH', `/api/game/${GAME_NONE}/score`, TAP]
   ];
   for (const [name, jobs] of [['scorekeeper', {}], ['squares manager', { canScore: false, canSquares: true }], ['helper with both jobs', { canSquares: true }]]) {
@@ -448,6 +452,80 @@ async function accountsRoutes() {
     for (const op of [TAP, { op: 'set', a: 1, b: 2 }, { op: 'end' }, { op: 'final' }, { op: 'undo' }, { op: 'resume' }, { op: 'edit', quarter: 'q1', a: 1, b: 2 }, { op: 'draw' }]) {
       eq((await call('PATCH', `/api/game/${GAME_A}/score`, { cookie: h.cookie, body: op })).statusCode, 401, op.op);
     }
+  });
+
+  const squares = (cookie, op, id, headers) => call('PATCH', `/api/game/${id || GAME_A}/squares`, { cookie, body: op, headers });
+
+  await test('a scorekeeper, a guest and a signed-out phone cannot touch squares, picks or paid marks', async () => {
+    const h = await join();
+    const before = t.db.writes;
+    for (const cookie of [h.cookie, undefined, 'sbs_guest=abc', 'sbs_helper=' + secret()]) {
+      for (const id of [GAME_A, GAME_PICKING]) {
+        for (const op of SQUARES_OPS) eq((await squares(cookie, op, id)).statusCode, 401, `${op.op} on ${id}`);
+      }
+    }
+    eq(t.db.writes, before, 'nothing written');
+  });
+
+  await test('a squares manager works on their own board; another board\'s cookie opens nothing', async () => {
+    const h = await join({ canScore: false, canSquares: true }, GAME_PICKING);
+    const r = await squares(h.cookie, { op: 'removeUnpaid', name: 'Ann', have: 100, unpaid: 100 }, GAME_PICKING);
+    eq([r.statusCode, r.json.game.squares.filter(Boolean).length], [200, 0], r.body.slice(0, 100));
+    eq((await squares(h.cookie, { op: 'claim', name: 'Bob', squares: [4, 5], have: 0 }, GAME_PICKING)).statusCode, 200, 'claim');
+    eq((await squares(h.cookie, { op: 'picks', on: true, max: 3 }, GAME_PICKING)).json.game.guestPick.max, 3, 'picks');
+    const paid = await squares(h.cookie, { op: 'paid', name: 'Bob', paidSquares: 1, have: 2, was: 0 }, GAME_PICKING);
+    eq([paid.statusCode, paid.json.name, paid.json.game.players.Bob.paidSquares], [200, 'Bob', 1], 'paid');
+    for (const id of [GAME_A, GAME_A2, GAME_B, GAME_NONE]) {
+      for (const op of SQUARES_OPS) eq((await squares(h.cookie, op, id)).statusCode, 401, `${op.op} on ${id}`);
+    }
+    eq((await squares(h.cookie, PAY, crypto.randomUUID())).statusCode, 401, 'no such board');
+  });
+
+  await test('the owner may use it too; another host may not', async () => {
+    eq((await squares(hostCookie(A), PAY)).statusCode, 200, 'owner');
+    eq((await squares(hostCookie(B), PAY)).statusCode, 403, 'another host');
+    eq((await squares(hostCookie(A), PAY, GAME_NONE)).statusCode, 403, 'a board nobody owns');
+    eq((await squares(hostCookie(A, 9), PAY)).statusCode, 401, 'an old session');
+  });
+
+  await test('squares ops carry nothing but themselves, and a locked board takes paid marks only', async () => {
+    const h = await join({ canScore: false, canSquares: true });
+    const r = await squares(h.cookie, Object.assign({ squares: [], players: {}, squarePrice: 0, status: 'picking', owner_id: B }, PAY));
+    eq(r.statusCode, 200, r.body);
+    const doc = t.db.games[GAME_A].doc;
+    eq([doc.squarePrice, doc.status, doc.squares.length, doc.players.Ann.paid, 'owner_id' in doc, 'owner_id' in r.json.game], [10, 'started', 100, true, false, false], 'untouched');
+    for (const op of SQUARES_OPS.slice(1)) {
+      const x = await squares(h.cookie, op);
+      eq([x.statusCode, /locked/.test(x.json.error)], [409, true], op.op);
+    }
+    eq((await squares(h.cookie, { op: 'lock' })).statusCode, 400, 'unknown');
+    eq((await call('PATCH', `/api/game/${GAME_A}/squares`, { cookie: h.cookie, body: Object.assign({ pad: 'x'.repeat(5000) }, PAY) })).statusCode, 413, 'size');
+  });
+
+  await test('a squares job switched off, removed, or signed out everywhere ends at the next request', async () => {
+    for (const end of ['off', 'remove', 'revoke']) {
+      const h = await join({ canScore: true, canSquares: true });
+      eq((await squares(h.cookie, PAY)).statusCode, 200, `${end}: before`);
+      const one = `${base()}/${h.id}`;
+      const owner = { cookie: hostCookie(A, t.db.hosts[A]) };
+      if (end === 'off') await call('PATCH', one, Object.assign({ body: { canScore: true, canSquares: false } }, owner));
+      if (end === 'remove') await call('DELETE', one, owner);
+      if (end === 'revoke') await call('POST', '/api/session/revoke-all', owner);
+      eq((await squares(h.cookie, PAY)).statusCode, 401, `${end}: after`);
+      eq((await tap(h.cookie)).statusCode, end === 'off' ? 200 : 401, `${end}: the other job`);
+    }
+  });
+
+  await test('the score survives a paid mark', async () => {
+    const h = await join({ canScore: false, canSquares: true });
+    Object.assign(t.db.games[GAME_A].doc, { scoring: 'manual', liveScore: { manual: true, a: 7, b: 3, period: 2, state: 'in' } });
+    const r = await squares(h.cookie, PAY);
+    eq([r.statusCode, r.json.game.liveScore.a, t.db.games[GAME_A].doc.liveScore.b], [200, 7, 3], r.body.slice(0, 100));
+    // A score merged on read (here a simulation) is in the answer too, and the mark is stored.
+    const plan = { startedAt: new Date(Date.now() - 5000).toISOString(), events: [{ team: 'a', atMs: 1, points: 7 }] };
+    Object.assign(t.db.games[GAME_A].doc, { scoring: 'simulation', simulation: true, simPlan: plan, liveScore: null, players: { Ann: { paid: false } } });
+    const sim = await squares(h.cookie, PAY);
+    eq([sim.statusCode, sim.json.game.liveScore.a, t.db.games[GAME_A].doc.players.Ann.paid], [200, 7, true], sim.body.slice(0, 100));
   });
 
   await test('score ops cannot carry anything but a score', async () => {
@@ -605,19 +683,122 @@ async function accountsRoutes() {
     }
     const cookie = phoneCookie(await call('POST', '/api/helper', { body: { token: made.token } }));
     eq((await call('PATCH', `/api/game/${GAME_A}/score`, { cookie, body: TAP, headers })).statusCode, 403, 'score');
+    const manager = await join({ canScore: false, canSquares: true });
+    for (const op of SQUARES_OPS) eq((await squares(manager.cookie, op, GAME_A, headers)).statusCode, 403, op.op);
+    eq(t.db.games[GAME_A].doc.players.Ann.paid, false, 'not paid');
   });
 
   await test('a broken sign-in setup lets no helper in', async () => {
-    const { cookie } = await join();
+    const { cookie } = await join({ canSquares: true });
     const { token } = await add();
     for (const broken of [{ ...ACCOUNTS_ENV, AUTH_MODE: 'acounts' }, { VERCEL: '1' }, { ...ACCOUNTS_ENV, SESSION_SECRET: 'short' }]) {
       setEnv(broken);
       eq(auth.authMode(), 'misconfigured', 'mode');
       eq((await call('POST', '/api/helper', { body: { token } })).statusCode, 503, 'redeem');
       eq((await tap(cookie)).statusCode, 503, 'score');
+      eq((await squares(cookie, PAY)).statusCode, 503, 'squares');
       eq((await call('POST', base(), { cookie: hostCookie(A) })).statusCode, 503, 'add');
       eq((await call('GET', `/api/game/${GAME_A}/role`, { cookie })).json, { role: 'none' }, 'role');
     }
+  });
+}
+
+// The squares route over a real store, in password mode: rules judged in the document the write is
+// conditional on. `s` takes the place of the store behind the routes; `made(id)` notes a board to delete.
+async function squaresRace(label, s, made) {
+  const real = {};
+  const names = ['getGame', 'updateGame', 'createGame', 'createHelper', 'useHelperToken', 'helperAccess', 'setHelperJobs', 'removeHelper', 'listHelpers', 'assignJoinCode'];
+  const open = { status: 'picking', axisX: null, axisY: null, squares: new Array(100).fill(null), players: {} };
+  const start = async (extra, jobs) => {
+    const g = await s.createGame(Object.assign(board(), open, extra), null);
+    made(g.id);
+    const token = secret();
+    // Not a player, no squares on the board.
+    await s.createHelper({ gameId: g.id, hostVersion: null, label: 'Pat', canScore: false, canSquares: true, tokenHash: hash(token), tokenSeconds: 300, max: 5 });
+    const cookie = phoneCookie(await call('POST', '/api/helper', { body: { token } }));
+    return { id: g.id, send: (op) => call('PATCH', `/api/game/${g.id}/squares`, { cookie, body: op }) };
+  };
+  // Another device's save lands between the route's read and its write, once.
+  const between = (change) => {
+    store.getGame = async (id) => {
+      const g = await s.getGame(id);
+      store.getGame = s.getGame;
+      const other = JSON.parse(JSON.stringify(g));
+      change(other);
+      assert((await s.updateGame(id, other, g.updatedAt)).ok, 'the other save');
+      return g;
+    };
+  };
+  const heldBy = (g, n) => g.squares.filter(x => x && x.name === n).length;
+  const lock = (g) => { g.status = 'started'; g.axisX = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]; g.axisY = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]; };
+  const gus = { squares: new Array(100).fill(null).map((x, i) => (i < 3 ? { name: 'Gus', at: 100 + i } : null)), players: { Gus: { paid: false } } };
+  const test = (name, fn) => check(`${label}: ${name}`, async () => {
+    setEnv({ HOST_PASSWORD: 'correct horse' });
+    names.forEach(n => { real[n] = store[n]; store[n] = s[n]; });
+    try { await fn(); } finally { names.forEach(n => { store[n] = real[n]; }); }
+  });
+
+  await test('a non-player manages a board with no squares yet', async () => {
+    const b = await start();
+    eq((await b.send({ op: 'picks', on: true, max: 4 })).statusCode, 200, 'picks');
+    eq((await b.send({ op: 'claim', name: 'Gus', count: 3, have: 0 })).statusCode, 200, 'claim');
+    eq((await b.send({ op: 'paid', name: 'Gus', paidSquares: 1, have: 3, was: 0 })).statusCode, 200, 'paid');
+    eq((await b.send({ op: 'removeUnpaid', name: 'Gus', have: 3, unpaid: 2 })).statusCode, 200, 'remove');
+    const g = await s.getGame(b.id);
+    eq([heldBy(g, 'Gus'), g.players.Gus.paid, g.guestPick.max], [1, true, 4], 'stored');
+  });
+
+  await test('a lock in between refuses everything but a paid mark', async () => {
+    for (const op of [{ op: 'claim', name: 'Eve', count: 1, have: 0 }, { op: 'claim', name: 'Eve', squares: [50], have: 0 },
+      { op: 'removeUnpaid', name: 'Gus', have: 3, unpaid: 3 }, { op: 'picks', on: true, max: 4 }]) {
+      const b = await start(gus);
+      between(lock);
+      eq((await b.send(op)).statusCode, 409, op.op);
+      const g = await s.getGame(b.id);
+      eq([g.status, heldBy(g, 'Gus'), heldBy(g, 'Eve'), g.guestPick], ['started', 3, 0, undefined], op.op);
+    }
+    const b = await start(gus);
+    between(lock);
+    eq((await b.send({ op: 'paid', name: 'Gus', paidSquares: 3, have: 3, was: 0 })).statusCode, 200, 'paid');
+    const g = await s.getGame(b.id);
+    eq([g.status, g.players.Gus.paid, !!g.axisX], ['started', true, true], 'the lock stays');
+  });
+
+  await test('a paid mark in between saves the squares it paid for', async () => {
+    const b = await start(gus);
+    between(g => { g.players.Gus = { paid: false, paidSquares: 1 }; });
+    eq((await b.send({ op: 'removeUnpaid', name: 'Gus', have: 3, unpaid: 3 })).statusCode, 409, 'refused');
+    eq(heldBy(await s.getGame(b.id), 'Gus'), 3, 'squares');
+  });
+
+  await test('two devices: one square, one mark; nothing is done twice', async () => {
+    const b = await start();
+    const claim = { op: 'claim', name: 'Gus', count: 3, have: 0 };
+    const twice = await Promise.all([b.send(claim), b.send(claim)]);
+    eq(twice.map(r => r.statusCode).sort(), [200, 409], 'the same claim sent twice');
+    eq(heldBy(await s.getGame(b.id), 'Gus'), 3, 'claimed once');
+    const g0 = await s.getGame(b.id);
+    const free = g0.squares.findIndex(x => !x);
+    const race = await Promise.all(['Ann', 'Bob'].map(name => b.send({ op: 'claim', name, squares: [free], have: 0 })));
+    eq(race.map(r => r.statusCode).sort(), [200, 409], 'one square');
+    eq(race.find(r => r.statusCode === 409).json.taken, [free], 'names it');
+    const gone = { op: 'removeUnpaid', name: 'Gus', have: 3, unpaid: 3 };
+    const removed = await Promise.all([b.send(gone), b.send(gone)]);
+    eq(removed.map(r => r.statusCode).sort(), [200, 409], 'the same removal sent twice');
+    eq(heldBy(await s.getGame(b.id), 'Gus'), 0, 'removed once');
+  });
+
+  await test('different people served at once all get through', async () => {
+    const b = await start();
+    const got = await Promise.all([0, 1, 2, 3].map(n => b.send({ op: 'claim', name: `P${n}`, count: 2, have: 0 })));
+    eq(got.map(r => r.statusCode), [200, 200, 200, 200], 'all');
+    eq((await s.getGame(b.id)).squares.filter(Boolean).length, 8, 'squares');
+  });
+
+  await test('a board deleted in between is gone', async () => {
+    const b = await start(gus);
+    store.getGame = async () => null;
+    eq((await b.send({ op: 'paid', name: 'Gus', paidSquares: 1, have: 3, was: 0 })).statusCode, 404, 'deleted');
   });
 }
 
@@ -736,6 +917,8 @@ async function fsRoutes() {
     eq(r.json, { gameId: g.id }, 'scan');
     eq((await call('GET', `/api/game/${g.id}/role`, { cookie: phoneCookie(r) })).json.canScore, true, 'the phone knows its job');
     eq((await call('GET', `/api/game/${g.id}/helpers`)).json.helpers.map(h => h.connected), [true], 'status');
+    eq((await call('PATCH', `/api/game/${g.id}/squares`, { body: PAY })).statusCode, 200, 'squares');
+    eq((await call('GET', `/api/game/${g.id}/squares`)).statusCode, 404, 'no read there');
   });
 
   await check('other methods and the retired hand-off routes are not found', async () => {
@@ -775,6 +958,7 @@ async function main() {
   });
   await accountsRoutes();
   await fsRoutes();
+  await squaresRace('fs squares', Object.assign({}, store), (id) => createdFs.push(id));
   setEnv({});
 
   if (PG_URL) {
@@ -793,6 +977,7 @@ async function main() {
       };
       await storeContract('pg accounts', pg, { accounts: true, version: host.session_version, newGame: newGame(host.id) });
       await storeContract('pg password', pg, { accounts: false, version: null, newGame: newGame(null) });
+      await squaresRace('pg squares', pg, (id) => games.push(id));
 
       const add = (g, v, tokenHash) => pg.createHelper({ gameId: g, hostVersion: v, label: 'Dana', canScore: true, canSquares: false, tokenHash, tokenSeconds: 300, max: 5 }, T0);
 

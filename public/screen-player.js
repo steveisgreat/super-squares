@@ -585,13 +585,15 @@
     return { root, render, start, followName };
   }
 
-  // Tabler "layout-grid" and "scoreboard" (MIT, 24 px outline).
+  // Tabler "layout-grid", "scoreboard" and "users" (MIT, 24 px outline).
   const tabSvg = (paths) => `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
   const GRID_ICON = tabSvg('<path d="M4 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M14 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M4 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M14 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/>');
   const SCORE_ICON = tabSvg('<path d="M3 5m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"/><path d="M12 5v2"/><path d="M12 10v1"/><path d="M12 14v1"/><path d="M12 18v1"/><path d="M7 3v2"/><path d="M17 3v2"/><path d="M15 10.5v3a1.5 1.5 0 0 0 3 0v-3a1.5 1.5 0 0 0 -3 0z"/><path d="M6 9h1.5a1.5 1.5 0 0 1 0 3h-.5h.5a1.5 1.5 0 0 1 0 3h-1.5"/>');
 
+  const PLAYERS_ICON = tabSvg('<path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0 -3 -3.85"/>');
+
   // The helper's side of Player View (decision 025 section 2): a welcome once, then a tab per job.
-  // ctx: { id, route, wrap, header, game(), setGame(g), redraw(), selected(), choose(name) }.
+  // ctx: { id, route, wrap, header, game(), setGame(g), redraw(), saved(), selected(), choose(name) }.
   // Opening a tab changes nothing on the server; the jobs come from GET …/role. The first tab is this
   // page as any player sees it, and no job is needed to see it. The name chosen here is display only:
   // a helper need not be playing, and nothing is authorized by a name.
@@ -619,27 +621,45 @@
       setGame: ctx.setGame,
       patch: (gid, op) => SBS.api.patchScore(gid, op, { prompt: false }),
       // 403, not 401, when this phone happens to be signed in as some other host.
-      onError: (e) => {
-        if (e.status !== 401 && e.status !== 403) return false;
-        lost();
-        ask();
-        return true;
-      }
+      onError: (e) => lost(e, 'canScore')
+    });
+    let people = null; // the Players tab, likewise
+    const makePeople = () => SBS.playersTab.create({
+      getGame: ctx.game,
+      // Names and squares may have changed, so the whole page follows, not only the score.
+      setGame: (g) => { ctx.setGame(g); ctx.redraw(); ctx.saved(); },
+      patch: (op) => SBS.api.patchSquares(ctx.id, op),
+      reload: () => SBS.api.getGame(ctx.id).catch(() => null),
+      onError: (e) => lost(e, 'canSquares')
     });
 
     const isOpen = () => ctx.game().status === 'started' || ctx.game().status === 'finished';
-    const jobNames = () => [role && role.canScore ? 'Scorekeeper' : ''].filter(Boolean).join(' and ');
+    // Each job is a tab, in this order after the first one.
+    const JOBS = [
+      { key: 'canScore', tab: 'score', label: 'Score', icon: SCORE_ICON, title: 'Scorekeeper', off: 'scorekeeping',
+        lost: 'keep score', duty: ['Keep score', 'Tap what happens. End each quarter.'] },
+      { key: 'canSquares', tab: 'players', label: 'Players', icon: PLAYERS_ICON, title: 'Squares manager', off: 'managing squares',
+        lost: 'manage squares', duty: ['Manage squares', 'Help people pick, and mark who has paid.'] }
+    ];
+    const held = () => JOBS.filter(j => role && role[j.key]);
+    const jobNames = () => held().map(j => j.title).join(' and ');
+    let told = null; // the job the note says is gone
 
     function say(text) {
       note.textContent = text || '';
       note.hidden = !text;
     }
-    function lost() {
-      role = null;
-      say('You no longer keep score on this board. If that is a mistake, ask the host for a new code.');
-      tab = 'mine';
+    // A save was refused: that job is over. 403 when this phone is also signed in as another host.
+    // Only its tab goes; the server says what is left.
+    function lost(e, job) {
+      if (e.status !== 401 && e.status !== 403) return false;
+      if (role) role = Object.assign({}, role, { [job]: false });
+      told = job;
+      say(`You no longer ${JOBS.find(j => j.key === job).lost} on this board. If that is a mistake, ask the host for a new code.`);
       draw();
       ctx.redraw();
+      ask();
+      return true;
     }
 
     async function ask() {
@@ -654,32 +674,44 @@
       const before = role;
       const isHelper = r.canScore !== undefined;
       role = isHelper ? r : null;
-      if (isHelper && note.textContent && r.canScore) say('');
+      if (isHelper && told && (told === 'all' ? held().length : r[told])) { told = null; say(''); }
       if (!isHelper && flag.get(ctx.id)) {
         flag.forget(ctx.id);
         ctx.route.helper = false;
+        told = 'all';
         say('You no longer help on this board. If that is a mistake, ask the host for a new code.');
       } else if (isHelper && !flag.get(ctx.id)) {
         flag.set(ctx.id, 'new');
       }
       if (wanted && role && role.canScore) { tab = wanted; }
       wanted = null;
-      if (before && role && before.canScore && !role.canScore) { role = r; say('The host switched off scorekeeping on this phone.'); }
+      const gone = before && role ? JOBS.filter(j => before[j.key] && !role[j.key]) : [];
+      if (gone.length) {
+        told = gone.length > 1 ? 'all' : gone[0].key;
+        say(`The host switched off ${gone.map(j => j.off).join(' and ')} on this phone.`);
+      }
       if (JSON.stringify(before) !== JSON.stringify(role)) { draw(); ctx.redraw(); }
     }
 
     function draw() {
       if (!ctx.game()) return;
-      if (tab === 'score' && !(role && role.canScore)) tab = 'mine';
-      const welcome = !!role && role.canScore && flag.get(ctx.id) === 'new';
-      const hasTabs = !!role && role.canScore && !welcome;
+      const job = held().find(j => j.tab === tab);
+      if (!job) tab = 'mine';
+      if (people && tab !== 'players') people.close();
+      const welcome = held().length > 0 && flag.get(ctx.id) === 'new';
+      const hasTabs = held().length > 0 && !welcome;
       ctx.wrap.classList.toggle('on-job', welcome || (hasTabs && tab !== 'mine'));
       ctx.wrap.classList.toggle('has-tabs', hasTabs);
       nav.hidden = !hasTabs;
-      pane.hidden = !(welcome || (hasTabs && tab === 'score'));
+      pane.hidden = !(welcome || (hasTabs && tab !== 'mine'));
       if (welcome) return drawWelcome();
       if (hasTabs) drawNav();
       if (pane.hidden) return pane.replaceChildren();
+      if (tab === 'players') {
+        if (!people) people = makePeople();
+        if (pane.firstChild !== people.el) pane.replaceChildren(people.el);
+        return people.update();
+      }
       if (!isOpen()) {
         const wait = el('div', 'card player-card helper-wait');
         wait.append(textEl('h2', '', "Scoring isn't open yet"), textEl('p', 'player-muted', 'It opens here by itself when the host locks the board and the numbers are drawn.'));
@@ -692,7 +724,7 @@
 
     function drawNav() {
       const had = nav.contains(document.activeElement);
-      nav.replaceChildren(...[['mine', ctx.selected() ? 'My squares' : 'Board', GRID_ICON], ['score', 'Score', SCORE_ICON]].map(([k, label, icon]) => {
+      nav.replaceChildren(...[['mine', ctx.selected() ? 'My squares' : 'Board', GRID_ICON], ...held().map(j => [j.tab, j.label, j.icon])].map(([k, label, icon]) => {
         const b = el('button', 'helper-tab', `${icon}<span>${label}</span>`);
         b.type = 'button';
         if (k === tab) b.setAttribute('aria-current', 'page');
@@ -710,10 +742,12 @@
 
     // Once: what they may do, and whose squares are theirs.
     function drawWelcome() {
-      if (pane.querySelector('.helper-welcome')) return; // a poll must not close an open list
+      const shown = pane.querySelector('.helper-welcome');
+      if (shown && shown.dataset.jobs === jobNames()) return; // a poll must not close an open list
       const card = el('div', 'card player-card helper-welcome');
+      card.dataset.jobs = jobNames();
       card.appendChild(textEl('h2', '', 'You were asked to help run this board'));
-      const duties = [['Keep score', 'Tap what happens. End each quarter.']];
+      const duties = held().map(j => j.duty);
       duties.push(['Your own squares stay here', 'Switch any time with the tabs at the bottom. Not playing? You still see the board.']);
       duties.forEach(([name, text]) => {
         const d = el('div', 'helper-duty');
@@ -738,7 +772,7 @@
       go.addEventListener('click', () => {
         flag.set(ctx.id, 'ok');
         ctx.choose(select.value || null);
-        tab = role && role.canScore && isOpen() ? 'score' : 'mine';
+        tab = role && role.canScore && isOpen() ? 'score' : role && role.canSquares ? 'players' : 'mine';
         pane.replaceChildren();
         draw();
         ctx.redraw();
@@ -751,9 +785,10 @@
     return {
       ask, draw,
       maybe,
-      onScore: () => tab === 'score' && !pane.hidden,
-      busy: () => !!pad && pad.busy(),
-      saved: () => { if (pad) pad.clearUndo(); }, // another device saved: what was scored here may not undo cleanly
+      onJob: () => tab !== 'mine' && !pane.hidden,
+      busy: () => (!!pad && pad.busy()) || (!!people && people.busy()),
+      // Another device saved: what was done here may not undo cleanly.
+      saved: () => { if (pad) pad.clearUndo(); if (people) people.clearUndo(); },
       line: () => (role && jobNames() ? [ctx.selected(), jobNames()].filter(Boolean).join(' · ') : '')
     };
   }
@@ -1084,6 +1119,7 @@
             game: () => game,
             setGame: (g) => { game = g; drawHeader(); drawBody(); }, // a later poll finds nothing new to draw
             redraw: () => drawAll(),
+            saved: () => { if (panel) panel.followName(); },
             selected: () => selectedPlayer,
             choose: (name) => { selectedPlayer = name; saveSelectedPlayer(name); }
           });
@@ -1130,9 +1166,9 @@
     // read-only "how am I doing" panel nobody can tell the difference.
     // The host's own board and the TV stay fast; there is exactly one of each.
     SBS.setManagedInterval(() => load(false), 15000);
-    // A helper keeping score stays in step with the host's screens. Whether the job still stands is
+    // A helper at work stays in step with the host's screens. Whether the job still stands is
     // asked on load, when the phone is shown again, on a tab tap and after a refusal: never on a timer.
-    SBS.setManagedInterval(() => { if (helper && helper.onScore() && !document.hidden) load(false); }, 5000);
+    SBS.setManagedInterval(() => { if (helper && helper.onJob() && !document.hidden) load(false); }, 5000);
     const onShow = () => { if (!document.hidden && helper && helper.maybe()) helper.ask(); };
     document.addEventListener('visibilitychange', onShow);
     SBS.onLeaveScreen(() => document.removeEventListener('visibilitychange', onShow));

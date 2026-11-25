@@ -965,8 +965,43 @@
   const PASTE_ICON = ic('<path d="M19 8h-14"/><path d="M5 12h9"/><path d="M11 16h-6"/><path d="M15 16h6"/><path d="M18 13v6"/>');
   const CLOSE_ICON = ic('<path d="M18 6l-12 12"/><path d="M6 6l12 12"/>');
 
+  // A small dialog on top of everything. `build(box, close)` fills it. Escape and a tap outside
+  // close it. Nothing in it has focus unless build says so, so a stray Enter confirms nothing.
+  function openSheet(title, build) {
+    const back = document.activeElement;
+    const overlay = overlayEl('0.72');
+    overlay.classList.add('sp-overlay');
+    const box = el('div', 'card sp-sheet');
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', title);
+    box.tabIndex = -1;
+    box.appendChild(textEl('h3', '', title));
+    const close = () => {
+      if (!overlay.parentNode) return;
+      overlay.remove();
+      if (back && document.body.contains(back) && back.focus) back.focus();
+    };
+    overlay.addEventListener('click', (e) => { e.stopPropagation(); if (e.target === overlay) close(); });
+    overlay.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+      if (e.key !== 'Tab') return;
+      const all = Array.from(box.querySelectorAll('button, input')).filter(n => !n.disabled && n.offsetParent !== null);
+      const first = all[0];
+      const last = all[all.length - 1];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === box)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+    SBS.onLeaveScreen(close);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    box.focus();
+    build(box, close);
+    return close;
+  }
+
   SBS.ui = {
-    el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake, keepPartyAwake, partyHistory,
+    openSheet, el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake, keepPartyAwake, partyHistory,
     showModal, showConfirm, showAlert, disturbMessage, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin, signInConsent,
     shownDescription, topbar, HOME_ICON, statusLabel, isTvBrowser, isPhone,
     formatKickoffTime, kickoffNotice,

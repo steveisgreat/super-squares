@@ -1332,9 +1332,127 @@
     return { game: g, name, changed: true };
   }
 
+  // ---------- Squares manager (R38, decision 025) ----------
+  // One operation by the host's helper (or the host). Returns { game, name, changed } (a fresh copy;
+  // the input is never mutated), with `removed` indexes for removeUnpaid, or { error, code } with code
+  // 'invalid' (HTTP 400) or 'illegal' (409); a refusal over taken squares carries `taken`.
+  // ctx = { now (ms), random (optional, for tests) }.
+  //   claim        { name, squares, have }              all or nothing; all already theirs counts as done
+  //   claim        { name, count, have }                random open squares
+  //   removeUnpaid { name, have, unpaid }               exactly the squares not paid for
+  //   paid         { name, paidSquares, have, was }     how many of their squares are paid for
+  //   picks        { on, max }                          either one, or both
+  // `have` is how many squares the screen shows for that name, `unpaid` and `was` how many of them are
+  // unpaid and paid: anything else now is refused, so a retry or a stale screen never acts twice.
+  // Everything but `paid` is before lock only. Only `squares`, `players` and `guestPick` ever change,
+  // and whoever asks needs no name or square of their own.
+  function applySquaresOp(game, op, ctx) {
+    const c = ctx || {};
+    const now = typeof c.now === 'number' ? c.now : Date.now();
+    const random = typeof c.random === 'function' ? c.random : Math.random;
+    const refuse = (error, extra) => Object.assign(failure('illegal', error), extra);
+    const moved = 'This board changed since your screen updated. Check it and try again.';
+
+    if (!isRecord(op)) return failure('invalid', 'Squares operation must be an object.');
+    const known = ['claim', 'removeUnpaid', 'paid', 'picks'];
+    if (known.indexOf(op.op) === -1) return failure('invalid', 'Unknown squares operation.');
+    const bySquares = op.squares !== undefined;
+    if (op.op === 'picks') {
+      if (op.on === undefined && op.max === undefined) return failure('invalid', 'Say what to change.');
+      if (op.on !== undefined && typeof op.on !== 'boolean') return failure('invalid', 'Player picks are on or off.');
+      if (op.max !== undefined && (!Number.isInteger(op.max) || op.max < 1 || op.max > 100)) return failure('invalid', 'The limit must be a whole number from 1 to 100.');
+    } else {
+      if (typeof op.name !== 'string') return failure('invalid', 'Say who the squares are for.');
+      if (!isWhole(op.have, 100)) return failure('invalid', 'Say how many squares they have.');
+      if (op.op === 'claim') {
+        if (bySquares === (op.count !== undefined)) return failure('invalid', 'Pick squares, or a count of squares.');
+        if (bySquares && !validSquareList(op.squares)) return failure('invalid', 'Pick from 1 to 100 different squares of the grid.');
+        if (!bySquares && (!isWhole(op.count, 100) || op.count < 1)) return failure('invalid', 'The count must be a whole number from 1 to 100.');
+      }
+      if (op.op === 'removeUnpaid' && (!isWhole(op.unpaid, 100) || op.unpaid < 1)) return failure('invalid', 'Say how many squares are not paid for.');
+      if (op.op === 'paid' && (!isWhole(op.paidSquares, 100) || !isWhole(op.was, 100))) return failure('invalid', 'Say how many squares are paid for.');
+    }
+
+    if (!game || !Array.isArray(game.squares)) return refuse('That board is not ready.');
+    if (op.op !== 'paid' && (game.status !== 'picking' || cutoffPassed(game, now))) {
+      return refuse(game.status === 'setup' ? "Picking isn't open yet." : "The board is locked, so squares can't move. You can still mark people paid.");
+    }
+
+    const g = JSON.parse(JSON.stringify(game));
+    if (!isRecord(g.players)) g.players = {};
+
+    if (op.op === 'picks') {
+      const before = Object.assign({ on: false, max: DEFAULT_GUEST_MAX, liftAt: null, lifted: false }, isRecord(g.guestPick) ? g.guestPick : null);
+      g.guestPick = Object.assign({}, before);
+      if (op.on !== undefined) g.guestPick.on = op.on;
+      if (op.max !== undefined) g.guestPick.max = op.max;
+      return { game: g, name: null, changed: g.guestPick.on !== before.on || g.guestPick.max !== before.max };
+    }
+
+    const held = squaresOf(g, op.name);
+
+    if (op.op === 'paid') {
+      if (!held.length || op.have !== held.length || op.paidSquares > held.length) return refuse(moved);
+      const current = paidSquareCount(g, op.name);
+      if (current === op.paidSquares) return { game: g, name: op.name, changed: false };
+      if (current !== op.was) return refuse(moved);
+      writePaid(g, op.name, op.paidSquares, held.length);
+      return { game: g, name: op.name, changed: true };
+    }
+
+    if (op.op === 'removeUnpaid') {
+      const unpaid = unpaidSquares(g);
+      const drop = held.filter(i => unpaid.has(i));
+      if (!drop.length || op.have !== held.length || op.unpaid !== drop.length) return refuse(moved);
+      const left = held.length - drop.length;
+      drop.forEach(i => { g.squares[i] = null; });
+      if (left) writePaid(g, op.name, left, left); else delete g.players[op.name];
+      return { game: g, name: op.name, changed: true, removed: drop };
+    }
+
+    const mode = g.pickMode || 'both';
+    if (!bySquares && mode === 'manual') return refuse('This board is Manual Only: pick the squares one by one.');
+    if (bySquares && mode === 'auto') return refuse('This board is Auto Only: add a number of squares.');
+
+    // Someone already on the board, by exactly that name, or someone new whose name nobody could
+    // mistake for theirs.
+    let name = op.name;
+    if (!held.length) {
+      const clean = cleanGuestName(op.name);
+      if (clean.error) return failure('invalid', clean.error);
+      name = clean.name;
+      const key = nameKey(name);
+      const same = g.squares.find(s => s && s.name !== name && nameKey(s.name) === key);
+      if (same) return refuse(`${same.name} already has squares. Choose ${same.name} to add to theirs, or add a last initial.`);
+    }
+    const mine = squaresOf(g, name);
+
+    let fresh;
+    if (bySquares) {
+      const taken = op.squares.filter(i => g.squares[i] && g.squares[i].name !== name);
+      if (taken.length) return refuse('Some of those squares were just taken.', { taken });
+      fresh = op.squares.filter(i => g.squares[i] === null);
+      if (!fresh.length) return { game: g, name, changed: false };
+    }
+    if (op.have !== mine.length) return refuse(op.have ? moved : `${name} already has squares. Choose ${name} to add to theirs, or add a last initial.`);
+    if (!bySquares) {
+      const open = [];
+      g.squares.forEach((s, i) => { if (!s) open.push(i); });
+      if (op.count > open.length) return refuse(!open.length ? 'No squares are open.' : open.length === 1 ? 'Only 1 square is open.' : `Only ${open.length} squares are open.`);
+      for (let i = 0; i < op.count; i++) {
+        const j = i + Math.floor(random() * (open.length - i));
+        [open[i], open[j]] = [open[j], open[i]];
+      }
+      fresh = open.slice(0, op.count);
+    }
+    hostAddSquares(g, name, fresh, false, Math.floor(now / 1000));
+    if (!g.players[name].color) g.players[name].color = pickPlayerColor(g.players);
+    return { game: g, name, changed: true };
+  }
+
   return {
     PLAYER_COLORS, pickPlayerColor,
-    applyGuestOp, guestCap, guestNameOf, paidSquareCount, unpaidSquares, cleanGuestName, nameKey,
+    applyGuestOp, applySquaresOp, guestCap, guestNameOf, paidSquareCount, unpaidSquares, cleanGuestName, nameKey,
     THEMES, isTheme, owedSummary, paidAfterAdd, hostAddSquares, setPaidCount, pruneEmptyPlayers, unpaidGuestPicks, parsePlayerList,
     QUARTERS, QLABEL, STATUSES, LEAGUES, SCORING_MODES,
     scoringMode, manualEntry, applyScoreOp, scorePlays, scoreKeyOp, inverseScoreOp, undoTarget, belowEndedQuarter, manualState, hasResult,

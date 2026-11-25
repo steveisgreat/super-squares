@@ -20,9 +20,10 @@
   const POLL_MS = 4000;
   const NAME_MAX = 10;
 
-  // The jobs on offer. The server also knows canSquares; its tab comes with R38.
+  // The jobs on offer. Each is a tab in Player View.
   const JOBS = [
-    { key: 'canScore', label: 'Keep score', words: 'keep score', text: 'Tap scores, end quarters, fix mistakes.' }
+    { key: 'canScore', label: 'Keep score', words: 'keep score', text: 'Tap scores, end quarters, fix mistakes.' },
+    { key: 'canSquares', label: 'Manage squares', words: 'manage squares', text: 'Add squares, mark who has paid, remove unpaid squares before the board locks.' }
   ];
 
   // ---------- Remembering that this phone is a helper ----------

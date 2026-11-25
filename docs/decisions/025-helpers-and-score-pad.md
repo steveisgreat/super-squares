@@ -1,7 +1,7 @@
 # 025 — Helpers: two jobs on one board, inside Player View, and one score pad
 
 **Date:** 2026-11-25 · **Status:** accepted (Steve approved the two-job design and mockup
-2026-11-25); section 6 (the score pad, R36) and the helpers and Score tab (R37) built 2026-11-25, the rest not built. The points marked *(recommended)* in section 7 can still change ·
+2026-11-25); section 6 (the score pad, R36), the helpers and Score tab (R37) and the squares manager (R38) built 2026-11-25; R39 not built. The points marked *(recommended)* in section 7 can still change ·
 **Roadmap:** R36–R39 · **Related:** 008, 009, 011, 012, 015, 016, 018 (its access and lifetime rules
 are replaced when R37 ships), 019, 020
 
@@ -137,7 +137,6 @@ boxes). That is money logic: test-first.
 - `GET …/role` may answer `host` with the helper fields too, so an owner's phone that took a code still gets its tabs.
 - Player View asks for the role only on a phone that took a code (a localStorage flag; never on a timer): on load,
   when the phone is shown again, on a tab tap and after a refusal. Guests make no extra call.
-- The Helpers screen offers Keep score only until R38 builds the Players tab; the server already stores both jobs.
 - Old `#score-<id>` links open Game Day (host), the Score tab (scorekeeper) or Player View. Old `#handoff-` links ask
   for a new code. The `/handoff` routes are gone.
 - Steve, 2026-11-25: helpers keep their own numbers, and a helper need not be playing. The first tab is Player View
@@ -146,6 +145,20 @@ boxes). That is money logic: test-first.
   playing" is a choice like a name. The tab then reads **Board**. The choice can be changed there at any time; it is
   display only and authorizes nothing.
 - "24 hours after the final" counts from the board's last save, so a late paid mark keeps a helper a little longer.
+
+### 10. As built: R38 (2026-11-25)
+- Every operation on a name carries what the screen shows: `have` (their squares) on all of them, `unpaid` (how many of those
+  are not paid for) on `removeUnpaid`, `was` (how many are paid) on `paid`. Anything else now is refused (409), so a retry, a stale screen or two
+  devices never claim, remove or mark twice. A claim of squares that are all already theirs, and a paid mark that is already so, count as done.
+- `claim` adds to someone already there only by their exact name; a near-match (020's `nameKey`) is refused, naming them. New squares start unpaid,
+  by 020's `hostAddSquares`. The board's pick mode holds; a player's own limit does not (it doesn't for the host either).
+- `picks` takes either field alone, so one device's switch never puts back another's limit. The host's lift stays the host's.
+- Remove unpaid asks first and has no Undo: a removed player-picked square loses its claim time and, with the last one, the phone that picked it.
+  Paid marks and the picks switch have Undo, which is the opposite operation and is refused once the board moved.
+- After an answer that never came, the add sheet closes and says to check the list: a second tap would count as a new request.
+- Player View's tabs and welcome come from a list of jobs, so a job that ends takes only its own tab. Neither the operations nor the
+  tab use the helper's own name or squares; a non-player works on a board with no squares yet. With both jobs, Continue opens Score once the
+  board is started, else Players.
 
 ## Consequences
 - **Deploy order:** migration 010 before R37; 011 before R39. Without them only helper features fail.

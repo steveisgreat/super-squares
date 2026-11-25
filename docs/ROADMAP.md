@@ -368,7 +368,7 @@ something sensible. Not shipped on a game day: phones already scoring need a new
 *Done:* access and lifetime tests in all auth modes and both stores; privacy page updated; scanned
 with a real iPhone and Android phone; `/code-review high` clean.
 
-**R38. Squares manager** — `Opus` (money records, access) — Depends on: R37.
+**R38. Squares manager** — `Opus` (money records, access) — ✅ built 2026-11-25, not pushed (real phones and Postgres not checked). Depends on: R37.
 `PATCH /api/game/:id/squares` with `applySquaresOp` (test-first) and the Players tab: add squares, mark
 paid or part paid, remove unpaid squares, player picks on/off and limit; after lock, paid marks only.
 *Done:* rule and race tests from decision 025; browser check at 360 and 390 px; `/code-review high` clean.

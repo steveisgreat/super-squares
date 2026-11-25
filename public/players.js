@@ -486,7 +486,7 @@
   SBS.players = {
     ensurePlayers, ensurePlayerColor, addSquares, replaceGame, formatAt, renameSquares,
     collectNameGroups, resolveNameForPick, paidChange, ownedLine,
-    playerSummaries, unpaidTotal, playersCard, openManagePlayersModal,
+    playerSummaries, unpaidTotal, playersCard, openPaymentBox, payState, PAY_WORD, openManagePlayersModal,
     toSubscript, fromSubscript, stripSubscript
   };
 })();
