@@ -1,6 +1,6 @@
 # 018 — Scorer-phone hand-off: a one-time QR gives one phone score entry on one board
 
-**Date:** 2026-11-24 · **Status:** accepted (approved by Steve 2026-11-24) · **Roadmap:** R24 · **Related:** 008, 009, 011, 012, 015, 017
+**Date:** 2026-11-24 · **Status:** accepted (approved by Steve 2026-11-24); **to be replaced** by [025](025-helpers-and-score-pad.md) when R37 ships · **Roadmap:** R24 · **Related:** 008, 009, 011, 012, 015, 017
 
 ## Context
 Decision 012 left one way to score from a second phone: sign that phone in to the host's

@@ -344,6 +344,37 @@ flush to the numbers, stretched squares, glowing numbers, the winner's pulse), s
 phone nothing changed, and neither did Party View (computed styles compared with the previous build).
 Not tried: a real iPad, a real touch screen, a window under 560 px tall (it scrolls instead).
 
+Helpers and one score pad (R36–R39): [decision 025](decisions/025-helpers-and-score-pad.md), Steve approved the
+design and mockup 2026-11-25 ("Helpers and one score pad" canvas, claude.ai artifact
+`TxJaeNkrcqrnAe9WoKY99Z`, private). Build in this order.
+
+**R36. One score pad** — `Opus` (score operations, test-first), `Sonnet` (UI) — Depends on: none.
+The labeled pad replaces the score panel's layout on Game Day (phone and wide) and in the Party View
+strip, with one Undo, an end-of-quarter question that names the winner, and Fix per quarter. The
+quarter score boxes, the Edit form and the wide pencil form go. `edit` works on Live and
+Simulation boards (and clears a quarter) without taking over from the feed, and the Final draw becomes a server
+operation. The `#score` page shows the pad in place of its keypad until R37 retires it; this also
+fixes it running off the right edge of a 375 px phone (429 px wide, measured 2026-11-25).
+*Done:* operation tests first; no score is saved by a whole-document `PUT`; browser check at 360, 390,
+1366 and 1920 px and the Party View strip; `/code-review high` clean.
+
+**R37. Helpers and the Scorekeeper tab** — `Opus` (auth, migration 010) — Depends on: R36.
+The Helpers screen (add, jobs, code or texted link, remove one), Player View tabs, the helper cookie,
+and the Score tab. Retires the scorer hand-off (018) and the `#score` page; old links still open
+something sensible. Not shipped on a game day: phones already scoring need a new code.
+*Done:* access and lifetime tests in all auth modes and both stores; privacy page updated; scanned
+with a real iPhone and Android phone; `/code-review high` clean.
+
+**R38. Squares manager** — `Opus` (money records, access) — Depends on: R37.
+`PATCH /api/game/:id/squares` with `applySquaresOp` (test-first) and the Players tab: add squares, mark
+paid or part paid, remove unpaid squares, player picks on/off and limit; after lock, paid marks only.
+*Done:* rule and race tests from decision 025; browser check at 360 and 390 px; `/code-review high` clean.
+
+**R39. Recent changes** — `Sonnet` build, `Opus` review (migration 011) — Depends on: R37 (covers
+squares once R38 ships).
+A host-only list of who did what on the board, the last 50. A failed log write never fails a score.
+*Done:* host-only access test; entries for score, squares and helper changes; deleted with the board.
+
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
 
 **R8. Cache board reads at the edge** — `Opus` — ✅ built 2026-11-24 ([decision 023](decisions/023-edge-cached-reads.md)), not pushed. Depends on: R3, R4a.
@@ -465,3 +496,5 @@ office-pool groups.
 2. Form an LLC before taking payments (R5, Later)?
 3. Product name (R16): pick the public name. Decides the domain.
 4. Founder price next year for hosts who used the launch season (decision 022)?
+5. Helper defaults (decision 025, section 7): job lifetime, texted links, the scorekeeper drawing the
+   final winner, and the change log. Built as recommended unless you say otherwise.
