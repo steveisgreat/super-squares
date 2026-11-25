@@ -1,8 +1,8 @@
 # Super-Squares
 
 A football/basketball squares-pool web app: hosts create boards, players claim squares,
-scores pay out per quarter, a TV view shows the grid. Being readied for public sale for
-the NFL championship game on **2027-02-14** (`docs/ROADMAP.md`).
+scores pay out per quarter, a TV view shows the grid. Being readied for a free public
+launch for the NFL championship game on **2027-02-14** (`docs/ROADMAP.md`, decision 022).
 
 **Profile: hosted app** (Vercel + Neon). The LAN build was retired
 (decision 014). The global `~/.claude/CLAUDE.md` and the `project-docs` skill apply;

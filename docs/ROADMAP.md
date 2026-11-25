@@ -1,7 +1,8 @@
 # Roadmap — Super-Squares
 
-**Goal:** sell Super-Squares to the public as a hosted web app in time for the
-NFL championship game on **2027-02-14**. Written 2026-11-23 from a design
+**Goal:** launch Super-Squares to the public as a hosted web app, free this season, in
+time for the NFL championship game on **2027-02-14**. Exposure comes first; paid passes
+start in 2027–28 ([decision 022](decisions/022-postseason-pass.md)). Written 2026-11-23 from a design
 session; Steve owns the order.
 
 **Profile:** hosted app (recorded in `CLAUDE.md`; decision 010).
@@ -10,9 +11,12 @@ There is no BRD yet, so items cite this roadmap's IDs instead of FR IDs.
 **Standing decisions from the 2026-11-23 session** (decisions 001–005 in `docs/decisions/`):
 - **Web app first.** No native iOS, Android or Apple TV app before 2027-02-14.
   Phone wrappers are reconsidered after (see Later).
-- **The host pays; players never do.** Free board up to ~25 players with a
-  "Host your own board" footer; Big Game Pass **$7.99** per board; Season Pass
-  **$24.99**. Prices are a hypothesis to test in the January soft launch.
+- **The host pays; players never do, and 2026–27 is free.** The launch season is free for
+  every host, with next year's price announced from day one: from 2027–28 the regular
+  season stays free, postseason boards are free up to 10 players, and one **$7.99**
+  Postseason Pass per host covers the rest
+  ([decision 022](decisions/022-postseason-pass.md)). Every board keeps the "Host your own
+  board" footer.
 - **We never hold or move pool money.** We sell software. Terms of Service say
   "entertainment and tracking only".
 - **No NFL marks in marketing.** Marketing says "the Big Game", never "Super Bowl".
@@ -111,12 +115,7 @@ quarter-end detection with and without `period`, host-wins, and claim
 concurrency in both stores; `/code-review medium` clean; a simulated 50-board
 run makes ≤4 provider calls a minute.
 
-**R5. Payments** — `Opus` — Depends on: R2, R16.
-Stripe Checkout for Big Game Pass and Season Pass, a signed webhook that grants
-the entitlement, free-tier limit enforced server-side, receipts by Stripe.
-Use Stripe test mode until Steve approves live keys.
-*Done:* webhook signature and idempotency tests; free limit cannot be bypassed
-from the client; `/code-review high` clean.
+**R5. Payments** — moved to Later (2026-11-24, decision 022: 2026–27 is free).
 
 **R6. Legal and trust pages** — `Sonnet` — drafted 2026-11-23, **not done**: needs
 Steve's and a lawyer's review, and the bracketed placeholders filled (name, company,
@@ -132,9 +131,10 @@ Opus review.
 
 **R7. Accounts and plans** — `Steve` — Depends on: none.
 Vercel Pro (Hobby forbids commercial use), Neon paid plan with autoscaling for
-game day, Resend paid plan (the free one sends 100 emails a day), Stripe account,
-optional LLC. The domain moved to R16.
-*Done:* all accounts exist.
+game day, Resend (free plan now, for sign-in email; its 100 emails a day cover the soft
+launch). The Stripe account and optional LLC wait for R5. The domain moved to R16. **By 2027-02-01:** move
+Resend to the paid plan, before launch-week sign-ups pass the daily limit.
+*Done:* all accounts exist; Resend is on the paid plan by 2027-02-01.
 
 **R16. Name and domain** — `Sonnet` research, `Steve` buys — Depends on: none.
 Research notes are private (git-ignored):
@@ -156,7 +156,7 @@ A second profile (**website**) beside the app. First a short decision: where it
 lives (same Vercel project as static pages vs. its own repo) and whether to use
 the RileySoft standard UI. Then the website Phase 1 (audience, message, pages,
 calls to action) and mockups of the home page for Steve's approval. Pages: home
-with the TV-view demo, how it works, pricing (decision 003), FAQ, legal (R6),
+with the TV-view demo, how it works, pricing (decision 022), FAQ, legal (R6),
 the search pages from R12, and "Start a board" into the app. No NFL marks.
 **Live by 2027-01-04** so search engines index it before the playoffs.
 *Done:* mockups approved; site live on the apex domain; Lighthouse, link check
@@ -346,18 +346,26 @@ Vercel Firewall rule on `/api/login` and `/api/login/verify`.
 
 **R11. Monitoring and game-day runbook** — `Sonnet` — Depends on: R9.
 Error alerts, a status check, the rollback path, and a game-day checklist
-(Neon compute raised beforehand — never a keepalive ping).
+(Neon compute raised beforehand — never a keepalive ping). Spending limits set on Vercel
+and Neon, because free use brings load with no income (decision 022).
 *Done:* runbook section reviewed by Steve.
+
+**R13. Guest-to-host loop** — `Sonnet` — Depends on: R2. Moved up from Milestone 3: the
+main growth item for the free season (decision 022).
+"Host your own board" on the player and TV views, with a referral code
+tracked to sign-ups.
+*Done:* referral attribution visible in the database.
+
+**R34. Opt-in for next season** — `Sonnet` build, `Opus` review (auth code, migration) —
+Depends on: R2, R6 (wording).
+An unticked "Tell me about next season" checkbox at sign-in, stored on `hosts` with the
+time, and a way to turn it off.
+*Done:* choice recorded and reversible; privacy policy covers it.
 
 ### Milestone 3 — Go to market (2027-01-11 → 2027-02-14)
 
 **R12. Landing and search pages** — merged into R17 (2026-11-23), which ships
 them earlier so they are indexed before the playoffs.
-
-**R13. Guest-to-host loop** — `Sonnet` — Depends on: R5.
-"Host your own board" on the player and TV views, with a referral code
-tracked to sign-ups.
-*Done:* referral attribution visible in the database.
 
 **R14. Soft launch on the NFL playoffs** — `Steve` — Depends on: M1, M2.
 Invite-only use starting with Wild Card weekend (mid-January 2027) as the real
@@ -372,6 +380,13 @@ office-pool groups.
 
 ## Later (after 2027-02-14)
 
+- **R5. Payments** — `Opus` — Depends on: R2, R16. Live before the 2027–28 postseason.
+  Stripe Checkout for the Postseason Pass ([decision 022](decisions/022-postseason-pass.md)),
+  a signed webhook that grants the entitlement, the postseason free limit (10 players)
+  enforced server-side, receipts by Stripe. Settles the open rules 022 lists. Stripe test
+  mode until Steve approves live keys.
+  *Done:* webhook signature and idempotency tests; free limit cannot be bypassed from the
+  client; `/code-review high` clean.
 - Phone app wrappers (Capacitor) for App Store and Google Play discovery —
   check Apple's real-money gaming guideline first.
 - Guests claim their own squares from their phones, the host confirms and marks paid
@@ -405,7 +420,7 @@ office-pool groups.
 
 ## Open questions for Steve
 
-1. Free-tier limit: 25 players, or one free board of any size with the footer?
-2. Ad budget for the final three weeks?
-3. Form an LLC before taking payments?
-4. Product name (R16): pick the public name. Decides the domain.
+1. Ad budget for the final three weeks?
+2. Form an LLC before taking payments (R5, Later)?
+3. Product name (R16): pick the public name. Decides the domain.
+4. Founder price next year for hosts who used the launch season (decision 022)?

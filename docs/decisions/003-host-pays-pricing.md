@@ -1,6 +1,7 @@
 # 003 — The host pays; players never do
 
-**Date:** 2026-11-23 · **Status:** accepted (prices are a hypothesis) · **Roadmap:** R5, R12, R13
+**Date:** 2026-11-23 · **Status:** accepted; prices and free limit **superseded by**
+[022](022-postseason-pass.md) (the host-pays rule stands) · **Roadmap:** R5, R12, R13
 
 ## Decision
 Only the person who hosts a board pays. Players join free, always.
