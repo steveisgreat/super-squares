@@ -167,7 +167,7 @@
     setTheme: (theme) => request('/api/theme', json('PUT', { theme })),
     getGameTheme: (id) => rawRequest(`/api/game/${id}/theme`),
     // Account sign-in. Raw on purpose: a 401 here must never open the prompt.
-    requestLoginCode: (email) => rawRequest('/api/login', json('POST', { email })),
+    requestLoginCode: (email) => rawRequest('/api/login', json('POST', { email, ref: SBS.referral.get() })),
     verifyLogin: (body) => rawRequest('/api/login/verify', json('POST', body)),
     revokeAllSessions: () => rawRequest('/api/session/revoke-all', { method: 'POST' }).then((r) => { forgetHostTheme(); return r; }),
     // The board as it is now, straight from the server: for opening a board, acting on it, or
@@ -339,7 +339,34 @@
   // `route.back`. Defaults to 'board', matching the Game Day screen's own
   // "Phone Score Entry" button, which doesn't bother adding the suffix.
   const ID_RE = '[0-9a-f-]{36}';
+
+  // Referral (R13): "Host your own board" opens /?ref=<join code>. The code is kept in this
+  // browser (localStorage, since the emailed link may open in another tab) and sent with the
+  // next sign-in request. The server ignores it unless the account is new.
+  const REF_KEY = 'sbs-ref';
+  const REF_RE = /^[2-9A-HJKMNP-Z]{6}$/;
+  SBS.referral = {
+    get() {
+      try { return window.localStorage.getItem(REF_KEY) || undefined; } catch (e) { return undefined; }
+    },
+    // Reads ?ref= from the address bar and drops it from the URL.
+    capture() {
+      let ref;
+      try { ref = new URLSearchParams(window.location.search).get('ref'); } catch (e) { return; }
+      if (ref === null) return;
+      ref = ref.trim().toUpperCase();
+      if (REF_RE.test(ref)) { try { window.localStorage.setItem(REF_KEY, ref); } catch (e) { /* optional */ } }
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.delete('ref');
+        window.history.replaceState(window.history.state, '', u.pathname + u.search + u.hash);
+      } catch (e) { /* the parameter just stays in the address bar */ }
+    },
+    url(code) { return `${window.location.origin}/?ref=${encodeURIComponent(code)}`; }
+  };
+
   SBS.parseInitialRoute = function () {
+    SBS.referral.capture();
     const hash = window.location.hash || '';
     // /<join code>: the guest link (R22). The server serves this same page for
     // it; the code is resolved to a board id, then the player view opens.

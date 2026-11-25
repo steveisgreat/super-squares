@@ -608,6 +608,12 @@
 
     const body = el('div', 'player-body');
     wrap.appendChild(body);
+    // R13: the guest-to-host link. Carries this board's join code so a sign-up is attributed to it.
+    const hostLink = el('a', 'player-host-link', 'Running your own pool? Host your own board');
+    hostLink.target = '_blank';
+    hostLink.rel = 'noopener';
+    hostLink.hidden = true; // until the board loads
+    wrap.appendChild(hostLink);
     wrap.appendChild(SBS.ui.legalLinks());
 
     let game = null;
@@ -875,6 +881,7 @@
       drawHeader();
       drawSelect();
       inviteBtn.hidden = false;
+      if (game.joinCode) { hostLink.href = SBS.referral.url(game.joinCode); hostLink.hidden = false; }
       drawBody();
     }
 

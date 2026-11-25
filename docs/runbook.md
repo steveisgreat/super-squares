@@ -113,6 +113,10 @@ needs a change there. On previews it blocks the Vercel toolbar, which is expecte
   (decision 018). Only the scorer-phone hand-off uses it, so without it only that fails.
 - **R33:** `migrations/007_host_themes.sql` was applied to production on 2026-11-24
   (decision 021). Without it every board shows the default theme and choosing one answers 503.
+- **Before the push that ships R13:** apply `migrations/008_referrals.sql` to production
+  (applied to `ci-tests` 2026-11-25). Unlike the others, the sign-in request writes the new
+  `login_requests.ref` column, so **without it every sign-in fails** once accounts are live. Count
+  sign-ups per board: `select referred_by, count(*) from hosts where referred_by is not null group by 1 order by 2 desc;`
 - **Before the first push that ships R4a part 2:** apply `migrations/003_live_slates.sql`
   and set `SCORE_PRIMARY=espn` (plus `SCORE_SECONDARY` and `BALLDONTLIE_API_KEY` if
   wanted) in Vercel production. On Vercel, unset means no provider (decision 001), so

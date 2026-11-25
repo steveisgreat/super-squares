@@ -381,6 +381,13 @@ main growth item for the free season (decision 022).
 "Host your own board" on the player and TV views, with a referral code
 tracked to sign-ups.
 *Done:* referral attribution visible in the database.
+*Built 2026-11-25, not pushed:* the referral is the board's join code. The player view links to
+`/?ref=<code>` ("Running your own pool? Host your own board"); the TV's join panel prints the same
+address while a board is filling (not after it locks). The app keeps the code in the browser,
+sends it with the sign-in request, and it lands in `hosts.referred_by` only when the account is
+first created (migration 008; an existing host is never re-attributed). Checked on `ci-tests` with
+throwaway rows, and in the preview. Not tried: a real email sign-in (needs R16), a real phone.
+**Before the push:** apply migration 008 to production, or sign-in fails (runbook).
 
 **R34. Opt-in for next season** — `Sonnet` build, `Opus` review (auth code, migration) —
 Depends on: R2, R6 (wording).

@@ -1495,7 +1495,8 @@
         const url = `${location.origin}/${game.joinCode}`;
         joinPanel.innerHTML = `<div class="tv-join-title">${title}</div>${window.QRCode.toSvg(url, 300)}`
           + `<div class="tv-join-or">or go to</div><div class="tv-join-url">${escapeHtml(location.host)}</div>`
-          + `<div class="tv-join-or">and enter</div><div class="tv-join-code-big">${escapeHtml(game.joinCode)}</div>`;
+          + `<div class="tv-join-or">and enter</div><div class="tv-join-code-big">${escapeHtml(game.joinCode)}</div>`
+          + `<div class="tv-join-host">Host your own board: ${escapeHtml(location.host)}/?ref=${escapeHtml(game.joinCode)}</div>`;
         joinPanelKey = key;
       } catch (e) {
         joinPanel.hidden = true; // best-effort, like the corner QR
