@@ -284,7 +284,7 @@ async function main() {
   const takeover = (op) => Object.assign({ override: true }, op);
 
   await check('live: a tap without override is illegal while the feed holds the score', () => {
-    for (const op of [add('a', 3), { op: 'set', a: 1, b: 1 }, { op: 'end' }, { op: 'final' }, { op: 'undo' }, { op: 'edit', quarter: 'q1', a: 1, b: 1 }]) {
+    for (const op of [add('a', 3), { op: 'set', a: 1, b: 1 }, { op: 'end' }, { op: 'final' }, { op: 'undo' }]) {
       eq(G.applyScoreOp(liveGame({ a: 7, b: 3 }), op).code, 'illegal', JSON.stringify(op));
     }
   });
@@ -297,6 +297,10 @@ async function main() {
   await check('live: once held, later ops need no override', () => {
     const g = run(liveGame({ a: 14, b: 10, period: 3 }), [takeover(add('a', 3)), add('b', 7), { op: 'end' }]);
     eq([g.results.q3.a, g.results.q3.b, g.liveScore.period, g.liveOverride], [17, 17, 4, true]);
+  });
+  await check('live: a take-over of no points keeps the feed score the server has', () => {
+    const g = run(liveGame({ a: 14, b: 10, period: 3 }), [takeover(add('a', 0))]);
+    eq([g.liveOverride, g.liveScore.a, g.liveScore.b, g.liveScore.period, g.liveScore.manual], [true, 14, 10, 3, true]);
   });
   await check('live: override with no feed score starts at 0-0, Q1', () => {
     const g = run(liveGame(null), [takeover(add('b', 2))]);
@@ -391,6 +395,181 @@ async function main() {
     eq(G.manualEntry({ scoring: 'manual' }), true);
   });
 
+  // ---------- edit on Live and Simulation boards, and clearing a quarter (R36, decision 025) ----------
+  const simGame = (extra) => baseGame(Object.assign({
+    scoring: 'simulation', simulation: true,
+    liveScore: { a: 14, b: 7, period: 2, clock: '1:00', state: 'in', completed: false, simulation: true }
+  }, extra || {}));
+  const edit = (quarter, a, b, more) => Object.assign({ op: 'edit', quarter, a, b }, more || {});
+
+  await check('edit on a Live board fixes a quarter and never takes the score over', () => {
+    const g = liveGame({ a: 14, b: 10, period: 3 }, { results: { q1: { a: 7, b: 0 } } });
+    for (const op of [edit('q1', 7, 3), edit('q1', 7, 3, { override: true })]) {
+      const out = run(g, [op]);
+      eq([out.results.q1, out.liveOverride, out.liveScore, out.status], [{ a: 7, b: 3 }, undefined, g.liveScore, 'started']);
+    }
+  });
+  await check('edit on a Live board may fill in a quarter the feed has not', () => {
+    const out = run(liveGame({ a: 14, b: 10, period: 3 }), [edit('q2', 14, 3)]);
+    eq([out.results.q2, out.liveOverride], [{ a: 14, b: 3 }, undefined]);
+  });
+  await check('edit on a taken-over Live board keeps the host score and the hold', () => {
+    const held = run(liveGame({ a: 14, b: 10, period: 3 }, { results: { q1: { a: 7, b: 0 } } }), [takeover(add('a', 3))]);
+    const out = run(held, [edit('q1', 0, 0)]);
+    eq([out.results.q1, out.liveOverride, out.liveScore.a, out.liveScore.period], [{ a: 0, b: 0 }, true, 17, 3]);
+  });
+  await check('edit on a Simulation board fixes a quarter and leaves the made-up score alone', () => {
+    const g = simGame({ results: { q1: { a: 7, b: 0 } } });
+    const out = run(g, [edit('q1', 7, 3)]);
+    eq([out.results.q1, out.liveScore, out.liveOverride], [{ a: 7, b: 3 }, g.liveScore, undefined]);
+    for (const op of [add('a', 3), { op: 'set', a: 1, b: 1 }, { op: 'end' }, { op: 'final' }, { op: 'undo' }, { op: 'resume' }]) {
+      eq(G.applyScoreOp(g, op).code, 'illegal', JSON.stringify(op));
+    }
+  });
+  await check('edit of the final on a Live or Simulation board finishes the game; clearing it reopens', () => {
+    for (const g of [liveGame({ a: 24, b: 17, period: 4 }), simGame()]) {
+      const done = run(g, [edit('final', 27, 23)]);
+      eq([done.status, done.results.final], ['finished', { a: 27, b: 23 }]);
+      const open = run(done, [edit('final', null, null)]);
+      eq([open.status, open.results.final], ['started', undefined]);
+    }
+  });
+  await check('edit of the final on a taken-over board keeps the host score in step', () => {
+    const held = run(liveGame({ a: 24, b: 17, period: 4 }), [takeover(add('a', 3))]);
+    const done = run(held, [edit('final', 27, 17)]);
+    eq([done.liveScore.state, done.liveScore.completed, done.liveScore.a], ['post', true, 27]);
+    const open = run(done, [edit('final', null, null)]);
+    eq([open.liveScore.state, open.liveScore.completed, open.liveScore.period], ['in', false, 4]);
+  });
+  await check('a simulated score stops being live once the final is typed', () => {
+    const done = run(simGame(), [edit('final', 27, 23)]);
+    eq([done.liveScore.state, done.liveScore.completed], ['post', true]);
+    eq(G.computeLiveHighlight(done), null);
+  });
+  await check('clearing a quarter: Live and Simulation only, both scores at once', () => {
+    for (const g of [liveGame({ a: 14, b: 10, period: 3 }), simGame()]) {
+      const has = Object.assign(g, { results: { q1: { a: 7, b: 0 }, q2: { a: 14, b: 7 } } });
+      const out = run(has, [edit('q1', null, null)]);
+      eq([out.results.q1, out.results.q2], [undefined, { a: 14, b: 7 }]);
+      eq(G.applyScoreOp(has, edit('q1', null, 3)).code, 'invalid');
+      eq(G.applyScoreOp(has, edit('q1', 3, null)).code, 'invalid');
+      eq(G.applyScoreOp(has, edit('q3', null, null)).code, 'illegal', 'nothing to clear');
+    }
+    const manual = run(baseGame(), [{ op: 'set', a: 7, b: 3 }, { op: 'end' }]);
+    eq(G.applyScoreOp(manual, edit('q1', null, null)).code, 'illegal', 'manual uses Undo');
+  });
+  await check('clearing the final keeps a stored draw', () => {
+    const g = liveGame({ a: 17, b: 10, period: 4 }, { status: 'finished', results: { final: { a: 17, b: 10, autoResolve: { key: '7-0', row: 0, col: 0, drawnAt: 1 } } } });
+    const open = run(g, [edit('final', null, null)]);
+    eq([open.status, open.results.final], ['started', { autoResolve: { key: '7-0', row: 0, col: 0, drawnAt: 1 } }]);
+    eq(G.computeGame(run(open, [edit('final', 17, 10)])).results.final.autoResolved, true);
+  });
+  await check('edit completes a half-typed quarter left by an older screen', () => {
+    const g = liveGame({ a: 14, b: 10, period: 3 }, { results: { q1: { a: 7, b: '' } } });
+    eq(run(g, [edit('q1', 7, 3)]).results.q1, { a: 7, b: 3 });
+    eq(run(g, [edit('q1', null, null)]).results.q1, undefined);
+  });
+  await check('edit on Live and Simulation is illegal before the lock', () => {
+    eq(G.applyScoreOp(liveGame({ a: 0, b: 0 }, { status: 'picking' }), edit('q1', 1, 1)).code, 'illegal');
+    eq(G.applyScoreOp(simGame({ status: 'picking' }), edit('q1', 1, 1)).code, 'illegal');
+  });
+  await check('edit does not mutate its input', () => {
+    const g = liveGame({ a: 14, b: 10, period: 3 }, { results: { q1: { a: 7, b: 0 } } });
+    const was = JSON.stringify(g);
+    run(g, [edit('q1', null, null), edit('q1', 1, 1), edit('final', 3, 0)]);
+    eq(JSON.stringify(g), was);
+  });
+
+  // ---------- `from`: what the tapped screen was showing ----------
+  await check('from: an operation made against a score that has moved is refused', () => {
+    const g = run(baseGame(), [{ op: 'set', a: 7, b: 3 }, { op: 'end' }, add('a', 7)]); // 14-3, Q2
+    const bad = [
+      { op: 'set', a: 7, b: 3, from: { a: 7, b: 3 } },
+      { op: 'end', from: { a: 14, b: 3, period: 1 } },
+      { op: 'end', from: { a: 7, b: 3, period: 2 } },
+      { op: 'final', from: { a: 14, b: 0, period: 2 } },
+      edit('q1', 1, 1, { from: { a: 7, b: 0 } }), edit('q1', 1, 1, { from: null }),
+      { op: 'undo', expect: 'q2' }, { op: 'undo', expect: 'final' }
+    ];
+    bad.forEach(op => eq(G.applyScoreOp(g, op).code, 'illegal', JSON.stringify(op)));
+    const ok = [
+      { op: 'set', a: 7, b: 3, from: { a: 14, b: 3 } },
+      { op: 'end', from: { a: 14, b: 3, period: 2 } },
+      { op: 'final', from: { a: 14, b: 3, period: 2 } },
+      edit('q1', 1, 1, { from: { a: 7, b: 3 } }),
+      { op: 'undo', expect: 'q1' }
+    ];
+    ok.forEach(op => eq(G.applyScoreOp(g, op).error, undefined, JSON.stringify(op)));
+  });
+  await check('from: a malformed guard is invalid', () => {
+    const g = run(baseGame(), [{ op: 'set', a: 7, b: 3 }, { op: 'end' }]);
+    [{ op: 'end', from: 'x' }, { op: 'end', from: { a: 1 } }, { op: 'set', a: 1, b: 1, from: [1, 2] },
+      edit('q1', 1, 1, { from: 7 }), { op: 'undo', expect: 'q9' }].forEach(op => eq(G.applyScoreOp(g, op).code, 'invalid', JSON.stringify(op)));
+  });
+  await check('from: two devices ending the same quarter end it once', () => {
+    const g = run(baseGame(), [{ op: 'set', a: 7, b: 3 }]);
+    const op = { op: 'end', from: { a: 7, b: 3, period: 1 } };
+    const once = run(g, [op]);
+    eq(G.applyScoreOp(once, op).code, 'illegal');
+  });
+  await check('undoTarget names what undo would undo', () => {
+    eq(G.undoTarget(baseGame()), null);
+    const q2 = run(baseGame(), [{ op: 'set', a: 7, b: 3 }, { op: 'end' }, { op: 'end' }]);
+    eq(G.undoTarget(q2), 'q2');
+    const ot = run(q2, [{ op: 'end' }, { op: 'set', a: 7, b: 7 }, { op: 'end' }]);
+    eq(G.undoTarget(ot), 'ot');
+    eq(G.undoTarget(run(ot, [add('a', 3), { op: 'end' }])), 'final');
+  });
+
+  // ---------- draw: the server picks the final's stand-in winner ----------
+  function needsDrawGame(extra) {
+    const g = run(baseGame(), [{ op: 'set', a: 17, b: 10 }, { op: 'final' }]);
+    return Object.assign(g, extra || {});
+  }
+  const ctx = (i) => ({ pick: () => i, now: 1234567890 });
+  await check('draw picks a claimed square, stamps the time and settles the final', () => {
+    const g = needsDrawGame();
+    eq(G.computeGame(g).results.final.needsDraw, true);
+    let asked = null;
+    const r = G.applyScoreOp(g, { op: 'draw' }, { pick: (n) => { asked = n; return 1; }, now: 99 });
+    eq([asked, r.error], [2, undefined], 'two claimed squares');
+    eq(r.game.results.final.autoResolve, { key: '7-0', row: 7, col: 3, drawnAt: 99 });
+    eq([G.computeGame(r.game).results.final.winnerName, r.game.status], ['Ann', 'finished']);
+  });
+  await check('draw takes nothing about the square from the request', () => {
+    const r = G.applyScoreOp(needsDrawGame(), { op: 'draw', row: 7, col: 3, key: '7-3', drawnAt: 5, pick: 1 }, ctx(0));
+    eq(r.game.results.final.autoResolve, { key: '7-0', row: 0, col: 0, drawnAt: 1234567890 });
+  });
+  await check('draw without a server context is refused, so no browser can choose', () => {
+    eq(G.applyScoreOp(needsDrawGame(), { op: 'draw' }).code, 'illegal');
+  });
+  await check('draw is refused unless the final needs one', () => {
+    eq(G.applyScoreOp(baseGame(), { op: 'draw' }, ctx(0)).code, 'illegal', 'not final');
+    eq(G.applyScoreOp(run(baseGame(), [{ op: 'set', a: 7, b: 3 }, { op: 'final' }]), { op: 'draw' }, ctx(0)).code, 'illegal', 'has a winner');
+    const drawn = G.applyScoreOp(needsDrawGame(), { op: 'draw' }, ctx(0)).game;
+    eq(G.applyScoreOp(drawn, { op: 'draw' }, ctx(1)).code, 'illegal', 'already drawn');
+    eq(G.applyScoreOp(needsDrawGame({ squares: G.emptyGrid() }), { op: 'draw' }, ctx(0)).code, 'illegal', 'no squares');
+  });
+  await check('draw works on Live and Simulation boards without taking over', () => {
+    for (const g of [liveGame({ a: 17, b: 10, period: 4, state: 'post' }), simGame()]) {
+      const done = run(g, [edit('final', 17, 10)]);
+      const r = G.applyScoreOp(done, { op: 'draw', override: true }, ctx(1));
+      eq([r.game.results.final.autoResolve.row, r.game.liveOverride], [7, undefined]);
+    }
+  });
+  await check('draw survives undo and the same final again', () => {
+    const drawn = G.applyScoreOp(needsDrawGame(), { op: 'draw' }, ctx(1)).game;
+    const again = run(drawn, [{ op: 'undo' }, { op: 'final' }]);
+    eq(G.computeGame(again).results.final.winnerName, 'Ann');
+  });
+  await check('a score fixed to another empty square needs a new draw', () => {
+    const drawn = G.applyScoreOp(needsDrawGame(), { op: 'draw' }, ctx(1)).game;
+    const moved = run(drawn, [edit('final', 21, 14)]);
+    eq(G.computeGame(moved).results.final.needsDraw, true);
+    const r = G.applyScoreOp(moved, { op: 'draw' }, ctx(0));
+    eq([r.game.results.final.autoResolve.key, G.computeGame(r.game).results.final.winnerName], ['1-4', 'Bob']);
+  });
+
   // ---------- live refresh gating ----------
   await check('refreshLiveScore never touches a manual game', async () => {
     const LiveScore = require('./server-livescore.js');
@@ -478,6 +657,40 @@ async function main() {
       const g = await mk();
       const res = await call('PATCH', `/api/game/${g.id}/score`, { op: 'add', side: 'b', points: 3 });
       eq(res.json.squares, g.squares);
+    });
+    await check('PATCH edit on a Live and a Simulation board saves the quarter and no takeover', async () => {
+      for (const extra of [{ scoring: 'live' }, { scoring: 'simulation', simulation: true, simPlan: { startedAt: new Date().toISOString(), quarterMs: 120000, events: [] } }]) {
+        const g = await mk(extra);
+        let res = await call('PATCH', `/api/game/${g.id}/score`, { op: 'edit', quarter: 'q1', a: 7, b: 3 });
+        eq([res.statusCode, res.json.results.q1.a, res.json.liveOverride], [200, 7, undefined], extra.scoring);
+        res = await call('PATCH', `/api/game/${g.id}/score`, { op: 'edit', quarter: 'q1', a: null, b: null, from: { a: 7, b: 3 } });
+        eq([res.statusCode, res.json.results.q1], [200, undefined], extra.scoring);
+      }
+    });
+    await check('PATCH draw: the server picks, once, whatever the body says', async () => {
+      const g = await mk();
+      const url = `/api/game/${g.id}/score`;
+      await call('PATCH', url, { op: 'set', a: 17, b: 10 });
+      eq((await call('PATCH', url, { op: 'draw' })).statusCode, 409, 'not final yet');
+      await call('PATCH', url, { op: 'final' });
+      const t = Date.now();
+      const res = await call('PATCH', url, { op: 'draw', row: 9, col: 9, drawnAt: 1 });
+      const ar = res.json.results.final.autoResolve;
+      eq([res.statusCode, ar.key], [200, '7-0']);
+      assert(g.squares[ar.row * 10 + ar.col], 'a claimed square');
+      assert(ar.drawnAt >= t, 'stamped by the server');
+      eq((await call('PATCH', url, { op: 'draw' })).statusCode, 409, 'drawn once');
+      eq((await store.getGame(g.id)).results.final.autoResolve, ar);
+    });
+    await check('PATCH end: two devices end the same quarter once', async () => {
+      const g = await mk();
+      const url = `/api/game/${g.id}/score`;
+      await call('PATCH', url, { op: 'set', a: 7, b: 3 });
+      const op = { op: 'end', from: { a: 7, b: 3, period: 1 } };
+      const both = await Promise.all([call('PATCH', url, op), call('PATCH', url, op)]);
+      eq(both.map(r => r.statusCode).sort(), [200, 409]);
+      const s = await store.getGame(g.id);
+      eq([s.liveScore.period, s.results.q2], [2, undefined]);
     });
     await check('PATCH requires the host when a password is set', async () => {
       const g = await mk();

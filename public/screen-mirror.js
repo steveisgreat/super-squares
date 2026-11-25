@@ -165,7 +165,11 @@
     function makePanel() {
       scorePanel = SBS.scorePanel.create({
         getGame: () => game,
+        quarters: false,
+        readOnly: false, // nothing to tap while the feed keeps the score
         setGame: (g) => {
+          // Resume drops liveOverride from the document; assign alone would keep the old one.
+          if (!('liveOverride' in g)) delete game.liveOverride;
           Object.assign(game, g);
           drawBoard();
         }
@@ -292,9 +296,12 @@
         } else if (SBS.boardKey(fresh) !== SBS.boardKey(game)) {
           // A score the host just tapped is still being saved: the panel's own answer wins.
           if (!scorePanel.busy()) {
+            const saved = fresh.updatedAt !== game.updatedAt;
             SBS.takeBoard(game, fresh);
             drawBoard();
             scorePanel.update();
+            // A change made somewhere else: what this screen scored may no longer undo cleanly.
+            if (saved) scorePanel.clearUndo();
           }
         }
       } catch (e) {

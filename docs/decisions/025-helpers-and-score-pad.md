@@ -1,7 +1,7 @@
 # 025 — Helpers: two jobs on one board, inside Player View, and one score pad
 
 **Date:** 2026-11-25 · **Status:** accepted (Steve approved the two-job design and mockup
-2026-11-25); not built. The points marked *(recommended)* in section 7 can still change ·
+2026-11-25); section 6 (the score pad, R36) built 2026-11-25, the rest not built. The points marked *(recommended)* in section 7 can still change ·
 **Roadmap:** R36–R39 · **Related:** 008, 009, 011, 012, 015, 016, 018 (its access and lifetime rules
 are replaced when R37 ships), 019, 020
 
@@ -116,6 +116,17 @@ boxes). That is money logic: test-first.
    011: board, time, helper id or null for the host, label, short text; last 50 kept per board). It
    records score and squares operations and helpers joining or leaving, not whole-document host saves. It
    is best effort: a failed log write never fails a score.
+
+### 8. As built: R36 (2026-11-25)
+- Operations may carry `from` (the score and period the screen showed; for `edit` the quarter's old score or
+  null) and `undo` may carry `expect`. A mismatch is refused, so two devices never end two quarters and an
+  undo never overwrites a score it has not seen. Without them an operation applies as before.
+- With nothing left to undo from this screen, Undo offers the board's newest ended quarter and asks first.
+- Taking a Live board over is an `add` of 0 points, so it starts from the server's copy of the feed.
+- Game Day's phone page uses the wide quarters list (score, winner, Mark paid out, Fix). On Live and Simulation
+  boards an open quarter has Enter, and Fix has Clear this score. After a clear the feed may fill it in again.
+- The scorer phone (018) may draw the final winner from now on.
+- The pad is hidden in Party View while the feed keeps the score, as before.
 
 ## Consequences
 - **Deploy order:** migration 010 before R37; 011 before R39. Without them only helper features fail.

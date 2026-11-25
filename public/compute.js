@@ -712,6 +712,13 @@
     return null;
   }
 
+  // Takes a quarter's score off, keeping the final's stored draw.
+  function clearScore(g, q) {
+    const draw = g.results[q].autoResolve;
+    if (draw) g.results[q] = { autoResolve: draw };
+    else delete g.results[q];
+  }
+
   function writeLive(g, s, extra) {
     g.liveScore = Object.assign({
       a: s.a, b: s.b, period: s.period, clock: '', state: 'in', completed: false,
@@ -719,15 +726,39 @@
     }, extra || {});
   }
 
+  // What the 'undo' operation would undo right now: 'final', 'ot' (the start of overtime), the
+  // newest ended quarter, or null.
+  function undoTarget(game) {
+    const results = (game && game.results) || {};
+    if (hasResult(results.final)) return 'final';
+    const s = manualState(game);
+    if (s.period === OT_PERIOD) return 'ot';
+    for (let n = Math.min(s.period - 1, 3); n >= 1; n--) if (hasResult(results['q' + n])) return 'q' + n;
+    return null;
+  }
+
+  // `from` on an operation is what the screen was showing when it was tapped. A well-formed one
+  // that no longer matches is refused, so a second device never ends the next quarter or types
+  // over a score it has not seen. Optional: an operation without it is applied as it stands.
+  function badFrom(op) {
+    if (op.op === 'undo') return op.expect !== undefined && QUARTERS.concat('ot').indexOf(op.expect) === -1;
+    if (op.from === undefined) return false;
+    if (op.op === 'edit' && op.from === null) return false;
+    if (!isRecord(op.from) || !isScore(op.from.a) || !isScore(op.from.b)) return true;
+    return op.from.period !== undefined && !Number.isInteger(op.from.period);
+  }
+  const MOVED = 'The score changed on another device. Check it and try again.';
+
   // One manual-score operation, as a pure function: returns { game } (a fresh
   // copy; the input is never mutated) or { error, code } where code is
   // 'invalid' (malformed op, HTTP 400) or 'illegal' (not allowed in the
   // current state, HTTP 409). The server is the authority; the UI calls the
-  // same function for optimistic display.
-  function applyScoreOp(game, op) {
+  // same function for optimistic display. Only the server passes `ctx`
+  // ({ pick(n): index, now: ms }): 'draw' needs it, so no browser chooses a winner.
+  function applyScoreOp(game, op, ctx) {
     if (!op || typeof op !== 'object' || Array.isArray(op)) return failure('invalid', 'Score operation must be an object.');
     const name = op.op;
-    if (['add', 'set', 'end', 'final', 'undo', 'edit', 'resume'].indexOf(name) === -1) return failure('invalid', 'Unknown score operation.');
+    if (['add', 'set', 'end', 'final', 'undo', 'edit', 'draw', 'resume'].indexOf(name) === -1) return failure('invalid', 'Unknown score operation.');
 
     // Validate the body before looking at game state, so a bad request is 400
     // whatever state the game is in.
@@ -738,8 +769,15 @@
     if (name === 'set' && (!isScore(op.a) || !isScore(op.b))) return failure('invalid', `Scores must be whole numbers from 0 to ${MAX_SCORE}.`);
     if (name === 'edit') {
       if (QUARTERS.indexOf(op.quarter) === -1) return failure('invalid', 'Quarter must be q1, q2, q3 or final.');
-      if (!isScore(op.a) || !isScore(op.b)) return failure('invalid', `Scores must be whole numbers from 0 to ${MAX_SCORE}.`);
+      // Both null clears the quarter (Live and Simulation boards only).
+      const clears = op.a === null && op.b === null;
+      if (!clears && (!isScore(op.a) || !isScore(op.b))) return failure('invalid', `Scores must be whole numbers from 0 to ${MAX_SCORE}.`);
     }
+    if (badFrom(op)) return failure('invalid', 'The score this change was made from is not valid.');
+
+    // Fixing a quarter and drawing the final's winner work on every board and never take a
+    // Live board's score over from the feed.
+    const anyBoard = name === 'edit' || name === 'draw';
 
     // A Live board takes the host's taps only once the host has chosen to enter the score
     // (decision 001 section 6): the op says so (override: true) or the board already
@@ -748,7 +786,7 @@
     const takeover = mode === 'live' && (op.override === true || game.liveOverride === true);
     if (name === 'resume') {
       if (mode !== 'live') return failure('illegal', 'This game does not use a live feed.');
-    } else if (mode !== 'manual' && !takeover) {
+    } else if (mode !== 'manual' && !takeover && !anyBoard) {
       return failure('illegal', 'This game does not use manual scoring.');
     }
     if (game.status !== 'started' && game.status !== 'finished') return failure('illegal', 'Scoring opens once the board is locked.');
@@ -765,42 +803,67 @@
     const ended = (q) => hasResult(g.results[q]);
 
     if (name === 'edit') {
-      if (!ended(op.quarter)) return failure('illegal', `${QLABEL[op.quarter]} has not ended yet.`);
-      const entry = g.results[op.quarter];
-      entry.a = op.a;
-      entry.b = op.b;
+      const q = op.quarter;
+      // On a Manual board the quarters and the period move together (End and Undo), so only an
+      // ended one can be fixed. Anywhere else a quarter can also be filled in or cleared.
+      if (mode === 'manual' && !ended(q)) return failure('illegal', `${QLABEL[q]} has not ended yet.`);
+      if (mode === 'manual' && op.a === null) return failure('illegal', 'Use Undo to take back an ended quarter.');
+      if (op.from !== undefined) {
+        const was = ended(q) ? { a: Number(g.results[q].a), b: Number(g.results[q].b) } : null;
+        if (!was !== !op.from || (was && (was.a !== op.from.a || was.b !== op.from.b))) return failure('illegal', MOVED);
+      }
       // A stored draw is keyed by grid row-col, and computeGame ignores one
-      // that no longer matches, so there is nothing to clear here.
-      return { game: syncStatus(g) };
+      // that no longer matches, so it stays, as it does for undo.
+      if (op.a === null) {
+        if (!g.results[q]) return failure('illegal', `${QLABEL[q]} has no score to clear.`);
+        clearScore(g, q);
+      } else {
+        g.results[q] = Object.assign({}, g.results[q], { a: op.a, b: op.b });
+      }
+      syncStatus(g);
+      // A score kept on the board (the host's, or a simulation's) follows the game over and back.
+      const kept = g.liveScore && (g.liveScore.manual || mode === 'simulation');
+      if (q === 'final' && kept && mode !== 'manual') {
+        g.liveScore = Object.assign({}, g.liveScore, op.a === null ? { state: 'in', completed: false } : { state: 'post', completed: true });
+      }
+      return { game: g };
+    }
+
+    if (name === 'draw') {
+      const fin = computeGame(g).results.final;
+      if (!fin.needsDraw) return failure('illegal', 'The final does not need a draw.');
+      const claimed = g.squares.map((sq, i) => (sq ? i : -1)).filter(i => i >= 0);
+      if (!claimed.length) return failure('illegal', 'No squares are filled in, so there is no winner to draw.');
+      if (!ctx || typeof ctx.pick !== 'function') return failure('illegal', 'The winner is drawn on the server.');
+      const idx = claimed[ctx.pick(claimed.length)];
+      g.results.final.autoResolve = { key: `${fin.row}-${fin.col}`, row: Math.floor(idx / 10), col: idx % 10, drawnAt: ctx.now };
+      return { game: g };
+    }
+
+    if (op.from && (op.from.a !== s.a || op.from.b !== s.b || (op.from.period !== undefined && op.from.period !== s.period))) {
+      return failure('illegal', MOVED);
     }
 
     // From here the host holds the score of a Live board: the feed no longer overwrites it.
     if (mode === 'live') g.liveOverride = true;
 
     if (name === 'undo') {
-      if (finished) {
-        // Clear only the score: a stored draw stays, so Undo then Final at the
-        // same score keeps the drawn winner instead of re-rolling it.
-        delete g.results.final.a;
-        delete g.results.final.b;
-        if (!g.results.final.autoResolve) delete g.results.final;
+      const target = undoTarget(g);
+      if (!target) return failure('illegal', 'Nothing has ended yet.');
+      if (op.expect !== undefined && op.expect !== target) return failure('illegal', MOVED);
+      if (target === 'final') {
+        // A stored draw stays, so Undo then Final at the same score keeps the
+        // drawn winner instead of re-rolling it.
+        clearScore(g, 'final');
         syncStatus(g);
         writeLive(g, s);
-        return { game: g };
-      }
-      if (s.period === OT_PERIOD) {
+      } else if (target === 'ot') {
         writeLive(g, Object.assign({}, s, { period: 4 }));
-        return { game: g };
+      } else {
+        delete g.results[target];
+        writeLive(g, Object.assign({}, s, { period: Number(target[1]) }));
       }
-      for (let n = Math.min(s.period - 1, 3); n >= 1; n--) {
-        const q = 'q' + n;
-        if (ended(q)) {
-          delete g.results[q];
-          writeLive(g, Object.assign({}, s, { period: n }));
-          return { game: g };
-        }
-      }
-      return failure('illegal', 'Nothing has ended yet.');
+      return { game: g };
     }
 
     if (finished) return failure('illegal', 'The game is already final.');
@@ -836,48 +899,71 @@
     return finish();
   }
 
-  // Keyboard scoring (Game Day, R25 part b). Q W E score for team A and P O I for team B, in the
-  // order of the league's usual plays; other sports use Q and P for one point. Keys are matched
-  // without regard to case. Returns a fresh 'add' op, or null for a key that scores nothing.
-  const SCORE_KEY_POINTS = { nfl: [7, 3, 2], nba: [3, 2, 1] };
+  // The plays on the score pad (decision 025 section 6), in the order of its buttons.
+  const SCORE_PLAYS = {
+    nfl: [
+      { label: 'Touchdown', word: 'touchdown', points: 6 },
+      { label: 'Extra point', word: 'extra point', points: 1 },
+      { label: 'Field goal', word: 'field goal', points: 3 },
+      { label: '2-pt or safety', word: 'two points', points: 2 }
+    ],
+    nba: [
+      { label: 'Free throw', word: 'free throw', points: 1 },
+      { label: 'Basket', word: 'basket', points: 2 },
+      { label: 'Three', word: 'three', points: 3 }
+    ],
+    other: [{ label: 'Point', word: 'point', points: 1 }]
+  };
+  const scorePlays = (league) => (hasOwn(SCORE_PLAYS, league) ? SCORE_PLAYS[league] : SCORE_PLAYS.other);
+
+  // Keyboard scoring (Game Day, R25 part b): Q W E R score for team A and U I O P for team B, left
+  // to right down the pad's buttons, without regard to case. Returns a fresh 'add' op, or null for
+  // a key that scores nothing.
+  const SCORE_KEYS = { a: 'qwer', b: 'uiop' };
   function scoreKeyOp(league, key) {
     if (typeof key !== 'string' || key.length !== 1) return null;
     const k = key.toLowerCase();
-    const a = 'qwe'.indexOf(k);
-    const b = 'poi'.indexOf(k);
-    if (a === -1 && b === -1) return null;
-    const table = SCORE_KEY_POINTS[league] || [1];
-    const i = a !== -1 ? a : b;
-    if (i >= table.length) return null;
-    return { op: 'add', side: a !== -1 ? 'a' : 'b', points: table[i] };
+    const side = SCORE_KEYS.a.indexOf(k) !== -1 ? 'a' : 'b';
+    const play = scorePlays(league)[SCORE_KEYS[side].indexOf(k)];
+    return play ? { op: 'add', side, points: play.points } : null;
   }
 
   // The op that undoes `op` after it was applied to `before` and gave `after` (both whole games),
-  // or null when there is nothing to undo from the keyboard. An add is undone by the opposite add,
-  // for what it really moved (a score clamped at 0 or 999 moved less than asked). An end or a final
-  // is undone by the 'undo' op. Everything else (set, edit, resume) is not undone this way.
+  // or null when there is nothing to undo. An add is undone by the opposite add, for what it really
+  // moved (a score clamped at 0 or 999 moved less than asked), so it is safe whatever happened since.
+  // A typed score and a fixed quarter put the old numbers back, and an end or a final is undone by
+  // the 'undo' op: those say what they expect to find and are refused if it changed. Taking a Live
+  // board over, resume, undo and draw are not undone this way.
   function inverseScoreOp(op, before, after) {
     if (!op || typeof op !== 'object' || !before || !after) return null;
+    const was = manualState(before);
+    const is = manualState(after);
     if (op.op === 'add') {
       if (op.side !== 'a' && op.side !== 'b') return null;
-      const moved = manualState(after)[op.side] - manualState(before)[op.side];
+      const moved = is[op.side] - was[op.side];
       return moved === 0 ? null : { op: 'add', side: op.side, points: -moved };
+    }
+    if (op.op === 'set') {
+      if (was.a === is.a && was.b === is.b) return null;
+      if (!before.liveOverride && after.liveOverride) return null;
+      return { op: 'set', a: was.a, b: was.b, from: { a: is.a, b: is.b } };
+    }
+    if (op.op === 'edit') {
+      const at = (game) => {
+        const r = game.results && game.results[op.quarter];
+        return hasResult(r) ? { a: Number(r.a), b: Number(r.b) } : null;
+      };
+      const old = at(before);
+      const now = at(after);
+      if (JSON.stringify(old) === JSON.stringify(now)) return null;
+      return { op: 'edit', quarter: op.quarter, a: old ? old.a : null, b: old ? old.b : null, from: now };
     }
     if (op.op === 'end' || op.op === 'final') {
       const same = JSON.stringify(before.results || {}) === JSON.stringify(after.results || {})
-        && JSON.stringify(manualState(before)) === JSON.stringify(manualState(after));
-      return same ? null : { op: 'undo' };
+        && JSON.stringify(was) === JSON.stringify(is);
+      return same ? null : { op: 'undo', expect: undoTarget(after) };
     }
     return null;
-  }
-
-  // Keypad entry: set one team's score for one quarter, in place. A stored
-  // final draw is left alone on purpose. It is keyed by grid row-col and
-  // computeGame ignores one that does not match the current score, so a score
-  // typed wrong and then corrected keeps its drawn winner.
-  function setQuarterScore(game, quarter, side, value) {
-    if (!game.results[quarter]) game.results[quarter] = {};
-    game.results[quarter][side] = value;
   }
 
   // ---------- Player colors ----------
@@ -1251,7 +1337,7 @@
     applyGuestOp, guestCap, guestNameOf, paidSquareCount, unpaidSquares, cleanGuestName, nameKey,
     THEMES, isTheme, owedSummary, paidAfterAdd, hostAddSquares, setPaidCount, pruneEmptyPlayers, unpaidGuestPicks, parsePlayerList,
     QUARTERS, QLABEL, STATUSES, LEAGUES, SCORING_MODES,
-    scoringMode, manualEntry, applyScoreOp, scoreKeyOp, inverseScoreOp, setQuarterScore, belowEndedQuarter, manualState, hasResult,
+    scoringMode, manualEntry, applyScoreOp, scorePlays, scoreKeyOp, inverseScoreOp, undoTarget, belowEndedQuarter, manualState, hasResult,
     shuffle, shuffledDigits, emptyGrid,
     potOf, actualPotOf, findCol, findRow, computeGame, computeLiveHighlight, payoutAmount, drawnDigits,
     payoutStatus, applyPayoutOp, paidQuartersDisturbed, whoToPay,

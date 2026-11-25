@@ -335,12 +335,20 @@
     boardCard.appendChild(el('div', 'board-legend', '<span class="legend-chip"></span> Square is claimed but not paid for'));
 
     // ---- Results panel ----
-    const resultsCard = el('div', 'card');
+    const resultsCard = el('div', 'card gd-results');
     layout.appendChild(resultsCard);
-    // Manual scoring: the current-score panel sits above the quarter cards
-    // and hides itself in any other mode or before the board is locked.
+    // The score pad sits above the quarters list, which carries the payouts.
     const scorePanel = SBS.scorePanel.create({
       keyboard: !phone, // the Keyboard scoring switch shows on wide screens with a mouse only
+      quarters: false,
+      // The winner the server drew: spin for it here at once, as the TV does on its next poll.
+      onDrawn: (g) => {
+        const info = g.results && g.results.final && g.results.final.autoResolve;
+        if (!info) return;
+        lastSeenDrawAt = info.drawnAt;
+        if (activeDrawReveal) activeDrawReveal.cancel();
+        activeDrawReveal = playDrawReveal({ game: g, row: info.row, col: info.col, elapsedMs: 0, onDone: () => { activeDrawReveal = null; } });
+      },
       getGame: () => game,
       setGame: (g) => {
         // Resume drops liveOverride from the document; assign alone would keep the old one, and
@@ -349,7 +357,7 @@
         Object.assign(game, g);
         const c = computeGame(game);
         drawBoard(c);
-        refreshQuarterCards(c);
+        refreshResults(c);
       }
     });
     resultsCard.appendChild(scorePanel.el);
@@ -415,6 +423,7 @@
         });
         if (focus) tabEls[k].focus();
         if (k === 'board') fitTeamBadges(boardHolder);
+        updateFeedBanner(); // the pad says it on the Score tab
       }
       select(tab, false);
 
@@ -431,7 +440,7 @@
           Object.assign(game, saved);
           const c = computeGame(game);
           drawBoard(c);
-          refreshQuarterCards(c);
+          refreshResults(c);
           scorePanel.update();
           updateFeedBanner();
         } catch (e) {
@@ -445,7 +454,7 @@
         const holding = game.liveOverride === true;
         const down = !!(game.liveFeed && game.liveFeed.available === false);
         feedBanner.innerHTML = '';
-        feedBanner.hidden = !(live && (down || holding));
+        feedBanner.hidden = tab === 'score' || !(live && (down || holding));
         if (feedBanner.hidden) return;
         const msg = el('span', 'gd-feed-msg');
         const b = el('button', '');
@@ -457,145 +466,146 @@
         } else {
           msg.innerHTML = '<strong>Live scores are down.</strong>';
           b.textContent = 'Take over';
-          b.addEventListener('click', () => {
-            const cur = window.GameLogic.manualState(game);
-            runOp({ op: 'set', a: cur.a, b: cur.b, override: true });
-          });
+          // No points: the server starts from its own copy of the feed, newer than this screen's.
+          b.addEventListener('click', () => runOp({ op: 'add', side: 'a', points: 0, override: true }));
         }
         feedBanner.append(msg, b);
       };
       updateFeedBanner();
     }
-    resultsCard.appendChild(el('h3', '', 'Quarterly Results'));
-    const qgrid = el('div', 'quarters');
-    resultsCard.appendChild(qgrid);
-
-    // Quarter cards are built once and then updated in place. Rebuilding them
-    // on every save destroyed the score input the host was typing into, which
-    // on an iPad also dismissed the keyboard mid-entry.
-    const qcards = {};
     // A wide screen (R35) keeps its panel in sync from here; set once that panel is built.
     let drawWide = () => {};
+    const GL = window.GameLogic;
+    const CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5l10 -10"></path></svg>';
 
-    // Final on an empty square: the host draws the winner at random. The quarter card and the
-    // wide quarters list both come here.
-    async function runDraw(res) {
-      const winnerIdx = drawFinalWinner(game);
-      if (winnerIdx === -1) { showAlert('No squares are filled in — cannot draw a winner.'); return; }
-      const row = Math.floor(winnerIdx / 10), col = winnerIdx % 10;
-      if (!game.results.final) game.results.final = {};
-      const drawnAt = Date.now();
-      game.results.final.autoResolve = { key: `${res.row}-${res.col}`, row, col, drawnAt };
-      lastSeenDrawAt = drawnAt;
-      if (activeDrawReveal) activeDrawReveal.cancel();
-      activeDrawReveal = playDrawReveal({ game, row, col, elapsedMs: 0, onDone: () => { activeDrawReveal = null; } });
-      await persist();
+    // One line per quarter: score, winner, Mark paid out, Fix. Rows are built once and filled in
+    // place (a row is left alone while nothing about it changed).
+    const rows = {};
+    const qsec = el('section', 'gd-quarters');
+    const qhead = el('div', 'gd-qhead', '<h3>Quarters</h3><span class="gd-qeach"></span>');
+    const qlist = el('ul', 'gd-qlist');
+    qsec.append(qhead, qlist);
+    QUARTERS.forEach(q => {
+      const li = el('li', 'gd-q');
+      li.dataset.q = q;
+      rows[q] = { li, sig: null };
+      qlist.appendChild(li);
+    });
+    const qName = (q) => (q === 'final' ? 'Final' : QLABEL[q]);
+
+    function focusIn(li, key) {
+      const hit = key && li.querySelector(`[data-gdq="${key}"]`);
+      if (hit) hit.focus();
     }
 
-    function buildQuarterCards(computedNow) {
-      qgrid.innerHTML = '';
-      QUARTERS.forEach(q => {
-        const res = computedNow.results[q];
-        const qcard = el('div', 'qcard');
-        const label = q === 'final' ? 'Final Score' : QLABEL[q];
-        qcard.innerHTML = `<h4><span>${label}</span><span class="qamt"></span></h4>`;
-        const scoreRow = el('div', 'score-inputs');
-        scoreRow.innerHTML = `
-          <div class="score-team badge-fit">
-            ${teamBadge(game, 'A', { logoSize: 16, cls: 'team-badge-sm' })}
-            <input type="number" min="0" id="score-${q}-a" value="${res.a === null ? '' : res.a}">
-          </div>
-          <span class="vs">–</span>
-          <div class="score-team badge-fit">
-            ${teamBadge(game, 'B', { logoSize: 16, cls: 'team-badge-sm' })}
-            <input type="number" min="0" id="score-${q}-b" value="${res.b === null ? '' : res.b}">
-          </div>
-        `;
-        qcard.appendChild(scoreRow);
-
-        const outcome = el('div', 'outcome');
-        qcard.appendChild(outcome);
-        const actionsEl = el('div', '');
-        qcard.appendChild(actionsEl);
-        const payEl = el('div', 'qpay');
-        payEl.hidden = true;
-        qcard.appendChild(payEl);
-        qgrid.appendChild(qcard);
-
-        const inputA = scoreRow.querySelector(`#score-${q}-a`);
-        const inputB = scoreRow.querySelector(`#score-${q}-b`);
-        // Manual scoring: results move only through the score panel (End,
-        // Undo, Edit), so typing here can never desync them from the period.
-        if (window.GameLogic.scoringMode(game) === 'manual') {
-          [inputA, inputB].forEach(i => { i.readOnly = true; i.setAttribute('aria-readonly', 'true'); i.title = 'Use the Current score panel to change scores.'; });
+    function drawRow(q, i, c, pays, firstPending) {
+      const r = rows[q];
+      const res = c.results[q];
+      const pay = pays[q];
+      const scored = res.a !== null && res.b !== null;
+      const digits = res.autoResolved ? drawnDigits(game, res) : null;
+      const sig = JSON.stringify([res.a, res.b, res.resolved, res.pushed, res.needsDraw, res.winnerName, res.autoResolved, digits, res.amount, res.carryIn, pay.state, pay.name, pay.amount, pay.paid, game.status, i === firstPending]);
+      if (sig === r.sig) return;
+      r.sig = sig;
+      const act = document.activeElement;
+      const keep = act && r.li.contains(act) ? act.dataset.gdq : null;
+      const li = r.li;
+      li.innerHTML = '';
+      li.className = 'gd-q is-' + pay.state;
+      const label = qName(q);
+      let who = '';
+      let whoCls = '';
+      let note = null;
+      let noteCls = '';
+      let draw = false;
+      if (!scored) {
+        if (game.status === 'started' && i === firstPending) { who = 'In play'; whoCls = ' is-dim'; }
+        if (res.carryIn > 0) note = `Includes ${money(res.carryIn)} rolled over from an earlier push. It goes to whichever quarter is scored next.`;
+      } else if (res.resolved && res.pushed) {
+        who = 'PUSH';
+        whoCls = ' is-push';
+        note = `PUSH: no one in that square. ${money(res.amount)} rolls into the next payout.`;
+      } else if (res.resolved && res.winnerName) {
+        who = res.winnerName;
+        if (res.autoResolved) note = `Auto-drawn: the square was empty${digits ? `; drawn numbers ${digits.y}-${digits.x}` : ''}.`;
+      } else if (q === 'final' && res.needsDraw) {
+        note = 'That square is empty! A winner must be drawn.';
+        noteCls = ' is-push';
+        draw = true;
+      }
+      li.appendChild(el('span', 'gd-q-lbl', label));
+      li.appendChild(el('span', 'gd-q-score', scored ? `${res.a}–${res.b}` : '–'));
+      const whoEl = el('span', 'gd-q-who' + whoCls);
+      const nameEl = el('span', 'gd-q-name');
+      nameEl.textContent = who;
+      nameEl.title = who;
+      whoEl.appendChild(nameEl);
+      if (pay.name && (pay.state === 'unpaid' || pay.state === 'paid' || pay.state === 'needsSettling')) whoEl.appendChild(el('span', 'gd-q-amt', money(pay.amount)));
+      li.appendChild(whoEl);
+      const payEl = el('span', 'gd-q-pay');
+      if (pay.state === 'unpaid') {
+        const b = payButton('Mark paid out', 'gd-pay is-owed', 'paid', pay);
+        b.setAttribute('aria-label', `Mark ${pay.name} paid out for ${label}, ${money(pay.amount)}`);
+        b.dataset.gdq = 'pay';
+        payEl.appendChild(b);
+      } else if (pay.state === 'paid') {
+        const b = payButton(CHECK + 'Paid out', 'gd-pay is-paid', 'unpaid', pay);
+        b.setAttribute('aria-label', `${label} is paid out to ${pay.name}, ${money(pay.amount)}. Undo`);
+        b.title = 'Tap to undo';
+        b.dataset.gdq = 'pay';
+        payEl.appendChild(b);
+      }
+      li.appendChild(payEl);
+      const editEl = el('span', 'gd-q-fix-slot');
+      // A Manual quarter is scored by ending it; on any other board the host may also fill one in.
+      if (scored || GL.scoringMode(game) !== 'manual') {
+        const b = el('button', 'sp-fix', scored ? 'Fix' : 'Enter');
+        b.type = 'button';
+        b.dataset.gdq = 'fix';
+        b.setAttribute('aria-label', `${scored ? 'Fix' : 'Enter'} the ${label} score`);
+        b.addEventListener('click', () => scorePanel.fix(q));
+        editEl.appendChild(b);
+      }
+      li.appendChild(editEl);
+      if (pay.state === 'needsSettling') {
+        const nowTxt = pay.name ? `${pay.name} is owed ${money(pay.amount)}` : 'nobody is owed anything for it';
+        const box = el('div', 'gd-q-note is-settle');
+        box.setAttribute('role', 'status');
+        const msg = el('span', 'gd-q-msg', `<strong>Needs settling.</strong> ${escapeHtml(`You paid ${pay.paid.name} ${money(pay.paid.amount)}; now ${nowTxt}. Sort it out with them, then mark it settled.`)}`);
+        const b = payButton('Settled', 'small', 'settle', pay);
+        b.dataset.gdq = 'settle';
+        box.append(msg, b);
+        li.appendChild(box);
+      } else if (note || draw) {
+        const box = el('div', 'gd-q-note' + noteCls);
+        const msg = el('span', 'gd-q-msg');
+        msg.textContent = note;
+        box.appendChild(msg);
+        if (draw) {
+          const b = el('button', 'small', 'Draw the winner');
+          b.type = 'button';
+          b.dataset.gdq = 'draw';
+          b.addEventListener('click', () => scorePanel.drawWinner());
+          box.appendChild(b);
         }
-        inputA.addEventListener('input', (e) => onScoreChange(q, 'a', e.target.value));
-        inputB.addEventListener('input', (e) => onScoreChange(q, 'b', e.target.value));
-        // Re-render with the normalized value once the host moves on.
-        inputA.addEventListener('blur', () => refreshQuarterCards(computeGame(game)));
-        inputB.addEventListener('blur', () => refreshQuarterCards(computeGame(game)));
-
-        qcards[q] = { amtEl: qcard.querySelector('.qamt'), outcome, inputA, inputB, actionsEl, payEl };
-      });
-      refreshQuarterCards(computedNow);
+        li.appendChild(box);
+      }
+      focusIn(li, keep);
     }
 
-    function refreshQuarterCards(computedNow) {
+    function drawRows(c) {
       const pays = payoutStatus(game);
-      QUARTERS.forEach(q => renderPayRow(q, pays[q]));
+      let firstPending = -1;
+      QUARTERS.forEach((q, i) => { if (firstPending < 0 && (c.results[q].a === null || c.results[q].b === null)) firstPending = i; });
+      QUARTERS.forEach((q, i) => drawRow(q, i, c, pays, firstPending));
+      const base = QUARTERS.map(q => c.results[q].baseAmount);
+      qhead.querySelector('.gd-qeach').textContent = base.every(v => v === base[0]) ? `${money(base[0])} each` : '';
+    }
+
+    function refreshResults(c) {
       renderWhoToPay();
-      QUARTERS.forEach(q => {
-        const res = computedNow.results[q];
-        const refs = qcards[q];
-        if (!refs) return;
-
-        refs.amtEl.textContent = money(payoutAmount(res));
-
-        // Never overwrite a field the host is currently typing in.
-        [['inputA', 'a'], ['inputB', 'b']].forEach(([key, side]) => {
-          const input = refs[key];
-          const want = res[side] === null ? '' : String(res[side]);
-          if (document.activeElement !== input && input.value !== want) input.value = want;
-        });
-
-        const outcome = refs.outcome;
-        outcome.className = 'outcome';
-        if (res.a === null || res.b === null) {
-          outcome.classList.add('pending');
-          const rollover = res.carryIn > 0
-            ? ` Includes ${money(res.carryIn)} rolled over from an earlier push — it goes to whichever quarter is scored next.`
-            : '';
-          outcome.textContent = 'Awaiting score entry…' + rollover;
-        } else if (res.resolved && res.pushed) {
-          outcome.classList.add('push');
-          outcome.textContent = `PUSH — no one in that square. ${money(res.amount)} rolls into the next payout.`;
-        } else if (res.resolved && res.winnerName) {
-          outcome.classList.add('win');
-          let winnerTxt = `Winner: ${res.winnerName}`;
-          if (res.autoResolved) {
-            const digits = drawnDigits(game, res);
-            winnerTxt += ` (auto-drawn — square was empty${digits ? `; drawn numbers ${digits.y}-${digits.x}` : ''})`;
-          }
-          outcome.textContent = winnerTxt;
-        } else if (q === 'final' && res.needsDraw) {
-          outcome.classList.add('push', 'outcome-needs-draw');
-          outcome.textContent = 'That square is empty! A winner must be randomly drawn.';
-        } else {
-          outcome.classList.add('pending');
-          outcome.textContent = 'Enter each team\'s score (the last digit of each determines the winning square).';
-        }
-
-        refs.actionsEl.innerHTML = '';
-        refs.actionsEl.className = '';
-        if (q === 'final' && res.needsDraw) {
-          refs.actionsEl.className = 'qcard-actions-center';
-          const drawBtn = el('button', '', 'Randomly Draw Winner');
-          drawBtn.style.marginTop = '10px';
-          drawBtn.addEventListener('click', () => runDraw(res));
-          refs.actionsEl.appendChild(drawBtn);
-        }
-      });
-      drawWide(computedNow);
+      drawRows(c);
+      drawWide(c);
     }
 
     // ---- Payout tracking (R21) ----
@@ -612,31 +622,6 @@
       const body = op === 'unpaid' ? { op, quarter: s.quarter } : { op, quarter: s.quarter, name: s.name, amount: s.amount };
       b.addEventListener('click', () => sendPayout(body, b));
       return b;
-    }
-
-    function renderPayRow(q, s) {
-      const refs = qcards[q];
-      if (!refs) return;
-      const box = refs.payEl;
-      box.innerHTML = '';
-      box.className = 'qpay';
-      box.hidden = ['unpaid', 'paid', 'needsSettling'].indexOf(s.state) === -1;
-      if (box.hidden) return;
-      const msg = el('div', 'qpay-msg');
-      if (s.state === 'unpaid') {
-        msg.textContent = `Pay ${s.name} ${money(s.amount)}`;
-        box.append(msg, payButton('Mark paid out', 'small', 'paid', s));
-      } else if (s.state === 'paid') {
-        box.classList.add('paid');
-        msg.textContent = `Paid out: ${s.name} ${money(s.amount)}`;
-        box.append(msg, payButton('Undo', 'small secondary', 'unpaid', s));
-      } else {
-        box.classList.add('settle');
-        box.setAttribute('role', 'status');
-        const now = s.name ? `${s.name} is owed ${money(s.amount)}` : 'nobody is owed anything for it';
-        msg.innerHTML = `<strong>Needs settling.</strong> ${escapeHtml(`You paid ${s.paid.name} ${money(s.paid.amount)}; now ${now}. Sort it out with them, then mark it settled.`)}`;
-        box.append(msg, payButton('Settled', 'small', 'settle', s));
-      }
     }
 
     // Game over: who still gets paid, per person, plus any quarter to settle.
@@ -662,14 +647,11 @@
       payBusy = true;
       if (btn) btn.disabled = true;
       try {
-        // A typed score still waiting on its debounce goes first, so the mark
-        // and the score the host sees are the same one.
-        if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; await doSave(); }
         const saved = await SBS.api.patchPayout(game.id, op);
         Object.assign(game, saved);
         const c = computeGame(game);
         drawBoard(c);
-        refreshQuarterCards(c);
+        refreshResults(c);
         scorePanel.update();
       } catch (e) {
         if (await SBS.handleConflict(e, game.id)) return;
@@ -678,16 +660,15 @@
         try { Object.assign(game, await SBS.api.getGame(game.id)); } catch (e2) { /* keep what we have */ }
         const c = computeGame(game);
         drawBoard(c);
-        refreshQuarterCards(c);
+        refreshResults(c);
         scorePanel.update();
       } finally {
         payBusy = false;
       }
     }
 
-    buildQuarterCards(computed);
-    resultsCard.appendChild(whoCard);
-    renderWhoToPay();
+    resultsCard.append(qsec, whoCard);
+    refreshResults(computed);
     fitTeamBadges(app);
 
     // ---- Wide screens (1024 px and up, not a phone): board left, panel right ----
@@ -697,7 +678,7 @@
     function redrawAll() {
       const c = computeGame(game);
       drawBoard(c);
-      refreshQuarterCards(c);
+      refreshResults(c);
       scorePanel.update();
       updateFeedBanner();
       drawStrip();
@@ -705,11 +686,9 @@
     }
 
     // The Paid pill: the same guarded save as Manage Players, through saveWith, so a score that
-    // changed on another device is kept (the change is applied again to the newer board). A score
-    // typed here and still waiting on its debounce is saved first, as sendPayout does.
+    // changed on another device is kept (the change is applied again to the newer board).
     async function savePlayers(change, showErr) {
       try {
-        if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; await doSave(); }
         return await SBS.saveWith(game, change);
       } catch (e) {
         if (await SBS.handleConflict(e, game.id)) return null;
@@ -735,10 +714,8 @@
       players.draw();
 
       // ---- Wide Game Day (R35): a tabbed panel on the left, the grid on the right ----
-      const GL = window.GameLogic;
       const periodLabel = SBS.board.periodLabel;
       const PENCIL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"></path><path d="M13.5 6.5l4 4"></path></svg>';
-      const CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5l10 -10"></path></svg>';
 
       const side = el('aside', 'card gd-side');
       side.setAttribute('aria-label', 'Scoring and players');
@@ -788,11 +765,6 @@
       }
       side.append(tabBar, scorePane, playersPane);
 
-      // Read-only score for a board the host is not scoring (Live with the feed up, Simulation, or
-      // a Live board once it is over). The panel itself takes over whenever the host can score.
-      const liveEl = el('section', 'gd-live');
-      let liveSig = null;
-      const holdsPanel = (g) => GL.manualEntry(g) && (g.status === 'started' || g.status === 'finished');
       function shown(g) {
         const ls = g.liveScore;
         const num = (v) => Number.isFinite(v);
@@ -818,216 +790,6 @@
         if (mode === 'manual' || (ls && ls.manual)) return ['MANUAL', 'manual'];
         if (g.liveFeed && g.liveFeed.available === false) return ['FEED OFFLINE', 'off'];
         return ls && ls.state !== 'pre' ? ['LIVE', 'live'] : null; // nothing is live before kickoff
-      }
-      function drawLive() {
-        const g = game;
-        liveEl.hidden = holdsPanel(g) || (g.status !== 'started' && g.status !== 'finished');
-        if (liveEl.hidden) { liveSig = null; return; }
-        const sc = shown(g);
-        const st = statusOf(g) || (sc.when ? [sc.when, 'live'] : null);
-        const sig = JSON.stringify([sc, st, g.status, GL.scoringMode(g)]);
-        if (sig === liveSig) return;
-        liveSig = sig;
-        const sim = st && st[1] === 'sim';
-        const val = (v) => (v === null ? '–' : String(v));
-        const tile = (side) => `<div class="gd-live-tile"><span class="badge-fit">${teamBadge(g, side, { logoSize: 18, cls: 'team-badge-sm' })}</span><span class="gd-live-pts">${val(side === 'A' ? sc.a : sc.b)}</span></div>`;
-        const chip = g.status === 'finished' ? '' : `<span class="gd-live-chip is-${st ? st[1] : 'live'}">${st ? `<span class="gd-live-dot" aria-hidden="true"></span>${escapeHtml(sc.when || st[0])}` : ''}</span>`;
-        const note = g.status === 'finished' ? '' : `<p class="gd-live-note">${sim ? 'This is a practice game with made-up scores. Each quarter fills in on its own when it ends.' : 'Scores come from the live feed. Each quarter fills in on its own when it ends.'}</p>`;
-        liveEl.innerHTML = `<div class="gd-live-head"><h3>${g.status === 'finished' ? 'Final score' : 'Live score'}</h3>${chip}</div>
-          <div class="gd-live-tiles">${tile('A')}${tile('B')}</div>${note}`;
-        fitTeamBadges(liveEl);
-      }
-
-      // One line per quarter: score, winner, Mark paid out, edit. Rows are built once and filled in
-      // place (a row is left alone while its score is being edited or nothing about it changed).
-      const rows = {};
-      let editingQ = null;
-      const qsec = el('section', 'gd-quarters');
-      const qhead = el('div', 'gd-qhead', '<h3>Quarters</h3><span class="gd-qeach"></span>');
-      const qlist = el('ul', 'gd-qlist');
-      qsec.append(qhead, qlist);
-      QUARTERS.forEach(q => {
-        const li = el('li', 'gd-q');
-        li.dataset.q = q;
-        rows[q] = { li, sig: null };
-        qlist.appendChild(li);
-      });
-      const qName = (q) => (q === 'final' ? 'Final' : QLABEL[q]);
-
-      function focusIn(li, key) {
-        const hit = key && li.querySelector(`[data-gdq="${key}"]`);
-        if (hit) hit.focus();
-      }
-
-      function drawRow(q, i, c, pays, firstPending) {
-        const r = rows[q];
-        if (editingQ === q) return;
-        const res = c.results[q];
-        const pay = pays[q];
-        const scored = res.a !== null && res.b !== null;
-        const digits = res.autoResolved ? drawnDigits(game, res) : null;
-        const sig = JSON.stringify([res.a, res.b, res.resolved, res.pushed, res.needsDraw, res.winnerName, res.autoResolved, digits, res.amount, res.carryIn, pay.state, pay.name, pay.amount, pay.paid, game.status, i === firstPending]);
-        if (sig === r.sig) return;
-        r.sig = sig;
-        const act = document.activeElement;
-        const keep = act && r.li.contains(act) ? act.dataset.gdq : null;
-        const li = r.li;
-        li.innerHTML = '';
-        li.className = 'gd-q is-' + pay.state;
-        const label = qName(q);
-        let who = '';
-        let whoCls = '';
-        let note = null;
-        let noteCls = '';
-        let draw = false;
-        if (!scored) {
-          if (game.status === 'started' && i === firstPending) { who = 'In play'; whoCls = ' is-dim'; }
-          if (res.carryIn > 0) note = `Includes ${money(res.carryIn)} rolled over from an earlier push. It goes to whichever quarter is scored next.`;
-        } else if (res.resolved && res.pushed) {
-          who = 'PUSH';
-          whoCls = ' is-push';
-          note = `PUSH: no one in that square. ${money(res.amount)} rolls into the next payout.`;
-        } else if (res.resolved && res.winnerName) {
-          who = res.winnerName;
-          if (res.autoResolved) note = `Auto-drawn: the square was empty${digits ? `; drawn numbers ${digits.y}-${digits.x}` : ''}.`;
-        } else if (q === 'final' && res.needsDraw) {
-          note = 'That square is empty! A winner must be randomly drawn.';
-          noteCls = ' is-push';
-          draw = true;
-        }
-        li.appendChild(el('span', 'gd-q-lbl', label));
-        li.appendChild(el('span', 'gd-q-score', scored ? `${res.a}–${res.b}` : '–'));
-        const whoEl = el('span', 'gd-q-who' + whoCls);
-        const nameEl = el('span', 'gd-q-name');
-        nameEl.textContent = who;
-        nameEl.title = who;
-        whoEl.appendChild(nameEl);
-        if (pay.name && (pay.state === 'unpaid' || pay.state === 'paid' || pay.state === 'needsSettling')) whoEl.appendChild(el('span', 'gd-q-amt', money(pay.amount)));
-        li.appendChild(whoEl);
-        const payEl = el('span', 'gd-q-pay');
-        if (pay.state === 'unpaid') {
-          const b = payButton('Mark paid out', 'gd-pay is-owed', 'paid', pay);
-          b.setAttribute('aria-label', `Mark ${pay.name} paid out for ${label}, ${money(pay.amount)}`);
-          b.dataset.gdq = 'pay';
-          payEl.appendChild(b);
-        } else if (pay.state === 'paid') {
-          const b = payButton(CHECK + 'Paid out', 'gd-pay is-paid', 'unpaid', pay);
-          b.setAttribute('aria-label', `${label} is paid out to ${pay.name}, ${money(pay.amount)}. Undo`);
-          b.title = 'Tap to undo';
-          b.dataset.gdq = 'pay';
-          payEl.appendChild(b);
-        }
-        li.appendChild(payEl);
-        const editEl = el('span', 'gd-q-edit-slot');
-        // A Manual quarter is scored by ending it; on any other board the host may also fill one in.
-        if (scored || GL.scoringMode(game) !== 'manual') {
-          const b = el('button', 'gd-icon-btn', PENCIL);
-          b.type = 'button';
-          b.dataset.gdq = 'edit';
-          b.setAttribute('aria-label', `Edit ${label} score`);
-          b.title = `Edit ${label} score`;
-          b.addEventListener('click', () => startEdit(q));
-          editEl.appendChild(b);
-        }
-        li.appendChild(editEl);
-        if (pay.state === 'needsSettling') {
-          const nowTxt = pay.name ? `${pay.name} is owed ${money(pay.amount)}` : 'nobody is owed anything for it';
-          const box = el('div', 'gd-q-note is-settle');
-          box.setAttribute('role', 'status');
-          const msg = el('span', 'gd-q-msg', `<strong>Needs settling.</strong> ${escapeHtml(`You paid ${pay.paid.name} ${money(pay.paid.amount)}; now ${nowTxt}. Sort it out with them, then mark it settled.`)}`);
-          const b = payButton('Settled', 'small', 'settle', pay);
-          b.dataset.gdq = 'settle';
-          box.append(msg, b);
-          li.appendChild(box);
-        } else if (note || draw) {
-          const box = el('div', 'gd-q-note' + noteCls);
-          const msg = el('span', 'gd-q-msg');
-          msg.textContent = note;
-          box.appendChild(msg);
-          if (draw) {
-            const b = el('button', 'small', 'Randomly Draw Winner');
-            b.type = 'button';
-            b.dataset.gdq = 'draw';
-            b.addEventListener('click', () => runDraw(res));
-            box.appendChild(b);
-          }
-          li.appendChild(box);
-        }
-        focusIn(li, keep);
-      }
-
-      // The host's correction of a quarter's score. A Manual board goes through the panel's own
-      // guarded 'edit' operation (so the period stays true); any other board saves the document,
-      // as the quarter cards always did. Both warn first when a paid-out quarter would be unsettled.
-      async function putEdit(q, a, b) {
-        const after = JSON.parse(JSON.stringify(game));
-        if (!after.results[q]) after.results[q] = {};
-        after.results[q].a = a;
-        after.results[q].b = b;
-        const disturbed = paidQuartersDisturbed(game, after);
-        if (disturbed.length && !(await showConfirm(disturbMessage(disturbed)))) return;
-        if (!game.results[q]) game.results[q] = {};
-        game.results[q].a = a;
-        game.results[q].b = b;
-        await persist();
-      }
-
-      function startEdit(q) {
-        editingQ = q;
-        drawRows(computeGame(game)); // a row that was being edited goes back to its line
-        const r = rows[q];
-        r.sig = null;
-        const res = computeGame(game).results[q];
-        const li = r.li;
-        li.innerHTML = '';
-        li.className = 'gd-q is-editing';
-        li.appendChild(el('span', 'gd-q-lbl', qName(q)));
-        const form = el('form', 'gd-q-form');
-        form.innerHTML = `<label>${escapeHtml(game.teamA)} <input type="number" min="0" max="999" name="a"></label>
-          <label>${escapeHtml(game.teamB)} <input type="number" min="0" max="999" name="b"></label>`;
-        form.elements.a.value = res.a === null ? '' : String(res.a);
-        form.elements.b.value = res.b === null ? '' : String(res.b);
-        const save = el('button', 'sp-btn sp-primary', 'Save');
-        save.type = 'submit';
-        const cancel = el('button', 'sp-btn', 'Cancel');
-        cancel.type = 'button';
-        const close = () => { editingQ = null; r.sig = null; drawRows(computeGame(game)); focusIn(li, 'edit'); };
-        cancel.addEventListener('click', close);
-        form.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); close(); } });
-        form.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const manual = GL.scoringMode(game) === 'manual';
-          const parse = (v) => { v = v.trim(); return v === '' ? '' : /^\d+$/.test(v) ? parseInt(v, 10) : NaN; };
-          const a = parse(form.elements.a.value);
-          const b = parse(form.elements.b.value);
-          // Another board mode may clear a quarter by blanking both boxes, as the quarter cards did.
-          const bad = [a, b].some(v => (v === '' ? manual : !(Number.isInteger(v) && v >= 0 && v <= 999)));
-          if (bad) { showAlert('Scores must be whole numbers from 0 to 999.'); return; }
-          save.disabled = true;
-          try {
-            if (manual) await scorePanel.edit(q, a, b); else await putEdit(q, a, b);
-          } finally {
-            r.sig = null;
-            // Unless the host opened another row while this one saved.
-            const mine = editingQ === q;
-            if (mine) editingQ = null;
-            drawRows(computeGame(game));
-            if (mine) focusIn(li, 'edit');
-          }
-        });
-        form.append(save, cancel);
-        li.appendChild(form);
-        form.elements.a.focus();
-        form.elements.a.select();
-      }
-
-      function drawRows(c) {
-        const pays = payoutStatus(game);
-        let firstPending = -1;
-        QUARTERS.forEach((q, i) => { if (firstPending < 0 && (c.results[q].a === null || c.results[q].b === null)) firstPending = i; });
-        QUARTERS.forEach((q, i) => drawRow(q, i, c, pays, firstPending));
-        const base = QUARTERS.map(q => c.results[q].baseAmount);
-        qhead.querySelector('.gd-qeach').textContent = base.every(v => v === base[0]) ? `${money(base[0])} each` : '';
       }
 
       // ---- Above the grid: score and period, squares sold, the pot, the price ----
@@ -1078,7 +840,7 @@
         fitStage();
       }
 
-      drawWide = (c) => { drawLive(); drawRows(c); drawStage(c); };
+      drawWide = drawStage;
 
       const wideQuery = window.matchMedia('(min-width: 1024px)');
       const fineQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
@@ -1092,7 +854,7 @@
         main.classList.toggle('gd-main', wide);
         if (wide) {
           selectWide(wideTab, false);
-          scorePane.append(scorePanel.el, liveEl, whoCard, qsec);
+          scorePane.append(scorePanel.el, whoCard, qsec);
           stage.appendChild(boardCard);
           layout.append(side, stage);
           resultsCard.remove();
@@ -1100,8 +862,7 @@
           drawWide(computeGame(game));
           scorePanel.update();
         } else {
-          resultsCard.insertBefore(scorePanel.el, resultsCard.firstChild);
-          resultsCard.appendChild(whoCard);
+          resultsCard.append(scorePanel.el, qsec, whoCard);
           layout.append(boardCard, resultsCard);
           side.remove();
           stage.remove();
@@ -1118,48 +879,6 @@
         app.classList.remove('fit-screen');
       });
       if (wideQuery.matches) placeCards();
-    }
-
-    // The keypad warns before it unsettles a paid quarter. Once the first
-    // keystroke is confirmed the quarter already reads Needs settling, so the
-    // rest of the number does not ask again.
-    async function onScoreChange(q, side, val) {
-      // Full score is stored and displayed as entered; only its last digit
-      // is used to place the square (see computeGame / lastDigit).
-      const num = val === '' ? '' : Math.max(0, parseInt(val, 10) || 0);
-      const after = JSON.parse(JSON.stringify(game));
-      if (!after.results[q]) after.results[q] = {};
-      after.results[q][side] = num;
-      const disturbed = paidQuartersDisturbed(game, after);
-      if (disturbed.length) {
-        const input = qcards[q][side === 'a' ? 'inputA' : 'inputB'];
-        const ok = await showConfirm(disturbMessage(disturbed));
-        if (!ok) { refreshQuarterCards(computeGame(game)); return; }
-        // The modal's blur re-rendered the box with the old score; put the typed one back.
-        if (input) { input.value = num === '' ? '' : String(num); input.focus(); }
-      }
-      if (!game.results[q]) game.results[q] = {};
-      game.results[q][side] = num;
-      persist(true);
-    }
-
-    // Uniform pick among the claimed squares.
-    function drawFinalWinner(g) {
-      const filledIdx = g.squares.map((s, i) => s ? i : -1).filter(i => i >= 0);
-      if (filledIdx.length === 0) return -1;
-      return filledIdx[Math.floor(Math.random() * filledIdx.length)];
-    }
-
-    let saveTimer = null;
-    async function persist(debounce) {
-      if (debounce) {
-        clearTimeout(saveTimer);
-        // Cleared when it fires: pollLive skips while a save is pending, and a
-        // timer left set stopped live updates for good after the first edit.
-        saveTimer = setTimeout(() => { saveTimer = null; doSave(); }, 500);
-      } else {
-        await doSave();
-      }
     }
 
     // Tracks the most recent Final "Randomly Draw Winner" event this board
@@ -1181,43 +900,19 @@
       activeDrawReveal = playDrawReveal({ game: freshGame, row: info.row, col: info.col, elapsedMs: elapsed, onDone: () => { activeDrawReveal = null; } });
     }
 
-    async function doSave() {
-      try {
-        const saved = await SBS.api.saveGame(game);
-        Object.assign(game, saved);
-        checkDrawSync(game);
-        const newComputed = computeGame(game);
-        drawBoard(newComputed);
-        refreshQuarterCards(newComputed);
-        scorePanel.update();
-      } catch (e) {
-        if (await SBS.handleConflict(e, game.id)) return;
-        const denied = await SBS.handleForbidden(e, game.id);
-        if (denied) {
-          // Drop the unsaved edit: show the server's copy, not the typed one.
-          // The save is debounced, so the host may have left this screen.
-          if (denied.fresh && SBS.currentScreen() === 'board') SBS.openGame(denied.fresh);
-          return;
-        }
-        console.error('Save failed', e);
-        showAlert('Could not save the score: ' + e.message);
-      }
-    }
-
     // Picks up the server's ESPN live-score poll (see server-livescore.js)
-    // and any quarter scores it auto-fills, without disturbing a score box
-    // the host is actively typing into. Skipped while a manual edit is
-    // in flight so the two never race each other.
+    // and any quarter scores it auto-fills. Skipped while a tap on the score
+    // pad is in flight so the two never race each other.
     let syncing = false;
     async function pollLive() {
-      if (saveTimer || syncing || scorePanel.busy()) return;
+      if (syncing || scorePanel.busy()) return;
       syncing = true;
       // A TV window the host closed by hand is noticed here (and when this window is focused).
       if (SBS.present) SBS.present.refresh();
       try {
         const fresh = await SBS.api.pollGame(game.id);
         // A save may have started while the poll was out: its answer wins.
-        if (!fresh || saveTimer || scorePanel.busy()) return;
+        if (!fresh || scorePanel.busy()) return;
         const feedChanged = !!(fresh.liveFeed && fresh.liveFeed.available === false) !== !!(game.liveFeed && game.liveFeed.available === false);
         if (feedChanged) { game.liveFeed = fresh.liveFeed; updateFeedBanner(); scorePanel.update(); drawWide(computeGame(game)); }
         const saved = fresh.updatedAt !== game.updatedAt;
@@ -1226,7 +921,7 @@
           if (saved) checkDrawSync(game);
           const newComputed = computeGame(game);
           drawBoard(newComputed);
-          refreshQuarterCards(newComputed);
+          refreshResults(newComputed);
           scorePanel.update();
           updateFeedBanner();
           drawStrip();

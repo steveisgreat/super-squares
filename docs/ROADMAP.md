@@ -351,7 +351,7 @@ Helpers and one score pad (R36–R39): [decision 025](decisions/025-helpers-and-
 design and mockup 2026-11-25 ("Helpers and one score pad" canvas, claude.ai artifact
 `TxJaeNkrcqrnAe9WoKY99Z`, private). Build in this order.
 
-**R36. One score pad** — `Opus` (score operations, test-first), `Sonnet` (UI) — Depends on: none.
+**R36. One score pad** — `Opus` (score operations, test-first), `Sonnet` (UI) — ✅ built 2026-11-25, not pushed. Depends on: none.
 The labeled pad replaces the score panel's layout on Game Day (phone and wide) and in the Party View
 strip, with one Undo, an end-of-quarter question that names the winner, and Fix per quarter. The
 quarter score boxes, the Edit form and the wide pencil form go. `edit` works on Live and

@@ -344,7 +344,8 @@ async function accountsRoutes() {
     eq(r.statusCode, 200, 'status');
     const doc = t.db.games[GAME_A].doc;
     eq([doc.squares.length, doc.squarePrice, doc.players.Ann.paid, 'owner_id' in doc], [100, 10, false, false], 'untouched');
-    eq((await call('PATCH', `/api/game/${GAME_A}/score`, { cookie, body: { op: 'draw' } })).statusCode, 400, 'no draw');
+    eq((await call('PATCH', `/api/game/${GAME_A}/score`, { cookie, body: { op: 'draw', row: 0, col: 0 } })).statusCode, 409, 'no draw unless the final needs one (decision 025)');
+    eq(t.db.games[GAME_A].doc.results, doc.results, 'results untouched');
   });
 
   await test('a code works once; wrong, used, cancelled and malformed all get one answer and no cookie', async () => {

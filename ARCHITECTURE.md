@@ -47,7 +47,7 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `GET /api/games` | host only; list summaries |
 | `GET /api/todays-games` | host only; the setup screen's schedule, read from the shared slate (no provider call of its own) |
 | `POST /api/game`, `PUT /api/game/:id`, `DELETE /api/game/:id` | host only |
-| `PATCH /api/game/:id/score` | host, or a scorer phone of that board (decision 018); one manual-score operation (decision 011) |
+| `PATCH /api/game/:id/score` | host, or a scorer phone of that board (decision 018); one score operation (decisions 011 and 025): `add`, `set`, `end`, `final`, `undo`, `resume`, `edit` (fix, fill in or clear a quarter; works on Live and Simulation without taking over) and `draw` (the server picks the final's stand-in winner). An optional `from` (or `expect` on `undo`) is what the screen showed; 409 if it moved |
 | `POST`, `GET`, `DELETE /api/game/:id/handoff` | host only; make a one-time scorer code → `{ token, scorers, expiresInSeconds }`, count → `{ waiting, scorers }`, remove all scorer phones |
 | `POST /api/handoff` | anonymous; `{ token }` spends the code once, sets `sbs_scorer` (24 h, `Path=/api/game/<id>`) → `{ gameId }`; 401 otherwise |
 | `GET /api/game/:id/role` | public; `{ role: 'host' \| 'scorer' \| 'none' }` for this device |
@@ -100,9 +100,9 @@ always wins.
 `index.html` loads plain scripts in order: `compute.js` (payout math, validation,
 cutoff rules, shared with the server and unit-tested), `teams.js` (NFL/NBA names
 colors and ESPN logo URLs), `qrcode.js`, `core.js` (API client, routing, sign-in prompt by mode and 401 replay, 403 handling), `ui.js`,
-`players.js`, `board.js`, `score-panel.js` (manual score; keyboard scoring on a laptop), `present.js` (Present on an HDMI TV:
+`players.js`, `board.js`, `score-panel.js` (the score pad: the only place a score is entered; one Undo, End and Fix dialogs, keyboard scoring on a laptop), `present.js` (Present on an HDMI TV:
 Party View in its own window, on the second screen when the browser can), then screens: `screen-home` (Home: top bar with New game and the account menu, Today / Coming up / Past games sections of cards with a primary button, Party View and a ⋯ menu, tiles for a TV browser; also setup and the version
-footer), `screen-picking` (two columns from 1024 px, one below, three tabs on a phone; `players.js` has the Players card and payment box it shares with Game Day), `screen-gameday` (from 1024 px, not a phone: a tabbed panel left, the grid right, the page fitted to the window by `#app.fit-screen`; below that, the stat strip, score panel, quarter cards and grid in one column), `screen-phone` (score entry),
+footer), `screen-picking` (two columns from 1024 px, one below, three tabs on a phone; `players.js` has the Players card and payment box it shares with Game Day), `screen-gameday` (from 1024 px, not a phone: a tabbed panel left, the grid right, the page fitted to the window by `#app.fit-screen`; below that, the stat strip, grid, score pad and quarters list in one column), `screen-phone` (score entry on another phone: the pad alone, until R37),
 `screen-player` (Player View: pick while picking is open, then My Squares), `screen-tvpair` (TV pairing and the Connect box),
 `screen-mirror` (Mirror mode for one phone, `#mirror-<id>`: TV-style board, score strip on tap),
 `screen-handoff` (scorer-phone code and the `#handoff-<token>` page), and `app.js` (hash router: `#tv-<id>`,

@@ -195,26 +195,30 @@ check('a stored draw is ignored once the final score changes', () => {
 
 // Regression: issue #2. The phone keypad compared the draw's row-col key with
 // the scores and deleted the drawn winner on almost any tap.
-check('keypad taps on the final keep the stored draw', () => {
-  const g = makeGame({ '5,5': 'Ann' }, {
-    results: { final: { a: 17, b: 2, autoResolve: { key: '7-2', row: 5, col: 5, drawnAt: 1 } } }
+check('typing over the final keeps the stored draw', () => {
+  let g = makeGame({ '5,5': 'Ann' }, {
+    status: 'finished', scoring: 'live', results: { final: { a: 17, b: 2, autoResolve: { key: '7-2', row: 5, col: 5, drawnAt: 1 } } }
   });
   const result = () => G.computeGame(g).results.final;
-  eq(result().winnerName, 'Ann', 'drawn winner before any tap');
-  G.setQuarterScore(g, 'final', 'a', 17);
-  eq(result().winnerName, 'Ann', 'same digit tapped again');
-  G.setQuarterScore(g, 'final', 'a', '');
-  assert(!result().resolved, 'no winner while the score is incomplete');
-  G.setQuarterScore(g, 'final', 'a', 18);
+  const type = (a, b) => {
+    const r = G.applyScoreOp(g, { op: 'edit', quarter: 'final', a, b });
+    if (r.error) throw new Error(r.error);
+    g = r.game;
+  };
+  eq(result().winnerName, 'Ann', 'drawn winner before any change');
+  type(17, 2);
+  eq(result().winnerName, 'Ann', 'same score typed again');
+  type(null, null);
+  assert(!result().resolved, 'no winner while the score is cleared');
+  type(18, 2);
   assert(result().needsDraw, 'a different empty square still needs its own draw');
-  G.setQuarterScore(g, 'final', 'a', 17);
+  type(17, 2);
   eq([result().winnerName, result().autoResolved], ['Ann', true], 'score corrected back');
 });
 
-check('setQuarterScore creates a missing quarter and touches only one side', () => {
-  const g = makeGame({}, { results: {} });
-  G.setQuarterScore(g, 'q1', 'a', 7);
-  eq(g.results, { q1: { a: 7 } }, 'results');
+check('typing a missing quarter creates it and touches no other', () => {
+  const g = makeGame({}, { status: 'started', scoring: 'live', results: {} });
+  eq(G.applyScoreOp(g, { op: 'edit', quarter: 'q1', a: 7, b: 0 }).game.results, { q1: { a: 7, b: 0 } }, 'results');
 });
 
 // ---------- shuffle ----------
