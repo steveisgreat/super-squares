@@ -1,5 +1,5 @@
 // The score pad (decision 025 section 6): the only place a score is entered. Game Day, the Party
-// View strip and score entry on another phone all draw this one. Every tap sends one operation to
+// View strip and a helper's Score tab all draw this one. Every tap sends one operation to
 // PATCH /api/game/:id/score (never the whole document). The pure transitions in
 // GameLogic.applyScoreOp run locally first so the number moves instantly; the server's answer then
 // replaces the game. The final's draw is the exception: only the server picks (op 'draw').

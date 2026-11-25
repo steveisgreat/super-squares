@@ -194,11 +194,13 @@
     createGame: (game) => request('/api/game', json('POST', game)),
     saveGame: (game) => request(`/api/game/${game.id}`, json('PUT', game)),
     patchScore: (id, op, o) => request(`/api/game/${id}/score`, json('PATCH', op), o),
-    // Scorer-phone hand-off (R24). The phone's calls are raw: it has no host session.
-    createHandoff: (id) => request(`/api/game/${id}/handoff`, { method: 'POST' }),
-    getHandoff: (id, o) => request(`/api/game/${id}/handoff`, null, o),
-    removeScorers: (id) => request(`/api/game/${id}/handoff`, { method: 'DELETE' }),
-    useHandoff: (token) => rawRequest('/api/handoff', json('POST', { token })),
+    // Helpers (R37). The phone's calls are raw: it has no host session.
+    getHelpers: (id, o) => request(`/api/game/${id}/helpers`, null, o),
+    addHelper: (id, body) => request(`/api/game/${id}/helpers`, json('POST', body)),
+    setHelperJobs: (id, helperId, jobs) => request(`/api/game/${id}/helpers/${helperId}`, json('PATCH', jobs)),
+    newHelperCode: (id, helperId, link) => request(`/api/game/${id}/helpers/${helperId}/code`, json('POST', { link })),
+    removeHelper: (id, helperId) => request(`/api/game/${id}/helpers/${helperId}`, { method: 'DELETE' }),
+    useHelperCode: (token) => rawRequest('/api/helper', json('POST', { token })),
     getRole: (id) => rawRequest(`/api/game/${id}/role`),
     patchPayout: (id, op) => request(`/api/game/${id}/payout`, json('PATCH', op)),
     // Guest picks (R28). Raw on purpose: a 401 here means "no cookie kept" and must never
@@ -286,10 +288,10 @@
 
   // ---------- Theme (R33) ----------
   // The host's theme, one per host. The screens that show one board by id to anyone (the TV, Party
-  // View, the scorer phone, Player View) wear that board's host's theme, cached per board for this
+  // View, Player View) wear that board's host's theme, cached per board for this
   // tab and asked of the server once per id per page load; everything else wears this device's
   // host theme. Nothing here polls, and a failed lookup is silent.
-  const BOARD_THEME_SCREENS = { tv: true, mirror: true, phone: true, player: true };
+  const BOARD_THEME_SCREENS = { tv: true, mirror: true, player: true };
   const themeAsked = new Set();
   const boardThemeKey = (id) => 'sbs-theme-' + String(id).toLowerCase();
 
@@ -326,22 +328,14 @@
     if (route.screen === 'tv') return s.tv(route.id, route.paired, route.from);
     if (route.screen === 'mirror') return s.mirror(route.id, route.from);
     if (route.screen === 'tv-pair') return s.tvPair();
-    if (route.screen === 'phone') return s.phone(route.id, route.back);
-    if (route.screen === 'player') return s.player(route.id);
+    if (route.screen === 'scoreLink') return s.scoreLink(route.id);
+    if (route.screen === 'player') return s.player(route.id, route);
     if (route.screen === 'join') return s.join(route.code);
     if (route.screen === 'login') return s.login(route.token);
-    if (route.screen === 'handoff') return s.handoff(route.token);
+    if (route.screen === 'helper') return s.helper(route.token, route.old);
   };
 
-  // Deep links, so the TV and the phone can each be pointed straight at the
-  // view they need: #tv-<id> (grid on the television) and #score-<id>
-  // (quarter entry on a phone). The phone link always opens in its own tab
-  // (a new one on the same device, or literally a different phone that
-  // scanned the QR code), so there's no shared browser history to "go back"
-  // through — the launching screen instead has to be baked into the link
-  // itself as an optional `-home`/`-board` suffix, read back here as
-  // `route.back`. Defaults to 'board', matching the Game Day screen's own
-  // "Phone Score Entry" button, which doesn't bother adding the suffix.
+  // Deep links, so a TV or a phone can be pointed straight at the view it needs.
   const ID_RE = '[0-9a-f-]{36}';
 
   // Referral (R13): "Host your own board" opens /?ref=<join code>. The code is kept in this
@@ -382,11 +376,12 @@
     if (tv) return { screen: 'tv', id: tv[1] };
     const mirror = hash.match(new RegExp(`^#mirror-(${ID_RE})$`, 'i'));
     if (mirror) return { screen: 'mirror', id: mirror[1] };
-    const phone = hash.match(new RegExp(`^#score-(${ID_RE})(?:-(home|board))?$`, 'i'));
-    if (phone) return { screen: 'phone', id: phone[1], back: phone[2] || 'board' };
+    // Score entry lived here before R37; links people kept still open something (screen-helpers.js).
+    const score = hash.match(new RegExp(`^#score-(${ID_RE})(?:-(?:home|board))?$`, 'i'));
+    if (score) return { screen: 'scoreLink', id: score[1].toLowerCase() };
     // Player companion view: what a grid player sees after scanning the QR
     // code printed/shown at the party — their squares, quarter winners, and
-    // a live "how am I doing" readout. Strictly read-only (see screen-player.js).
+    // a live "how am I doing" readout. A helper's jobs are tabs on it (see screen-player.js).
     const player = hash.match(new RegExp(`^#player-(${ID_RE})$`, 'i'));
     if (player) return { screen: 'player', id: player[1] };
     // Emailed sign-in link. The token is 43 URL-safe characters; anything else
@@ -395,18 +390,20 @@
       const m = hash.match(/^#login-([A-Za-z0-9_-]{43})$/);
       return { screen: 'login', token: m ? m[1] : null };
     }
-    // The one-time code a host shows a scorer's phone (R24), same shape.
-    if (/^#handoff-/i.test(hash)) {
-      const m = hash.match(/^#handoff-([A-Za-z0-9_-]{43})$/);
-      return { screen: 'handoff', token: m ? m[1] : null };
+    // The one-time code a host gives a helper's phone (R37), same shape. #handoff- is its
+    // predecessor (R24), which no longer works.
+    if (/^#helper-/i.test(hash)) {
+      const m = hash.match(/^#helper-([A-Za-z0-9_-]{43})$/);
+      return { screen: 'helper', token: m ? m[1] : null };
     }
+    if (/^#handoff-/i.test(hash)) return { screen: 'helper', token: null, old: true };
     return { screen: 'home' };
   };
 
   // Pasting a sign-in link into a tab that is already open only changes the
   // hash. Other deep links are read at load, as before.
   window.addEventListener('hashchange', () => {
-    if (!/^#(login|handoff)-/i.test(window.location.hash || '')) return;
+    if (!/^#(login|helper|handoff)-/i.test(window.location.hash || '')) return;
     // The prompt asking for this very link would otherwise cover the page.
     SBS.ui.closeEmailPrompt();
     SBS.go(SBS.parseInitialRoute());

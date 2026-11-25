@@ -1,12 +1,12 @@
 // Player companion view: what a grid player sees after scanning the QR code
-// printed or displayed at the party. Read-only — no square picking, no score
-// entry, just "how am I doing right now" plus quarter winners so far. Polls
+// printed or displayed at the party. Read-only for everyone but a helper,
+// whose jobs are tabs at the bottom (decision 025): just "how am I doing right now" plus quarter winners so far. Polls
 // like the TV/phone screens so it stays live without a manual refresh.
 (function () {
   'use strict';
 
   const SBS = window.SBS = window.SBS || {};
-  const { el, escapeHtml, money, showAlert, applyTeamColors, teamBadge, teamAbbr, teamStyle, fitTeamBadges, isPhone } = SBS.ui;
+  const { el, textEl, escapeHtml, money, showAlert, applyTeamColors, teamBadge, teamAbbr, teamStyle, fitTeamBadges, isPhone } = SBS.ui;
   const { playerSummaries } = SBS.players;
   const { QUARTERS, QLABEL, computeGame, computeLiveHighlight, payoutAmount, drawnDigits } = window.GameLogic;
 
@@ -585,7 +585,180 @@
     return { root, render, start, followName };
   }
 
-  function renderPlayer(id) {
+  // Tabler "layout-grid" and "scoreboard" (MIT, 24 px outline).
+  const tabSvg = (paths) => `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+  const GRID_ICON = tabSvg('<path d="M4 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M14 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M4 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M14 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/>');
+  const SCORE_ICON = tabSvg('<path d="M3 5m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"/><path d="M12 5v2"/><path d="M12 10v1"/><path d="M12 14v1"/><path d="M12 18v1"/><path d="M7 3v2"/><path d="M17 3v2"/><path d="M15 10.5v3a1.5 1.5 0 0 0 3 0v-3a1.5 1.5 0 0 0 -3 0z"/><path d="M6 9h1.5a1.5 1.5 0 0 1 0 3h-.5h.5a1.5 1.5 0 0 1 0 3h-1.5"/>');
+
+  // The helper's side of Player View (decision 025 section 2): a welcome once, then a tab per job.
+  // ctx: { id, route, wrap, header, game(), setGame(g), redraw(), selected(), choose(name) }.
+  // Opening a tab changes nothing on the server; the jobs come from GET …/role. The first tab is this
+  // page as any player sees it, and no job is needed to see it. The name chosen here is display only:
+  // a helper need not be playing, and nothing is authorized by a name.
+  function createHelperTabs(ctx) {
+    const flag = SBS.helpers.phone;
+    let role = null;          // the server's last answer, or null
+    let tab = 'mine';
+    let wanted = ctx.route.tab === 'score' ? 'score' : null; // an old score link
+    const maybe = () => ctx.route.helper === true || !!flag.get(ctx.id);
+
+    const pane = el('div', 'helper-pane');
+    pane.hidden = true;
+    const nav = el('nav', 'helper-tabs');
+    nav.setAttribute('aria-label', 'This board');
+    nav.hidden = true;
+    const note = el('p', 'helper-note');
+    note.setAttribute('role', 'status');
+    note.hidden = true;
+    ctx.header.after(note, pane);
+    ctx.wrap.appendChild(nav);
+
+    let pad = null; // made the first time it is shown: most phones here are guests'
+    const makePad = () => SBS.scorePanel.create({
+      getGame: ctx.game,
+      setGame: ctx.setGame,
+      patch: (gid, op) => SBS.api.patchScore(gid, op, { prompt: false }),
+      // 403, not 401, when this phone happens to be signed in as some other host.
+      onError: (e) => {
+        if (e.status !== 401 && e.status !== 403) return false;
+        lost();
+        ask();
+        return true;
+      }
+    });
+
+    const isOpen = () => ctx.game().status === 'started' || ctx.game().status === 'finished';
+    const jobNames = () => [role && role.canScore ? 'Scorekeeper' : ''].filter(Boolean).join(' and ');
+
+    function say(text) {
+      note.textContent = text || '';
+      note.hidden = !text;
+    }
+    function lost() {
+      role = null;
+      say('You no longer keep score on this board. If that is a mistake, ask the host for a new code.');
+      tab = 'mine';
+      draw();
+      ctx.redraw();
+    }
+
+    async function ask() {
+      if (!maybe()) return;
+      let r;
+      try {
+        r = await SBS.api.getRole(ctx.id);
+      } catch (e) {
+        return; // keep what is on screen; the server decides each save
+      }
+      if (!ctx.wrap.isConnected || !ctx.game()) return;
+      const before = role;
+      const isHelper = r.canScore !== undefined;
+      role = isHelper ? r : null;
+      if (isHelper && note.textContent && r.canScore) say('');
+      if (!isHelper && flag.get(ctx.id)) {
+        flag.forget(ctx.id);
+        ctx.route.helper = false;
+        say('You no longer help on this board. If that is a mistake, ask the host for a new code.');
+      } else if (isHelper && !flag.get(ctx.id)) {
+        flag.set(ctx.id, 'new');
+      }
+      if (wanted && role && role.canScore) { tab = wanted; }
+      wanted = null;
+      if (before && role && before.canScore && !role.canScore) { role = r; say('The host switched off scorekeeping on this phone.'); }
+      if (JSON.stringify(before) !== JSON.stringify(role)) { draw(); ctx.redraw(); }
+    }
+
+    function draw() {
+      if (!ctx.game()) return;
+      if (tab === 'score' && !(role && role.canScore)) tab = 'mine';
+      const welcome = !!role && role.canScore && flag.get(ctx.id) === 'new';
+      const hasTabs = !!role && role.canScore && !welcome;
+      ctx.wrap.classList.toggle('on-job', welcome || (hasTabs && tab !== 'mine'));
+      ctx.wrap.classList.toggle('has-tabs', hasTabs);
+      nav.hidden = !hasTabs;
+      pane.hidden = !(welcome || (hasTabs && tab === 'score'));
+      if (welcome) return drawWelcome();
+      if (hasTabs) drawNav();
+      if (pane.hidden) return pane.replaceChildren();
+      if (!isOpen()) {
+        const wait = el('div', 'card player-card helper-wait');
+        wait.append(textEl('h2', '', "Scoring isn't open yet"), textEl('p', 'player-muted', 'It opens here by itself when the host locks the board and the numbers are drawn.'));
+        return pane.replaceChildren(wait);
+      }
+      if (!pad) pad = makePad();
+      if (pane.firstChild !== pad.el) pane.replaceChildren(pad.el);
+      pad.update();
+    }
+
+    function drawNav() {
+      const had = nav.contains(document.activeElement);
+      nav.replaceChildren(...[['mine', ctx.selected() ? 'My squares' : 'Board', GRID_ICON], ['score', 'Score', SCORE_ICON]].map(([k, label, icon]) => {
+        const b = el('button', 'helper-tab', `${icon}<span>${label}</span>`);
+        b.type = 'button';
+        if (k === tab) b.setAttribute('aria-current', 'page');
+        b.addEventListener('click', () => {
+          if (tab === k) return;
+          tab = k;
+          draw();
+          window.scrollTo(0, 0);
+          ask();
+        });
+        return b;
+      }));
+      if (had) nav.querySelector('[aria-current]').focus();
+    }
+
+    // Once: what they may do, and whose squares are theirs.
+    function drawWelcome() {
+      if (pane.querySelector('.helper-welcome')) return; // a poll must not close an open list
+      const card = el('div', 'card player-card helper-welcome');
+      card.appendChild(textEl('h2', '', 'You were asked to help run this board'));
+      const duties = [['Keep score', 'Tap what happens. End each quarter.']];
+      duties.push(['Your own squares stay here', 'Switch any time with the tabs at the bottom. Not playing? You still see the board.']);
+      duties.forEach(([name, text]) => {
+        const d = el('div', 'helper-duty');
+        d.append(textEl('strong', '', name), textEl('span', '', text));
+        card.appendChild(d);
+      });
+      const names = playerSummaries(ctx.game()).map(p => p.name);
+      const label = el('label', 'helper-mine', 'Your squares are under');
+      const select = el('select', 'player-select');
+      select.appendChild(el('option', '', "I'm not playing")).value = '';
+      const same = names.find(n => n.toLowerCase() === String(role.label).toLowerCase());
+      const mine = names.includes(ctx.selected()) ? ctx.selected() : same || '';
+      names.forEach(n => {
+        const o = textEl('option', '', n);
+        o.value = n;
+        o.selected = n === mine;
+        select.appendChild(o);
+      });
+      label.appendChild(select);
+      const go = el('button', '', 'Continue');
+      go.type = 'button';
+      go.addEventListener('click', () => {
+        flag.set(ctx.id, 'ok');
+        ctx.choose(select.value || null);
+        tab = role && role.canScore && isOpen() ? 'score' : 'mine';
+        pane.replaceChildren();
+        draw();
+        ctx.redraw();
+        window.scrollTo(0, 0);
+      });
+      card.append(label, go, textEl('p', 'player-muted', 'This works on this phone, for this board, until the game is over.'));
+      pane.replaceChildren(card);
+    }
+
+    return {
+      ask, draw,
+      maybe,
+      onScore: () => tab === 'score' && !pane.hidden,
+      busy: () => !!pad && pad.busy(),
+      saved: () => { if (pad) pad.clearUndo(); }, // another device saved: what was scored here may not undo cleanly
+      line: () => (role && jobNames() ? [ctx.selected(), jobNames()].filter(Boolean).join(' · ') : '')
+    };
+  }
+
+  function renderPlayer(id, route) {
     const app = SBS.appEl;
     app.innerHTML = '';
     document.body.classList.add('player-mode');
@@ -619,12 +792,13 @@
     let game = null;
     let selectedPlayer = null;
     let panel = null; // the guest-pick panel, kept for the life of the screen
+    let helper = null; // the helper's tabs, made once the board has loaded
     let panelCard = null; // the card it sits in, left in place while picking so typing and focus survive
     const panelCtx = {
       id,
       game: () => game,
       setGame: (g) => { game = g; drawAll(); },
-      remember: (name) => { selectedPlayer = name; saveSelectedPlayer(name); },
+      remember: (name) => { selectedPlayer = name; saveSelectedPlayer(name); if (helper) { drawHeader(); helper.draw(); } },
       reload: () => load(false, true),
       viewing: () => selectedPlayer,
       markPicker: () => { try { window.localStorage.setItem(pickerKey(id), '1'); } catch (e) { /* asks again next time */ } }
@@ -689,6 +863,7 @@
           <div class="player-title">${guestPickingOn(game) ? 'Pick your squares' : 'Player View'}</div>
         </div>
         ${tickerHtml}
+        ${helper && helper.line() ? `<div class="helper-line">${escapeHtml(helper.line())}</div>` : ''}
       `;
       fitTeamBadges(header);
     }
@@ -707,7 +882,8 @@
       }
       const label = el('label', 'player-select-label', 'Viewing squares for');
       const select = el('select', 'player-select');
-      select.appendChild(el('option', '', 'Choose your name…'));
+      // A helper's name can change later: one who bought squares, or tapped the wrong name.
+      select.appendChild(el('option', '', helper && helper.line() ? "I'm not playing" : 'Choose your name…')).value = '';
       summaries.forEach(p => {
         const opt = el('option', '', escapeHtml(p.name));
         opt.value = p.name;
@@ -717,6 +893,7 @@
       select.addEventListener('change', (e) => {
         selectedPlayer = e.target.value || null;
         saveSelectedPlayer(selectedPlayer);
+        if (helper) { drawHeader(); helper.draw(); }
         drawBody();
       });
       selectRow.appendChild(label);
@@ -883,13 +1060,16 @@
       inviteBtn.hidden = false;
       if (game.joinCode) { hostLink.href = SBS.referral.url(game.joinCode); hostLink.hidden = false; }
       drawBody();
+      if (helper) helper.draw(); // the first tab's label follows the name
     }
 
     async function load(initial, now) {
+      // A score on its way must not be overwritten by an answer from before it.
+      if (helper && helper.busy()) return;
       try {
         // A phone that picks must see its own squares after a reload, not a copy from before them.
         const fresh = now || (initial && isPicker(id)) ? await SBS.api.getGame(id) : await SBS.api.pollGame(id, { must: initial });
-        if (!fresh) return;
+        if (!fresh || (helper && helper.busy())) return;
         if (initial) {
           game = fresh;
           selectedPlayer = loadSelectedPlayer();
@@ -899,6 +1079,15 @@
             selectedPlayer = null;
           }
           drawAll();
+          helper = createHelperTabs({
+            id, route: route || {}, wrap, header,
+            game: () => game,
+            setGame: (g) => { game = g; drawHeader(); drawBody(); }, // a later poll finds nothing new to draw
+            redraw: () => drawAll(),
+            selected: () => selectedPlayer,
+            choose: (name) => { selectedPlayer = name; saveSelectedPlayer(name); }
+          });
+          helper.ask();
           // A phone that picked before opens straight into picking. Its name may have changed
           // since (a host rename), so the server is asked, not the remembered name trusted.
           if (isPicker(id) && panel && guestPickingOn(game)) panel.start(true);
@@ -913,6 +1102,10 @@
             drawHeader();
             drawBody();
           }
+          if (helper) {
+            if (saved) helper.saved();
+            helper.draw();
+          }
         }
       } catch (e) {
         if (e && e.status === 404) {
@@ -920,6 +1113,8 @@
           selectRow.innerHTML = '';
           inviteBtn.hidden = true;
           body.innerHTML = '';
+          wrap.classList.remove('on-job');
+          wrap.querySelectorAll('.helper-pane, .helper-tabs, .helper-note').forEach(n => n.remove());
           return;
         }
         if (initial) header.innerHTML = `<div class="error-msg">Could not load this game: ${escapeHtml(e.message)}</div>`;
@@ -935,6 +1130,12 @@
     // read-only "how am I doing" panel nobody can tell the difference.
     // The host's own board and the TV stay fast; there is exactly one of each.
     SBS.setManagedInterval(() => load(false), 15000);
+    // A helper keeping score stays in step with the host's screens. Whether the job still stands is
+    // asked on load, when the phone is shown again, on a tab tap and after a refusal: never on a timer.
+    SBS.setManagedInterval(() => { if (helper && helper.onScore() && !document.hidden) load(false); }, 5000);
+    const onShow = () => { if (!document.hidden && helper && helper.maybe()) helper.ask(); };
+    document.addEventListener('visibilitychange', onShow);
+    SBS.onLeaveScreen(() => document.removeEventListener('visibilitychange', onShow));
   }
 
   // The host's QR code for the guest view. Guests pass the link on with showInvite.

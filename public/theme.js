@@ -2,7 +2,7 @@
 // wears the right theme. It must not depend on window.SBS: nothing else has loaded yet.
 //
 // The theme is the host's, one per host. A device remembers it in localStorage ('sbs-theme'); a
-// board shown to anyone (the TV, Player View, the scorer phone) wears its host's theme, cached per
+// board shown to anyone (the TV, Player View) wears its host's theme, cached per
 // board in sessionStorage ('sbs-theme-<id>') and refreshed from the server once per page load (see
 // core.js). The tokens live in styles.css as [data-theme="…"] blocks.
 (function () {

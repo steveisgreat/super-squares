@@ -967,7 +967,7 @@
 
   SBS.ui = {
     el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake, keepPartyAwake, partyHistory,
-    overlayEl, showModal, showConfirm, showAlert, disturbMessage, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin, signInConsent,
+    showModal, showConfirm, showAlert, disturbMessage, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin, signInConsent,
     shownDescription, topbar, HOME_ICON, statusLabel, isTvBrowser, isPhone,
     formatKickoffTime, kickoffNotice,
     teamMeta, teamStyle, applyTeamColors, resetTeamColors, teamLogoTag,

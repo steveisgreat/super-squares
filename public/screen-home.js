@@ -219,12 +219,12 @@
         }
       }
     ];
-    if (g.status === 'started') {
+    if (g.status === 'picking' || g.status === 'started') {
       items.push({
-        label: 'Score from another phone', icon: MOBILE_ICON,
+        label: 'Helpers', icon: MOBILE_ICON,
         onSelect: async () => {
           const game = await loadFull(g.id);
-          if (game) SBS.handoff.open(game, opener);
+          if (game) SBS.helpers.open(game, opener);
         }
       });
     }

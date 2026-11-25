@@ -340,16 +340,11 @@ body {
 
 .header-icon { color: var(--accent); flex-shrink: 0; }
 /* Home: the same size and place (20 px in, top left) on every screen that has it. */
-.topbar .home-btn, .phone-header .home-btn { width: 44px; height: 44px; flex: none; }
+.topbar .home-btn { width: 44px; height: 44px; flex: none; }
 .topbar.setup-topbar { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; min-height: 64px; padding: 8px 20px; }
 /* Where a tall title would center it lower, it stays up with the rest. */
 .setup-topbar .home-btn, .pick-topbar .home-btn { align-self: start; margin-top: 2px; }
 .setup-topbar h1 { justify-content: center; text-align: center; }
-.phone-header.has-home { padding-top: 8px; }
-.phone-header .home-btn { position: absolute; left: 6px; top: 6px; }
-.phone-header.has-home .phone-matchup, .phone-header.has-home .phone-sub { margin-left: 54px; margin-right: 54px; }
-.phone-header.has-home .phone-matchup { flex-wrap: nowrap; min-width: 0; }
-.phone-header, .phone-panel { min-width: 0; }
 
 .topbar h1.brand-pill {
   padding: 8px 18px;
@@ -404,7 +399,6 @@ h3 { font-family: var(--serif); font-size: 1.15rem; color: var(--text); font-wei
 
 /* The setup form is one narrow column: centered, not stretched across a laptop. */
 .main > .card:has(#league-group) { max-width: 720px; margin-left: auto; margin-right: auto; }
-
 
 .archive-wrap { margin-top: 4px; }
 .archive-toggle {
@@ -1970,7 +1964,6 @@ body.tv-fullscreen .tv-meta { font-size: 1.5rem; }
 .manage-modal-head h3 { margin: 0; color: var(--text); font-family: var(--serif); font-size: 1.25rem; }
 .modal-close { padding: 8px 12px; border-radius: var(--radius); }
 
-
 .player-list {
   display: flex;
   flex-direction: column;
@@ -2024,64 +2017,6 @@ body.tv-fullscreen .tv-meta { font-size: 1.5rem; }
   text-align: right;
 }
 .unpaid-summary strong { color: var(--danger); font-size: 1.15rem; }
-
-/* --- Phone score entry (#score-YYYY) --------------------------------------
-   One-thumb quarter entry, used while the grid is up on the television.
-   Digits are tapped rather than typed so no keyboard covers the screen. */
-body.phone-mode { background: var(--bg); }
-body.phone-mode #app { padding: 0; }
-
-.phone-screen {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  max-width: 560px;
-  margin: 0 auto;
-  padding: 4px 14px calc(24px + env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.phone-header {
-  position: sticky;
-  top: 0;
-  border-top: var(--sat) solid transparent;
-  z-index: 5;
-  background: var(--bg);
-  padding: 10px 2px 8px;
-  border-bottom: 1px solid var(--border);
-}
-.phone-matchup {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 1.15rem;
-  font-weight: 800;
-  flex-wrap: wrap;
-}
-.phone-matchup .pm-vs { color: var(--muted); font-weight: 600; font-size: 0.9rem; }
-.phone-matchup .team-badge { font-size: 1.05rem; }
-.phone-sub {
-  text-align: center;
-  color: var(--muted);
-  font-size: 0.85rem;
-  margin-top: 4px;
-}
-
-.phone-actions { display: flex; gap: 8px; margin-top: 8px; }
-.phone-action-btn {
-  flex: 1;
-  background: var(--panel2);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 8px 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-.phone-action-btn:hover { background: var(--accent-soft); }
 
 .phone-link-list { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 12px 0; }
 .phone-qr-block { display: flex; flex-direction: column; align-items: center; gap: 8px; }
@@ -2526,16 +2461,74 @@ button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color:
 .room-status { min-height: 1.3em; margin: 8px 0 0; }
 .room-status.room-error { color: var(--danger); }
 
-/* Scorer-phone hand-off (R24) */
-.handoff-card { max-width: 480px; width: 100%; margin: 0 auto; max-height: 92vh; overflow-y: auto; box-sizing: border-box; }
-.handoff-text { margin: 0 0 8px; color: var(--muted); line-height: 1.4; }
-.handoff-text:empty { display: none; }
-.handoff-qr { display: flex; justify-content: center; margin: 12px 0; }
-.handoff-qr:empty { display: none; }
-.handoff-qr svg { display: block; width: 220px; max-width: 100%; height: auto; padding: 10px; background: #fff; border-radius: 8px; box-sizing: content-box; }
-.handoff-score { margin: 0 0 8px; font-size: 1.15rem; text-align: center; }
-.handoff-card .actions { flex-wrap: wrap; }
-.handoff-card [hidden] { display: none; }
+/* Helpers (R37): the host's panel (dialog and wide Game Day tab) */
+.helpers-card { max-width: 480px; width: 100%; margin: 0 auto; max-height: 92vh; overflow-y: auto; box-sizing: border-box; }
+.helpers-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.helpers-head h3 { margin: 0; flex: 1; min-width: 0; font-size: 1.3rem; overflow-wrap: anywhere; }
+.helpers-head .icon-btn { flex: none; min-width: 44px; min-height: 44px; }
+.helpers-tab { padding: 12px; }
+.helpers-panel { display: flex; flex-direction: column; gap: 12px; }
+.helpers-panel h4 { margin: 4px 0 0; font-size: 1.1rem; }
+.helpers-panel [hidden], .helpers-head [hidden], .helpers-head[hidden] { display: none; }
+.helpers-text { margin: 0; color: var(--muted); line-height: 1.4; }
+.helpers-status { margin: 0; font-weight: 600; line-height: 1.4; }
+.helpers-status:empty { display: none; }
+.helpers-status.is-error { color: var(--danger); }
+.helpers-status.is-ok { color: var(--live); }
+.helpers-list { display: flex; flex-direction: column; gap: 10px; }
+.helpers-list:empty { display: none; }
+.helpers-item { border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; }
+.helpers-item-head, .helpers-job { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.helpers-who { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.helpers-who strong { font-size: 1.1rem; overflow-wrap: anywhere; }
+.helpers-who span { font-size: .9rem; color: var(--muted); }
+.helpers-who .is-on { color: var(--live); }
+.helpers-job { min-height: 46px; border-top: 1px solid var(--border); margin-top: 6px; }
+button.helpers-link { background: transparent; border: 0; box-shadow: none; color: var(--accent); min-height: 44px; padding: 0 4px; font-weight: 700; }
+button.helpers-link.is-danger { color: var(--danger); }
+button.helpers-switch { flex: none; width: 60px; min-height: 44px; padding: 0; background: transparent; border: 0; box-shadow: none; display: flex; align-items: center; justify-content: center; }
+.helpers-switch span { width: 52px; height: 30px; box-sizing: border-box; padding: 3px; border-radius: 15px; background: #4a5a6a; display: flex; }
+.helpers-switch span::after { content: ''; width: 24px; height: 24px; border-radius: 12px; background: #fff; }
+.helpers-switch[aria-checked="true"] span { background: #1f8a4d; justify-content: flex-end; }
+button.helpers-add, button.helpers-text-btn { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; }
+.helpers-people { display: flex; flex-wrap: wrap; gap: 8px; max-height: 40vh; overflow-y: auto; }
+button.helpers-chip { min-height: 44px; padding: 0 16px; border-radius: 22px; background: transparent; border: 1px solid var(--border); box-shadow: none; color: var(--text); font-weight: 700; }
+button.helpers-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.helpers-other { display: flex; flex-direction: column; gap: 6px; }
+.helpers-other input { min-height: 46px; font-size: 16px; }
+.helpers-jobs { display: flex; flex-direction: column; gap: 8px; }
+button.helpers-choice { display: flex; align-items: flex-start; gap: 14px; padding: 14px; text-align: left; background: transparent; border: 2px solid var(--border); box-shadow: none; border-radius: 12px; color: var(--text); font-weight: 500; line-height: 1.35; }
+button.helpers-choice[aria-checked="true"] { border-color: var(--accent); }
+.helpers-tick { flex: none; width: 26px; height: 26px; box-sizing: border-box; border: 2px solid var(--muted); border-radius: 6px; }
+.helpers-choice[aria-checked="true"] .helpers-tick { background: var(--accent); border-color: var(--accent); position: relative; }
+.helpers-choice[aria-checked="true"] .helpers-tick::after { content: ''; position: absolute; left: 7px; top: 2px; width: 6px; height: 12px; border: solid var(--on-accent); border-width: 0 3px 3px 0; transform: rotate(45deg); }
+.helpers-code-title { text-align: center; }
+.helpers-qr { display: flex; justify-content: center; }
+.helpers-qr:empty { display: none; }
+.helpers-qr svg { display: block; width: 220px; max-width: 100%; height: auto; padding: 10px; background: #fff; border-radius: 8px; box-sizing: content-box; }
+.helpers-actions { display: flex; flex-direction: column; gap: 8px; }
+.helpers-actions button { min-height: 50px; }
+
+@media (max-height: 820px) { .helpers-tab .helpers-qr svg { width: 180px; } }
+
+/* Helpers (R37): the phone, in Player View */
+.player-screen.has-tabs { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+.player-screen.on-job > :not(.player-header):not(.helper-note):not(.helper-pane):not(.helper-tabs) { display: none; }
+.player-screen.on-job .player-title-row { display: none; }
+.helper-pane[hidden], .helper-tabs[hidden], .helper-note[hidden] { display: none; }
+.helper-pane { min-width: 0; }
+.helper-line { margin-top: 6px; text-align: center; color: var(--muted); font-size: .95rem; overflow-wrap: anywhere; }
+.helper-note { margin: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; line-height: 1.4; }
+.helper-wait { text-align: center; }
+.helper-wait h2, .helper-welcome h2 { margin: 0 0 10px; font-size: 1.4rem; line-height: 1.2; text-wrap: balance; }
+.helper-welcome { display: flex; flex-direction: column; gap: 12px; }
+.helper-welcome > p { margin: 0; }
+.helper-duty { display: flex; flex-direction: column; line-height: 1.35; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; }
+.helper-duty span { color: var(--muted); }
+.helper-mine { display: flex; flex-direction: column; gap: 6px; font-weight: 700; }
+.helper-tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; gap: 6px; max-width: 560px; margin: 0 auto; padding: 6px 8px calc(8px + env(safe-area-inset-bottom)); box-sizing: border-box; background: var(--bg); border-top: 1px solid var(--border); }
+button.helper-tab { flex: 1; min-width: 0; min-height: 56px; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; background: transparent; border: 0; box-shadow: none; border-radius: 12px; color: var(--muted); font-size: .9rem; font-weight: 700; }
+button.helper-tab[aria-current="page"] { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 
 /* Guest picks (R28): the guest's panel on the player page and the host's controls. */
 .guest-panel { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
@@ -2965,7 +2958,6 @@ button.danger-line:hover { background: var(--danger-soft); color: var(--bad-text
 .pay-count { min-width: 64px; text-align: center; font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 button.pay-full { background: transparent; color: var(--good); border-color: var(--good); box-shadow: none; }
 button.pay-full:hover { background: var(--good-soft); color: var(--good); border-color: var(--good); }
-
 
 /* ---- Connect (R29): a bottom sheet on a phone, a popover on a wide screen ---- */
 .connect-layer { position: fixed; inset: 0; z-index: 100; }

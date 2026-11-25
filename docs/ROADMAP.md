@@ -326,7 +326,7 @@ the phone Game Day header shows only the matchup.
 **R33. Host themes** — `Opus` (storage, access, review), `Sonnet` (front end) — ✅ built 2026-11-24
 ([decision 021](decisions/021-host-themes.md), migration 007, applied to production 2026-11-24). Six themes,
 one per host, chosen on a Theme page in the account menu; the original palette is "Neon", with solid
-buttons. Player View, Party View, paired TVs and scorer phones wear the board's host's theme.
+buttons. Player View, Party View and paired TVs wear the board's host's theme.
 
 **R35. Wide Game Day and the Party View grid on the host screens** — `Opus` design (Steve approved the
 mockups), `Sonnet` build — ✅ built 2026-11-25. From 1024 px (not a phone) Game Day fits the
@@ -361,7 +361,7 @@ fixes it running off the right edge of a 375 px phone (429 px wide, measured 202
 *Done:* operation tests first; no score is saved by a whole-document `PUT`; browser check at 360, 390,
 1366 and 1920 px and the Party View strip; `/code-review high` clean.
 
-**R37. Helpers and the Scorekeeper tab** — `Opus` (auth, migration 010) — Depends on: R36.
+**R37. Helpers and the Scorekeeper tab** — `Opus` (auth, migration 010) — ✅ built 2026-11-25, not pushed (real phones and Postgres not checked). Depends on: R36.
 The Helpers screen (add, jobs, code or texted link, remove one), Player View tabs, the helper cookie,
 and the Score tab. Retires the scorer hand-off (018) and the `#score` page; old links still open
 something sensible. Not shipped on a game day: phones already scoring need a new code.

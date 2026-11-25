@@ -47,10 +47,12 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `GET /api/games` | host only; list summaries |
 | `GET /api/todays-games` | host only; the setup screen's schedule, read from the shared slate (no provider call of its own) |
 | `POST /api/game`, `PUT /api/game/:id`, `DELETE /api/game/:id` | host only |
-| `PATCH /api/game/:id/score` | host, or a scorer phone of that board (decision 018); one score operation (decisions 011 and 025): `add`, `set`, `end`, `final`, `undo`, `resume`, `edit` (fix, fill in or clear a quarter; works on Live and Simulation without taking over) and `draw` (the server picks the final's stand-in winner). An optional `from` (or `expect` on `undo`) is what the screen showed; 409 if it moved |
-| `POST`, `GET`, `DELETE /api/game/:id/handoff` | host only; make a one-time scorer code → `{ token, scorers, expiresInSeconds }`, count → `{ waiting, scorers }`, remove all scorer phones |
-| `POST /api/handoff` | anonymous; `{ token }` spends the code once, sets `sbs_scorer` (24 h, `Path=/api/game/<id>`) → `{ gameId }`; 401 otherwise |
-| `GET /api/game/:id/role` | public; `{ role: 'host' \| 'scorer' \| 'none' }` for this device |
+| `PATCH /api/game/:id/score` | host, or a scorekeeper helper of that board (decision 025); one score operation (decisions 011 and 025): `add`, `set`, `end`, `final`, `undo`, `resume`, `edit` (fix, fill in or clear a quarter; works on Live and Simulation without taking over) and `draw` (the server picks the final's stand-in winner). An optional `from` (or `expect` on `undo`) is what the screen showed; 409 if it moved |
+| `GET`, `POST /api/game/:id/helpers` | host only (decision 025); list → `{ helpers: [{ id, label, canScore, canSquares, connected, waiting }] }`; add `{ label, canScore, canSquares, link? }` → `{ id, token, expiresInSeconds }` (5 minutes, 24 hours with `link`); 409 at 5 helpers or a day after the final |
+| `PATCH`, `DELETE /api/game/:id/helpers/:helper` | host only; switch the jobs, remove that helper → `{ helpers }` |
+| `POST /api/game/:id/helpers/:helper/code` | host only; a new one-time code for that helper, cancels the waiting one |
+| `POST /api/helper` | anonymous; `{ token }` spends the code once, sets `sbs_helper` (180 d, `Path=/api/game/<id>`) → `{ gameId }`; 401 otherwise |
+| `GET /api/game/:id/role` | public; `{ role: 'host' \| 'helper' \| 'none' }` for this device, plus `label`, `canScore`, `canSquares` on a helper's phone |
 | `POST /api/tv` | anonymous; a TV asks to pair → `{ code, token }` (decision 017) |
 | `GET /api/tv/:token` | the TV reads its pairing → `{ state: 'waiting', code }` or `{ state: 'paired', gameId }`; 404 unknown or expired |
 | `POST /api/tv/pair` | owner of `gameId`; `{ code, gameId }` pairs a waiting TV and retires the code |
@@ -83,8 +85,9 @@ Accounts (`migrations/002_host_accounts.sql`): `hosts`, `login_requests`, and
 `referred_by` (migration 008), and the next-season opt-in and accepted Terms version (migration
 009, decision 024). The store stamps `createdAt` and `updatedAt`.
 
-Scorer phones (`migrations/006_scorer_grants.sql`): `scorer_grants`, one row per one-time
-code, which becomes that phone's grant when used (decision 018). Only hashes are stored.
+Helpers (`migrations/010_helpers.sql`): `helpers`, one row per helper: label, two jobs, the one-time
+code's hash, then that phone's cookie hash (decision 025). Without the table only helper features
+fail. `scorer_grants` (006) is left in place, unused.
 
 Live scores (`migrations/003_live_slates.sql`): `live_slates (league, et_date, payload jsonb, checked_at, fetched_at)`,
 one row per league and ET date, shared by every Live board. `checked_at` is the throttle: a
@@ -102,11 +105,11 @@ cutoff rules, shared with the server and unit-tested), `teams.js` (NFL/NBA names
 colors and ESPN logo URLs), `qrcode.js`, `core.js` (API client, routing, sign-in prompt by mode and 401 replay, 403 handling), `ui.js`,
 `players.js`, `board.js`, `score-panel.js` (the score pad: the only place a score is entered; one Undo, End and Fix dialogs, keyboard scoring on a laptop), `present.js` (Present on an HDMI TV:
 Party View in its own window, on the second screen when the browser can), then screens: `screen-home` (Home: top bar with New game and the account menu, Today / Coming up / Past games sections of cards with a primary button, Party View and a ⋯ menu, tiles for a TV browser; also setup and the version
-footer), `screen-picking` (two columns from 1024 px, one below, three tabs on a phone; `players.js` has the Players card and payment box it shares with Game Day), `screen-gameday` (from 1024 px, not a phone: a tabbed panel left, the grid right, the page fitted to the window by `#app.fit-screen`; below that, the stat strip, grid, score pad and quarters list in one column), `screen-phone` (score entry on another phone: the pad alone, until R37),
-`screen-player` (Player View: pick while picking is open, then My Squares), `screen-tvpair` (TV pairing and the Connect box),
+footer), `screen-picking` (two columns from 1024 px, one below, three tabs on a phone; `players.js` has the Players card and payment box it shares with Game Day), `screen-gameday` (from 1024 px, not a phone: a tabbed panel left, the grid right, the page fitted to the window by `#app.fit-screen`; below that, the stat strip, grid, score pad and quarters list in one column),
+`screen-player` (Player View: pick while picking is open, then My Squares; a helper's phone gets a bottom tab bar, My squares and Score), `screen-tvpair` (TV pairing and the Connect box),
 `screen-mirror` (Mirror mode for one phone, `#mirror-<id>`: TV-style board, score strip on tap),
-`screen-handoff` (scorer-phone code and the `#handoff-<token>` page), and `app.js` (hash router: `#tv-<id>`,
-`#score-<id>`, `#player-<id>`). Every polling screen refetches its game every 4 to 15 s through
+`screen-helpers` (the Helpers panel: a dialog from Connect and Home, a tab on wide Game Day; the `#helper-<token>` page; where an old `#score-<id>` link goes), and `app.js` (hash router: `#tv-<id>`,
+`#player-<id>`, `#helper-<token>`). Every polling screen refetches its game every 4 to 15 s through
 `SBS.api.pollGame` (the edge's copy, never older than what the tab has seen); other reads use
 `SBS.api.getGame` (`?fresh=1`).
 Wide Game Day (`gd-wide`) and wide picking (`is-wide`) draw their grid with Party View's look: the board card

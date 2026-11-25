@@ -725,11 +725,15 @@
       const scorePane = el('section', 'gd-pane gd-score-pane');
       const playersPane = el('section', 'gd-pane players-sec');
       playersPane.appendChild(players.el);
-      const tabOrder = ['score', 'players'];
-      const panes = { score: scorePane, players: playersPane };
+      const helpersPane = el('section', 'gd-pane gd-helpers-pane');
+      const helpersTab = SBS.helpers.tab(game);
+      helpersPane.appendChild(helpersTab.el);
+      const tabOrder = ['score', 'players', 'helpers'];
+      const tabNames = { score: 'Score', players: 'Players', helpers: 'Helpers' };
+      const panes = { score: scorePane, players: playersPane, helpers: helpersPane };
       const tabEls = {};
       tabOrder.forEach(k => {
-        const t = el('button', 'gd-tab', k === 'score' ? 'Score' : 'Players');
+        const t = el('button', 'gd-tab', tabNames[k]);
         t.type = 'button';
         t.id = `gd-wtab-${k}`;
         t.setAttribute('role', 'tab');
@@ -751,7 +755,7 @@
         tabBar.appendChild(t);
       });
       // The tab is remembered for this board, so a redraw (a saved pot, a resize) keeps it.
-      let wideTab = SBS.gamedayTab && SBS.gamedayTab.id === game.id && SBS.gamedayTab.tab === 'players' ? 'players' : 'score';
+      let wideTab = SBS.gamedayTab && SBS.gamedayTab.id === game.id && tabOrder.includes(SBS.gamedayTab.tab) ? SBS.gamedayTab.tab : 'score';
       function selectWide(k, focus) {
         wideTab = k;
         SBS.gamedayTab = { id: game.id, tab: k };
@@ -761,9 +765,11 @@
           tabEls[o].tabIndex = on ? 0 : -1;
           panes[o].hidden = !on;
         });
+        // Asked only when the tab is opened, and again each time.
+        if (k === 'helpers') helpersTab.show(); else helpersTab.stop();
         if (focus) tabEls[k].focus();
       }
-      side.append(tabBar, scorePane, playersPane);
+      side.append(tabBar, scorePane, playersPane, helpersPane);
 
       function shown(g) {
         const ls = g.liveScore;

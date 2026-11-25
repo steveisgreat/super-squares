@@ -176,10 +176,10 @@
           <div class="room-row"><button type="button" id="room-mirror">Mirror this phone</button></div>
         </div>
       </section>
-      <section class="room-opt" aria-labelledby="room-score-h"${game.status === 'picking' ? ' hidden' : ''}>
-        <h4 id="room-score-h">Scoring</h4>
-        <p><strong>Score from another phone.</strong> Hand score entry for this board to one phone. It scans a code; no sign-in.</p>
-        <div class="room-row"><button type="button" id="room-score">Show the scoring code</button></div>
+      <section class="room-opt" aria-labelledby="room-help-h">
+        <h4 id="room-help-h">Helpers</h4>
+        <p><strong>Give someone a job.</strong> Their phone can keep score on this board. No account needed.</p>
+        <div class="room-row"><button type="button" id="room-helpers" class="secondary">Helpers</button></div>
       </section>`;
     overlay.appendChild(box);
     document.body.appendChild(overlay);
@@ -249,9 +249,9 @@
     const status = box.querySelector('#room-status');
     const pairBtn = box.querySelector('#room-pair');
 
-    box.querySelector('#room-score').addEventListener('click', () => {
+    box.querySelector('#room-helpers').addEventListener('click', () => {
       close();
-      SBS.handoff.open(game, opener);
+      SBS.helpers.open(game, opener);
     });
 
     // `leaving` skips returning focus to the opener when the screen is about to change.

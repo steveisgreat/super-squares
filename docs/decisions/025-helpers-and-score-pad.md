@@ -1,7 +1,7 @@
 # 025 — Helpers: two jobs on one board, inside Player View, and one score pad
 
 **Date:** 2026-11-25 · **Status:** accepted (Steve approved the two-job design and mockup
-2026-11-25); section 6 (the score pad, R36) built 2026-11-25, the rest not built. The points marked *(recommended)* in section 7 can still change ·
+2026-11-25); section 6 (the score pad, R36) and the helpers and Score tab (R37) built 2026-11-25, the rest not built. The points marked *(recommended)* in section 7 can still change ·
 **Roadmap:** R36–R39 · **Related:** 008, 009, 011, 012, 015, 016, 018 (its access and lifetime rules
 are replaced when R37 ships), 019, 020
 
@@ -127,6 +127,25 @@ boxes). That is money logic: test-first.
   boards an open quarter has Enter, and Fix has Clear this score. After a clear the feed may fill it in again.
 - The scorer phone (018) may draw the final winner from now on.
 - The pad is hidden in Party View while the feed keeps the score, as before.
+
+### 9. As built: R37 (2026-11-25)
+- `POST /api/game/:id/helpers/:helper/code` makes a new code for the same helper (a phone swap, or the texted
+  link). It cancels the waiting code; the old phone works until the new code is used. `token_hash` is nullable and
+  cleared on use.
+- The cap is 5 helpers a board, connected or not, so it can never be passed by redeeming codes. An unused code's row
+  is dropped a day after it ended, and rows from before "sign out everywhere" when the next helper is added.
+- `GET …/role` may answer `host` with the helper fields too, so an owner's phone that took a code still gets its tabs.
+- Player View asks for the role only on a phone that took a code (a localStorage flag; never on a timer): on load,
+  when the phone is shown again, on a tab tap and after a refusal. Guests make no extra call.
+- The Helpers screen offers Keep score only until R38 builds the Players tab; the server already stores both jobs.
+- Old `#score-<id>` links open Game Day (host), the Score tab (scorekeeper) or Player View. Old `#handoff-` links ask
+  for a new code. The `/handoff` routes are gone.
+- Steve, 2026-11-25: helpers keep their own numbers, and a helper need not be playing. The first tab is Player View
+  as any player sees it (squares, numbers, status, winners, total won, own picks), and no job, switched off or ended,
+  takes it away. A helper can be added under any typed label, before anyone has squares; on the phone "I'm not
+  playing" is a choice like a name. The tab then reads **Board**. The choice can be changed there at any time; it is
+  display only and authorizes nothing.
+- "24 hours after the final" counts from the board's last save, so a late paid mark keeps a helper a little longer.
 
 ## Consequences
 - **Deploy order:** migration 010 before R37; 011 before R39. Without them only helper features fail.
