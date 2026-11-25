@@ -899,7 +899,8 @@
     SBS.setManagedInterval(async () => {
       if (SBS.currentScreen() !== 'picking' || lockInFlight || saving) return;
       try {
-        const fresh = await SBS.api.getGame(game.id);
+        const fresh = await SBS.api.pollGame(game.id);
+        if (!fresh || lockInFlight || saving) return;
         if (!fresh.updatedAt || fresh.updatedAt === game.updatedAt) return;
         if (fresh.status === 'started' || fresh.status === 'finished' || (!manualSelecting && !hostIsTyping())) {
           const locked = fresh.status === 'started' || fresh.status === 'finished';

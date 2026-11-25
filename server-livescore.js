@@ -349,4 +349,4 @@ async function refreshLiveScore(game, claimSlot) {
   return changed;
 }
 
-module.exports = { refreshLiveScore, getTodaysGames };
+module.exports = { refreshLiveScore, getTodaysGames, applySimulatedData };

@@ -9,6 +9,47 @@
   SBS.appEl = document.getElementById('app');
   SBS.screens = {}; // filled in by the screens-*.js files
 
+  // ---------- Board copies ----------
+  // A poll reads the edge's shared copy of a board, up to about 5 s old (decision 023). A screen
+  // that has just been handed something newer (its own save, say) must not be put back by it, so
+  // the newest version this tab has seen of each board is remembered for a short while. Past that
+  // an older board is real (the database was restored) and is shown.
+  const SEEN_MS = 12000;
+  const seen = new Map(); // board id -> { updatedAt, asOf, at }
+
+  // When the merged score was read: it moves without updatedAt.
+  function asOf(g) {
+    if (g.liveFeed) return Date.parse(g.liveFeed.fetchedAt);
+    return g.liveScore && g.liveScore.simulation ? Date.parse(g.liveScore.updatedAt) : NaN;
+  }
+
+  function seenNewer(g) {
+    const s = seen.get(String(g.id).toLowerCase());
+    if (!s || Date.now() - s.at >= SEEN_MS) return false;
+    const u = Date.parse(g.updatedAt);
+    if (u !== s.updatedAt) return u < s.updatedAt; // NaN compares false: never called old
+    return asOf(g) < s.asOf;
+  }
+
+  function noteBoard(g) {
+    if (!g || !g.id || !Array.isArray(g.squares) || seenNewer(g)) return;
+    seen.set(String(g.id).toLowerCase(), { updatedAt: Date.parse(g.updatedAt), asOf: asOf(g), at: Date.now() });
+  }
+
+  // What a poll compares to decide whether to redraw. A Live or Simulation score moves without a
+  // save, so updatedAt alone would miss it.
+  SBS.boardKey = function (g) {
+    const l = g.liveScore || {};
+    return JSON.stringify([g.updatedAt, g.status, l.a, l.b, l.period, l.clock, l.state, l.statusName,
+      g.liveFeed ? g.liveFeed.available : null]);
+  };
+
+  // Merge a polled board into the one on screen. The fields a board can lose go when they are gone.
+  SBS.takeBoard = function (game, fresh) {
+    ['liveOverride', 'liveFeed', 'liveScore'].forEach(k => { if (!(k in fresh)) delete game[k]; });
+    return Object.assign(game, fresh);
+  };
+
   // ---------- API ----------
   async function rawRequest(path, opts) {
     let res;
@@ -19,6 +60,8 @@
     }
     let data = null;
     try { data = await res.json(); } catch (e) { /* no body */ }
+    noteBoard(data);
+    if (data) noteBoard(data.game);
     if (!res.ok) {
       const err = new Error((data && data.error) || `Request failed (${res.status})`);
       err.status = res.status;
@@ -127,7 +170,16 @@
     requestLoginCode: (email) => rawRequest('/api/login', json('POST', { email })),
     verifyLogin: (body) => rawRequest('/api/login/verify', json('POST', body)),
     revokeAllSessions: () => rawRequest('/api/session/revoke-all', { method: 'POST' }).then((r) => { forgetHostTheme(); return r; }),
-    getGame: (id) => request(`/api/game/${id}`),
+    // The board as it is now, straight from the server: for opening a board, acting on it, or
+    // recovering from a refused save.
+    getGame: (id) => request(`/api/game/${id}?fresh=1`),
+    // The edge's copy, for screens that poll. Null when this tab already holds something newer;
+    // with { must: true } (a first load) it asks the server instead.
+    pollGame: async (id, o) => {
+      const g = await request(`/api/game/${id}`);
+      if (!seenNewer(g)) return g;
+      return o && o.must ? SBS.api.getGame(id) : null;
+    },
     getJoin: (code) => rawRequest(`/api/join/${encodeURIComponent(code)}`),
     // TV pairing (R23). The TV's calls are raw: it has no host session and must never prompt.
     createTv: () => rawRequest('/api/tv', { method: 'POST' }),

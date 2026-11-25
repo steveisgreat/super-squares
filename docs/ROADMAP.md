@@ -325,7 +325,7 @@ buttons. Player View, Party View, paired TVs and scorer phones wear the board's 
 
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
 
-**R8. Cache board reads at the edge** — `Opus` — Depends on: R3, R4a.
+**R8. Cache board reads at the edge** — `Opus` — ✅ built 2026-11-24 ([decision 023](decisions/023-edge-cached-reads.md)), not pushed. Depends on: R3, R4a.
 `GET /api/game/:id` currently reads Neon on every poll (ETag is computed after
 the read) and may write (auto-cutoff; R4a already removes the live-score
 writes). Move the remaining server-owned writes off the read path, then send `s-maxage=2, stale-while-revalidate` so eight screens
@@ -333,6 +333,8 @@ on one board cost about one function call. Host writes return the fresh
 document directly.
 *Done:* at 8 pollers per board, function invocations per board fall to
 ≤1 per 2 s in a measured test; no stale view lasts over ~5 s.
+*Measured on a preview:* one run per 2.5 s at 8 pollers every 4 s, 3.2 s at every 8 s; oldest view
+3.3 s. The cutoff lock and quarter results stay on the read (one-time writes, decision 023).
 
 **R9. Load test** — `Sonnet` — Depends on: R8.
 A dependency-free Node script simulating 25,000 screens across 3,000 boards

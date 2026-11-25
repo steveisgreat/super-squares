@@ -342,11 +342,11 @@ async function run() {
       const date = '2099-05-02';
       await seed(date, [lg({ etDate: date, hs: 7, as: 3 })], { at: fresh() });
       const g = await mk(date);
-      const one = await call('GET', `/api/game/${g.id}`);
-      const again = await call('GET', `/api/game/${g.id}`, undefined, { 'if-none-match': one.headers.ETag });
+      const one = await call('GET', `/api/game/${g.id}?fresh=1`);
+      const again = await call('GET', `/api/game/${g.id}?fresh=1`, undefined, { 'if-none-match': one.headers.ETag });
       eq(again.statusCode, 304);
       await seed(date, [lg({ etDate: date, hs: 14, as: 3 })], { at: fresh() });
-      const two = await call('GET', `/api/game/${g.id}`, undefined, { 'if-none-match': one.headers.ETag });
+      const two = await call('GET', `/api/game/${g.id}?fresh=1`, undefined, { 'if-none-match': one.headers.ETag });
       eq(two.statusCode, 200);
       eq(two.json.liveScore.b, 14);
     });

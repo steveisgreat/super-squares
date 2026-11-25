@@ -1,7 +1,7 @@
 # 007 — Live scores refresh on read, not on a timer
 
 **Date:** 2026-08 (recorded 2026-11-23) · **Status:** accepted; refined by
-[001](001-score-providers.md) · **Source:** migration plan step 1.2
+[001](001-score-providers.md) and [023](023-edge-cached-reads.md) · **Source:** migration plan step 1.2
 
 ## Decision
 There is no `setInterval` score poller: serverless has no long-lived process. A read of

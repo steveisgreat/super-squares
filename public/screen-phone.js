@@ -357,7 +357,8 @@
       try {
         // No answer means the host's screen, as before R24: the server decides each save.
         const asked = initial ? SBS.api.getRole(id).catch(() => ({ role: 'host' })) : null;
-        const fresh = await SBS.api.getGame(id);
+        const fresh = initial ? await SBS.api.getGame(id) : await SBS.api.pollGame(id);
+        if (!fresh) return;
         if (initial) {
           const { role } = await asked;
           scorer = role === 'scorer';

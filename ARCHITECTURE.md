@@ -22,14 +22,14 @@ framework-free (`handleApi(req, res, pathname, query)`).
 
 | File | Role |
 |---|---|
-| `lib/api.js` | Route table, guards (`denyUnlessSignedIn`, `denyUnlessOwner`), cross-site check, whole-game GET/PUT/POST/DELETE, ETag on game reads |
+| `lib/api.js` | Route table, guards (`denyUnlessSignedIn`, `denyUnlessOwner`), cross-site check, whole-game GET/PUT/POST/DELETE, edge caching and ETag on game reads (decision 023) |
 | `lib/auth.js` | Mode (`authMode`: accounts, password, off, misconfigured), signed cookies `sbs_session` (accounts) and `sbs_host` (password), sign-in tokens and codes, `identify(req)` (decisions 009, 012) |
 | `lib/mailer.js` | The sign-in email, one `fetch` to Resend |
 | `lib/store.js` | Storage contract and backend switch (decision 008) |
 | `lib/store-fs.js`, `lib/store-pg.js` | The two backends; both apply auto-cutoff on read (Postgres: only if the row is unchanged since it was read) |
 | `lib/version.js` | App version from `package.json`; adds `+<short hash>` on Vercel non-production |
 | `lib/scores/` | Score providers (decision 001): `espn.js` and `balldontlie.js` adapters, `index.js` (config, failover, no-backward merge, quarter completion), `slate.js` (the shared slate: one claimed refresh per league and date every 15 s, merge into a board, `listGames` for the picker) |
-| `server-livescore.js` | Simulation scoring (`applySimulatedData`) via `refreshLiveScore`. Its ESPN lookup (`findEvent`, `getTodaysGames`) is no longer called by the API and remains only for `test-livescore.js` |
+| `server-livescore.js` | Simulation scoring (`applySimulatedData`). Its ESPN lookup (`refreshLiveScore`, `findEvent`, `getTodaysGames`) is no longer called by the API and remains only for its tests |
 | `server.js` | Local dev only: static files and the API on 127.0.0.1; sends the security headers it reads from `vercel.json` |
 | `scripts/assign-owner.js` | One-off: gives boards with no owner to an account (runbook) |
 | `scripts/poll-scores.js` | Probe for the score providers (decision 001); not part of the app |
@@ -43,7 +43,7 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `DELETE /api/session` | sign out |
 | `POST /api/login`, `POST /api/login/verify` | accounts mode: send the link and code; use either one |
 | `POST /api/session/revoke-all` | accounts mode: sign out everywhere |
-| `GET /api/game/:id` | public (the id is the read capability); a Live board merges the shared slate into `liveScore` and adds a response-only `liveFeed: { available, fetchedAt }`; writes the game only when a quarter newly completes |
+| `GET /api/game/:id` | public (the id is the read capability); cached at the edge up to about 5 s, the same for every caller (`?fresh=1` is never cached); a Simulation board merges its score; a Live board merges the shared slate into `liveScore` and adds a response-only `liveFeed: { available, fetchedAt }`; writes the game only when a quarter newly completes |
 | `GET /api/games` | host only; list summaries |
 | `GET /api/todays-games` | host only; the setup screen's schedule, read from the shared slate (no provider call of its own) |
 | `POST /api/game`, `PUT /api/game/:id`, `DELETE /api/game/:id` | host only |
@@ -103,7 +103,9 @@ footer), `screen-picking` (two columns from 1024 px, one below, three tabs on a 
 `screen-player` (Player View: pick while picking is open, then My Squares), `screen-tvpair` (TV pairing and the Connect box),
 `screen-mirror` (Mirror mode for one phone, `#mirror-<id>`: TV-style board, score strip on tap),
 `screen-handoff` (scorer-phone code and the `#handoff-<token>` page), and `app.js` (hash router: `#tv-<id>`,
-`#score-<id>`, `#player-<id>`). Every polling screen refetches its game about every 8 s.
+`#score-<id>`, `#player-<id>`). Every polling screen refetches its game every 4 to 15 s through
+`SBS.api.pollGame` (the edge's copy, never older than what the tab has seen); other reads use
+`SBS.api.getGame` (`?fresh=1`).
 It is also a PWA (`manifest.webmanifest`, icons).
 
 `viewport-nudge.js` loads first, in the head. `el(tag, cls, html)` takes HTML, so callers

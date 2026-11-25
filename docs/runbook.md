@@ -127,7 +127,8 @@ needs a change there. On previews it blocks the Vercel toolbar, which is expecte
 1. Open the site, confirm the version in the Home footer is the one you expect.
 2. Sign in with `HOST_PASSWORD`, create a game, open its `#player-<id>` link in a private
    window (public read works signed out).
-3. `GET /api/games` signed out returns 401.
+3. `GET /api/games` signed out returns 401. Two quick `GET /api/game/<id>` in a row: the second has
+   `x-vercel-cache: HIT` (decision 023).
 4. The page response has a `Content-Security-Policy` header, and the browser console shows
    no policy errors on Home and on a `#tv-<id>` view.
 

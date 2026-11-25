@@ -619,7 +619,7 @@
       game: () => game,
       setGame: (g) => { game = g; drawAll(); },
       remember: (name) => { selectedPlayer = name; saveSelectedPlayer(name); },
-      reload: () => load(false),
+      reload: () => load(false, true),
       viewing: () => selectedPlayer,
       markPicker: () => { try { window.localStorage.setItem(pickerKey(id), '1'); } catch (e) { /* asks again next time */ } }
     };
@@ -878,9 +878,11 @@
       drawBody();
     }
 
-    async function load(initial) {
+    async function load(initial, now) {
       try {
-        const fresh = await SBS.api.getGame(id);
+        // A phone that picks must see its own squares after a reload, not a copy from before them.
+        const fresh = now || (initial && isPicker(id)) ? await SBS.api.getGame(id) : await SBS.api.pollGame(id, { must: initial });
+        if (!fresh) return;
         if (initial) {
           game = fresh;
           selectedPlayer = loadSelectedPlayer();
@@ -893,10 +895,17 @@
           // A phone that picked before opens straight into picking. Its name may have changed
           // since (a host rename), so the server is asked, not the remembered name trusted.
           if (isPicker(id) && panel && guestPickingOn(game)) panel.start(true);
-        } else if (fresh.updatedAt !== (game && game.updatedAt)) {
+        } else if (!game || SBS.boardKey(fresh) !== SBS.boardKey(game)) {
+          const saved = !game || fresh.updatedAt !== game.updatedAt;
           game = fresh;
-          drawAll();
-          if (panel) panel.followName();
+          if (saved) {
+            drawAll();
+            if (panel) panel.followName();
+          } else {
+            // Only the live score moved: leave the name list alone, it may be open.
+            drawHeader();
+            drawBody();
+          }
         }
       } catch (e) {
         if (e && e.status === 404) {

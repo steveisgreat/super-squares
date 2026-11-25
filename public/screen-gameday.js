@@ -332,6 +332,9 @@
       keyboard: !phone, // the Keyboard scoring switch shows on wide screens with a mouse only
       getGame: () => game,
       setGame: (g) => {
+        // Resume drops liveOverride from the document; assign alone would keep the old one, and
+        // a key would then take the board over from the feed again.
+        if (!('liveOverride' in g)) delete game.liveOverride;
         Object.assign(game, g);
         const c = computeGame(game);
         SBS.board.renderFullBoard(boardHolder, game, c);
@@ -839,13 +842,15 @@
       // A TV window the host closed by hand is noticed here (and when this window is focused).
       if (SBS.present) SBS.present.refresh();
       try {
-        const fresh = await SBS.api.getGame(game.id);
+        const fresh = await SBS.api.pollGame(game.id);
+        // A save may have started while the poll was out: its answer wins.
+        if (!fresh || saveTimer || scorePanel.busy()) return;
         const feedChanged = !!(fresh.liveFeed && fresh.liveFeed.available === false) !== !!(game.liveFeed && game.liveFeed.available === false);
         if (feedChanged) { game.liveFeed = fresh.liveFeed; updateFeedBanner(); scorePanel.update(); }
-        if (fresh.updatedAt !== game.updatedAt) {
-          if (!('liveOverride' in fresh)) delete game.liveOverride;
-          Object.assign(game, fresh);
-          checkDrawSync(game);
+        const saved = fresh.updatedAt !== game.updatedAt;
+        if (saved || SBS.boardKey(fresh) !== SBS.boardKey(game)) {
+          SBS.takeBoard(game, fresh);
+          if (saved) checkDrawSync(game);
           const newComputed = computeGame(game);
           SBS.board.renderFullBoard(boardHolder, game, newComputed);
           fitTeamBadges(boardHolder);
@@ -853,9 +858,9 @@
           scorePanel.update();
           updateFeedBanner();
           drawStrip();
-          if (players) players.draw();
+          if (saved && players) players.draw();
           // A change made somewhere else: what this screen scored no longer undoes cleanly.
-          scorePanel.clearUndo();
+          if (saved) scorePanel.clearUndo();
         }
       } catch (e) {
         // Deleted on another device — nothing left here to show.
@@ -1533,7 +1538,8 @@
     async function load() {
       if (SBS.currentScreen() !== 'tv') return;
       try {
-        const game = await SBS.api.getGame(id);
+        const game = await SBS.api.pollGame(id, { must: !lastGame });
+        if (!game) return;
         lastGame = game;
         applyTeamColors(game);
         syncJoinPanel(game);

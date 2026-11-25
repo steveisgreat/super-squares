@@ -279,8 +279,8 @@
           if (closed) return;
           if (role.role !== 'host') { SBS.go({ screen: 'home' }); return; }
         }
-        const fresh = await SBS.api.getGame(id);
-        if (closed) return;
+        const fresh = await SBS.api.pollGame(id, { must: initial || !game });
+        if (closed || !fresh) return;
         if (fresh.status !== 'started' && fresh.status !== 'finished') {
           notReady('Mirror mode opens once the numbers are drawn.');
           return;
@@ -289,11 +289,10 @@
           game = fresh;
           drawBoard();
           makePanel();
-        } else if (fresh.updatedAt !== game.updatedAt) {
-          if (!('liveOverride' in fresh)) delete game.liveOverride;
+        } else if (SBS.boardKey(fresh) !== SBS.boardKey(game)) {
           // A score the host just tapped is still being saved: the panel's own answer wins.
           if (!scorePanel.busy()) {
-            Object.assign(game, fresh);
+            SBS.takeBoard(game, fresh);
             drawBoard();
             scorePanel.update();
           }

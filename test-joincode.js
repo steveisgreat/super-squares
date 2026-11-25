@@ -249,7 +249,7 @@ async function main() {
     await store.createGame(g);
     created.push(g.id);
     assert(!(await store.getGame(g.id)).joinCode, 'precondition');
-    const r = await call('GET', `/api/game/${g.id}`);
+    const r = await call('GET', `/api/game/${g.id}?fresh=1`);
     assert(JoinCode.CODE_RE.test(r.json.joinCode), 'owner read should assign');
     eq((await call('GET', `/api/join/${r.json.joinCode}`)).json, { id: g.id }, 'resolves');
   });
