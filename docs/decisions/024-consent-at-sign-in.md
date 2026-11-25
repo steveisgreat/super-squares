@@ -1,6 +1,6 @@
 # 024 — Consent is given where the sign-in finishes
 
-**Date:** 2026-11-25 · **Status:** proposed, built with R34; Steve approves, and the lawyer
+**Date:** 2026-11-25 · **Status:** accepted (Steve, 2026-11-25), built with R34; the lawyer still
 reviews the wording · **Roadmap:** R34, R6 · **Related:** 012, 022
 
 ## Context
