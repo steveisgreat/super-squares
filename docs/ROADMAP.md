@@ -375,6 +375,30 @@ squares once R38 ships).
 A host-only list of who did what on the board, the last 50. A failed log write never fails a score.
 *Done:* host-only access test; entries for score, squares and helper changes; deleted with the board.
 
+Editing a locked game (R40–R43): [decision 026](decisions/026-editing-a-locked-game.md), Steve approved the
+design 2026-11-25 ("Editing a locked game" canvas, claude.ai artifact `JJmzusrbdA7Cro7XCiWWHo`, private).
+
+**R40. Settings rules on the server** — `Opus` (money logic, test-first) — Depends on: none.
+`gameUnderWay`, `applySettingsOp` (`edit`, `lock`), `PATCH /api/game/:id/settings`, and the guards on `PUT`. The
+server draws the numbers at lock. No save makes a quarter's amount negative (a $100 pot on a $1,000 board
+pays a Final of -$500 today). Locking and Total Pot move to the new route.
+*Done:* decision 026 tests; no browser draws the numbers that count; `/code-review high` clean.
+
+**R41. Edit form after lock** — `Sonnet` build, `Opus` review — Depends on: R40.
+Edit game from Home, the picking screen and Game Day; blocked fields with the reason, the review sheet, the paid-marks
+choice, a Kickoff field, and "Keep theirs or use mine". A date change no longer drops the kickoff and turns Live off on
+a locked board.
+*Done:* browser check at 360, 390, 1366 and 1920 px in all four stages; a stale form never reverts another device's change.
+
+**R42. Unlock and wrong game** — `Opus` (test-first) — Depends on: R40, R41.
+`unlock` and `relink` with their confirm sheets.
+*Done:* decision 026 tests, including a past cutoff and a paid-out quarter; `/code-review high` clean.
+
+**R43. Changed by the host** — `Sonnet` build, `Opus` review — Depends on: R40 (shows redraws and a changed
+game once R42 ships).
+`game.changes` (written by R40's and R42's operations), the list on Player View, and the ten-minute line on the TV.
+*Done:* browser check on Player View and the TV; a board with no changes looks as it does today.
+
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
 
 **R8. Cache board reads at the edge** — `Opus` — ✅ built 2026-11-24 ([decision 023](decisions/023-edge-cached-reads.md)), not pushed. Depends on: R3, R4a.
