@@ -111,6 +111,8 @@ needs a change there. On previews it blocks the Vercel toolbar, which is expecte
   `/tv` on the preview (rewrite in `vercel.json`).
 - **Before the push that ships R24:** apply `migrations/006_scorer_grants.sql` to production
   (decision 018). Only the scorer-phone hand-off uses it, so without it only that fails.
+- **R33:** `migrations/007_host_themes.sql` was applied to production on 2026-11-24
+  (decision 021). Without it every board shows the default theme and choosing one answers 503.
 - **Before the first push that ships R4a part 2:** apply `migrations/003_live_slates.sql`
   and set `SCORE_PRIMARY=espn` (plus `SCORE_SECONDARY` and `BALLDONTLIE_API_KEY` if
   wanted) in Vercel production. On Vercel, unset means no provider (decision 001), so

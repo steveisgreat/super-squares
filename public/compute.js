@@ -1072,6 +1072,11 @@
     return { paid: false, paidSquares: paid > 0 ? paid : undefined };
   }
 
+  // The color themes a host can choose (decision 021); the first is the default. The colors are in
+  // styles.css, under [data-theme].
+  const THEMES = ['classic', 'cyan', 'blue', 'slate', 'indigo', 'emerald'];
+  const isTheme = (id) => typeof id === 'string' && THEMES.indexOf(id) >= 0;
+
   // The host's own word on how many of a name's squares are paid for (0 to all of them). Returns
   // false, and changes nothing, for a name with no squares or a number that does not fit.
   function setPaidCount(game, name, n) {
@@ -1244,7 +1249,7 @@
   return {
     PLAYER_COLORS, pickPlayerColor,
     applyGuestOp, guestCap, guestNameOf, paidSquareCount, unpaidSquares, cleanGuestName, nameKey,
-    owedSummary, paidAfterAdd, hostAddSquares, setPaidCount, pruneEmptyPlayers, unpaidGuestPicks, parsePlayerList,
+    THEMES, isTheme, owedSummary, paidAfterAdd, hostAddSquares, setPaidCount, pruneEmptyPlayers, unpaidGuestPicks, parsePlayerList,
     QUARTERS, QLABEL, STATUSES, LEAGUES, SCORING_MODES,
     scoringMode, manualEntry, applyScoreOp, scoreKeyOp, inverseScoreOp, setQuarterScore, belowEndedQuarter, manualState, hasResult,
     shuffle, shuffledDigits, emptyGrid,

@@ -82,6 +82,17 @@
       `;
       fitTeamBadges(header);
 
+      // Home, top left like every host screen. A phone that was handed the scoring has no Home.
+      if (!scorer) {
+        const homeBtn = el('button', 'icon-btn home-btn', SBS.ui.HOME_ICON);
+        homeBtn.type = 'button';
+        homeBtn.setAttribute('aria-label', 'Home');
+        homeBtn.title = 'Home';
+        homeBtn.addEventListener('click', () => SBS.go({ screen: 'home' }));
+        header.prepend(homeBtn);
+      }
+      header.classList.toggle('has-home', !scorer);
+
       const actions = el('div', 'phone-actions');
       const manageBtn = el('button', 'phone-action-btn', 'Manage Players');
       manageBtn.type = 'button';
@@ -89,11 +100,10 @@
       const gridBtn = el('button', 'phone-action-btn', 'Back');
       gridBtn.type = 'button';
       gridBtn.addEventListener('click', () => {
-        if (backScreen === 'home') SBS.go({ screen: 'home' });
-        else SBS.go({ screen: 'board', game });
+        SBS.go({ screen: 'board', game });
       });
       actions.appendChild(manageBtn);
-      actions.appendChild(gridBtn);
+      if (backScreen !== 'home') actions.appendChild(gridBtn); // Home does it
       if (!scorer) header.appendChild(actions);
 
       if (isManual()) { drawManual(computed); return; }

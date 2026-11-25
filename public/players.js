@@ -304,7 +304,7 @@
         const row = el('div', 'fill-player');
         const dot = el('span', 'fill-player-dot');
         dot.setAttribute('aria-hidden', 'true');
-        dot.style.background = p.color;
+        dot.style.setProperty('--nc', p.color);
         const info = el('button', 'fill-player-info' + (st === 'part' ? ' is-part' : ''),
           `<span class="player-name">${escapeHtml(p.name)}</span><span class="player-sub">${ownedLine(p)}</span>`);
         info.type = 'button';

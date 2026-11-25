@@ -312,6 +312,17 @@ picks in Player View"; the guest page is Player View. Part payments:
 [decision 020](decisions/020-paid-per-square.md). Not tried on a real iPad or phone. The privacy
 and terms pages still say "guest picks" (wording waits for the lawyer review).
 
+**R32. Team pills, glass buttons and Home placement** — `Sonnet` — ✅ built 2026-11-24. Team pills:
+the logo disc is 2 px taller than the pill, names are centered and every team font's capitals are
+the same height (`TEAM_CAPS` in `ui.js`), and a team color close to the dark cards gets an outline.
+Button colors are theme tokens (R33). Home is top left on every host screen, and
+the phone Game Day header shows only the matchup.
+
+**R33. Host themes** — `Opus` (storage, access, review), `Sonnet` (front end) — ✅ built 2026-11-24
+([decision 021](decisions/021-host-themes.md), migration 007, applied to production 2026-11-24). Six themes,
+one per host, chosen on a Theme page in the account menu; the original palette is "Neon", with solid
+buttons. Player View, Party View, paired TVs and scorer phones wear the board's host's theme.
+
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
 
 **R8. Cache board reads at the edge** — `Opus` — Depends on: R3, R4a.

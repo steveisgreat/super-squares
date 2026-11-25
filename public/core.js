@@ -108,15 +108,25 @@
     }
   }
 
+  function forgetHostTheme() {
+    if (window.SBSTheme) window.SBSTheme.forgetHost();
+  }
+
   SBS.api = {
     getGames: (o) => request('/api/games', null, o),
     getSession: () => rawRequest('/api/session'),
     signIn: (message) => promptSignIn(message),
-    signOut: () => rawRequest('/api/session', { method: 'DELETE' }),
+    // Signing out also makes this device forget the host's theme (R33).
+    signOut: () => rawRequest('/api/session', { method: 'DELETE' }).then((r) => { forgetHostTheme(); return r; }),
+    // The host's color theme (R33). getGameTheme is raw on purpose: the board id is all it needs,
+    // so it never opens the sign-in prompt.
+    getTheme: (o) => request('/api/theme', null, o),
+    setTheme: (theme) => request('/api/theme', json('PUT', { theme })),
+    getGameTheme: (id) => rawRequest(`/api/game/${id}/theme`),
     // Account sign-in. Raw on purpose: a 401 here must never open the prompt.
     requestLoginCode: (email) => rawRequest('/api/login', json('POST', { email })),
     verifyLogin: (body) => rawRequest('/api/login/verify', json('POST', body)),
-    revokeAllSessions: () => rawRequest('/api/session/revoke-all', { method: 'POST' }),
+    revokeAllSessions: () => rawRequest('/api/session/revoke-all', { method: 'POST' }).then((r) => { forgetHostTheme(); return r; }),
     getGame: (id) => request(`/api/game/${id}`),
     getJoin: (code) => rawRequest(`/api/join/${encodeURIComponent(code)}`),
     // TV pairing (R23). The TV's calls are raw: it has no host session and must never prompt.
@@ -218,12 +228,42 @@
     window.scrollTo(0, 0);
   };
 
+  // ---------- Theme (R33) ----------
+  // The host's theme, one per host. The screens that show one board by id to anyone (the TV, Party
+  // View, the scorer phone, Player View) wear that board's host's theme, cached per board for this
+  // tab and asked of the server once per id per page load; everything else wears this device's
+  // host theme. Nothing here polls, and a failed lookup is silent.
+  const BOARD_THEME_SCREENS = { tv: true, mirror: true, phone: true, player: true };
+  const themeAsked = new Set();
+  const boardThemeKey = (id) => 'sbs-theme-' + String(id).toLowerCase();
+
+  function applyRouteTheme() {
+    const T = window.SBSTheme;
+    if (!T) return;
+    if (!BOARD_THEME_SCREENS[route.screen] || !route.id) { T.apply(T.host()); return; }
+    const id = route.id;
+    let cached = null;
+    try { cached = window.sessionStorage.getItem(boardThemeKey(id)); } catch (e) { /* no cache */ }
+    T.apply(T.known(cached) ? cached : T.host());
+    if (themeAsked.has(id)) return;
+    themeAsked.add(id);
+    SBS.api.getGameTheme(id).then((r) => {
+      if (!r || !T.known(r.theme)) return;
+      try { window.sessionStorage.setItem(boardThemeKey(id), r.theme); } catch (e) { /* no cache */ }
+      // Only while that board is still the one on screen. Colors alone: drawing the screen again could
+      // throw away a score or a name being typed.
+      if (BOARD_THEME_SCREENS[route.screen] && route.id === id) T.apply(r.theme);
+    }).catch(() => { /* the screen keeps the theme it has */ });
+  }
+
   SBS.render = function () {
     clearManagedTimers();
     runCleanups();
+    applyRouteTheme();
     const s = SBS.screens;
     if (route.screen === 'home') return s.home();
     if (route.screen === 'setup') return s.setup();
+    if (route.screen === 'theme') return s.theme();
     if (route.screen === 'editGame') return s.editGame(route.game);
     if (route.screen === 'picking') return s.picking(route.game);
     if (route.screen === 'board') return s.board(route.game);

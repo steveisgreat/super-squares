@@ -56,6 +56,8 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `POST /api/tv/pair` | owner of `gameId`; `{ code, gameId }` pairs a waiting TV and retires the code |
 | `POST /api/tv/follow` | owner of `gameId`; moves all the caller's paired TVs to that board |
 | `GET /api/tv/mine` | signed in; `{ count }` of the caller's paired TVs |
+| `GET`, `PUT /api/theme` | host only; the caller's color theme → `{ theme }`; 400 unknown theme (decision 021) |
+| `GET /api/game/:id/theme` | public; the theme of the board's host → `{ theme }`; 404 unknown board |
 | `GET /api/join/:code` | public; a join code resolves to `{ id }` (decision 016); 400 malformed, 404 unknown |
 | `POST /api/game/:id/guest` | anyone with the board id; `{ name }` this device holds, sets `sbs_guest` (180 d, `Path=/api/game/<id>`) if it has none; 409 unless guest picks are on and the board is picking (decision 019) |
 | `PATCH /api/game/:id/guest` | a device with that key; claim or release its own squares, one atomic write → `{ game, name }`; 400, 401 (never the host prompt), 409 with the current `game` |

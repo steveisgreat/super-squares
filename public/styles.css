@@ -3,9 +3,37 @@
    ABOVE the page; --accent needs dark text on top — see --on-accent), just
    a deeper near-black base, cyan-tinted glass borders, and a saturated
    cyan accent in place of the original pastel blue. Applies everywhere —
-   every screen shares these tokens, not just the TV Grid View. */
-:root {
+   every screen shares these tokens, not just the TV Grid View.
+
+   Themes (R33): the host picks one of six. A theme is a block of tokens on
+   [data-theme="…"], which works on any element, so the Theme page can show a
+   card wearing its own theme. The page's theme is <html data-theme="…"> (set by
+   theme.js before first paint). "classic" is the original palette, shown as
+   "Neon". A token whose value uses var() of another themed token is written out
+   in every block (or lives in the shared rule below), or a nested card would
+   show the page's value. */
+:root, [data-theme] {
+  --accent2: var(--good);
+  --teamA: #ff6b6b;
+  --teamA-alt: #ffb3b3;
+  --teamB: #4dabf7;
+  --teamB-alt: #a5d8ff;
+  --radius: 6px;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 14px rgb(0 0 0 / 30%), 0 0 24px rgba(var(--accent-rgb), 0.06);
+  --shadow-pop: 0 10px 30px rgb(0 0 0 / 50%);
+  /* Exo 2 everywhere except the topbar title, which uses Orbitron directly.
+     --serif is kept only so existing rules don't need renaming; it now
+     points at the same sans stack. */
+  --sans: 'Exo 2', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --serif: var(--sans);
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+:root { font-size: 16px; }
+
+/* Neon (classic): the original palette. Its buttons are solid cyan. */
+:root, [data-theme="classic"] {
   --bg: #06070d;
+  --chrome-bg: #050609;
   --panel: #12171f;
   --panel2: #171f2b;
   --panel3: #202a38;
@@ -16,33 +44,218 @@
   --accent: #00e5ff;
   --accent-hi: #6df1ff;
   --accent-soft: rgba(0, 229, 255, 0.12);
+  --accent-rgb: 0, 229, 255;
   --on-accent: #06070d;
-  --accent2: #93c9aa;
+  --glow2-rgb: 255, 46, 136;
+  --on-glow2: #fff;
+  --brand: #2ecc71;
+  --brand-rgb: 46, 204, 113;
+  --btn-fill: #00e5ff;
+  --btn-fill-hover: #6df1ff;
+  --btn-edge: #00e5ff;
+  --btn-text: #06070d;
+  --btn-danger: #ef4444;
+  --btn-danger-hover: #f87171;
+  --btn-danger-edge: #ef4444;
+  --btn-danger-text: #06070d;
   --danger: #ef4444;
   --danger-soft: #33120f;
   --danger-border: #7a2320;
   --good: #93c9aa;
   --good-soft: #1e2b23;
+  --good-rgb: 147, 201, 170;
+  --live: #2ecc71;
+  --live-rgb: 46, 204, 113;
   --warn: #e6b271;
   --warn-soft: #2b2317;
-  --teamA: #ff6b6b;
-  --teamA-alt: #ffb3b3;
-  --teamB: #4dabf7;
-  --teamB-alt: #a5d8ff;
-  --radius: 6px;
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 14px rgb(0 0 0 / 30%), 0 0 24px rgba(0, 229, 255, 0.06);
-  --shadow-pop: 0 10px 30px rgb(0 0 0 / 50%);
-  --chrome-bg: #050609;
+  --part: #f4d35e;
+  --part-soft: #2e280f;
+  --bad-text: #ff8a80;
+  --chip-fg: #ffc24d;
+  --chip-bg: rgba(255, 194, 77, 0.13);
+  --cell-empty: #192230;
   --chrome-fg: #b3c1cd;
   --chrome-dim: #8b9aa8;
   --on-chrome: #f4f7fa;
-  /* Exo 2 everywhere except the topbar title, which uses Orbitron directly.
-     --serif is kept only so existing rules don't need renaming; it now
-     points at the same sans stack. */
-  --sans: 'Exo 2', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --serif: var(--sans);
-  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 16px;
+  --nc-mix: 100%;
+}
+
+/* The five other themes share these. Their buttons are opaque. */
+[data-theme="cyan"], [data-theme="blue"], [data-theme="slate"], [data-theme="indigo"], [data-theme="emerald"] {
+  --good: #7ee2ab;
+  --good-soft: #12291f;
+  --good-rgb: 126, 226, 171;
+  --live: #7ee2ab;
+  --live-rgb: 126, 226, 171;
+  --part: #f6d365;
+  --part-soft: #2d2710;
+  --warn: #f6d365;
+  --warn-soft: #2d2710;
+  --danger: #e5575c;
+  --danger-soft: #33161a;
+  --danger-border: #7a2c31;
+  --bad-text: #ff9b93;
+  --btn-danger: #6b2329;
+  --btn-danger-hover: #822b32;
+  --btn-danger-edge: #e5575c;
+  --btn-danger-text: #fff;
+  --btn-text: #fff;
+  --nc-mix: 62%;
+}
+
+/* Deep Cyan */
+[data-theme="cyan"] {
+  --bg: #070b14;
+  --chrome-bg: #060912;
+  --panel: #0f1726;
+  --panel2: #172238;
+  --panel3: #1e2c48;
+  --cell-empty: #172238;
+  --border: #22314b;
+  --border-strong: #36496a;
+  --text: #eaf1fb;
+  --muted: #a9b8cf;
+  --accent: #4cc9f0;
+  --accent-hi: #84daf5;
+  --accent-soft: rgba(76, 201, 240, 0.14);
+  --accent-rgb: 76, 201, 240;
+  --on-accent: #05080e;
+  --on-glow2: #05080e;
+  --glow2-rgb: 76, 201, 240;
+  --brand: #4cc9f0;
+  --brand-rgb: 76, 201, 240;
+  --btn-fill: #14507a;
+  --btn-fill-hover: #196499;
+  --btn-edge: #4cc9f0;
+  --chip-fg: #4cc9f0;
+  --chip-bg: #172238;
+  --chrome-fg: #a9b8cf;
+  --chrome-dim: #8394ad;
+  --on-chrome: #eaf1fb;
+}
+
+/* Stadium Blue */
+[data-theme="blue"] {
+  --bg: #080c18;
+  --chrome-bg: #070a14;
+  --panel: #10172a;
+  --panel2: #19223b;
+  --panel3: #202b4b;
+  --cell-empty: #19223b;
+  --border: #26324f;
+  --border-strong: #3b4a70;
+  --text: #edf1fb;
+  --muted: #aeb9d3;
+  --accent: #7cb0ff;
+  --accent-hi: #b9d5ff;
+  --accent-soft: rgba(124, 176, 255, 0.14);
+  --accent-rgb: 124, 176, 255;
+  --on-accent: #060811;
+  --on-glow2: #060811;
+  --glow2-rgb: 124, 176, 255;
+  --brand: #7cb0ff;
+  --brand-rgb: 124, 176, 255;
+  --btn-fill: #2457c5;
+  --btn-fill-hover: #3368da;
+  --btn-edge: #7cb0ff;
+  --chip-fg: #7cb0ff;
+  --chip-bg: #19223b;
+  --chrome-fg: #aeb9d3;
+  --chrome-dim: #8893b0;
+  --on-chrome: #edf1fb;
+}
+
+/* Ice Slate */
+[data-theme="slate"] {
+  --bg: #0d1015;
+  --chrome-bg: #0a0d11;
+  --panel: #161b22;
+  --panel2: #202731;
+  --panel3: #29323f;
+  --cell-empty: #202731;
+  --border: #2c3541;
+  --border-strong: #465260;
+  --text: #eef2f6;
+  --muted: #aab4c0;
+  --accent: #a8d4ff;
+  --accent-hi: #cce6ff;
+  --accent-soft: rgba(168, 212, 255, 0.14);
+  --accent-rgb: 168, 212, 255;
+  --on-accent: #090b0f;
+  --on-glow2: #090b0f;
+  --glow2-rgb: 168, 212, 255;
+  --brand: #a8d4ff;
+  --brand-rgb: 168, 212, 255;
+  --btn-fill: #34506b;
+  --btn-fill-hover: #406283;
+  --btn-edge: #a8d4ff;
+  --chip-fg: #a8d4ff;
+  --chip-bg: #202731;
+  --chrome-fg: #aab4c0;
+  --chrome-dim: #8792a0;
+  --on-chrome: #eef2f6;
+}
+
+/* Indigo Night */
+[data-theme="indigo"] {
+  --bg: #0b0a17;
+  --chrome-bg: #090813;
+  --panel: #151428;
+  --panel2: #1f1e3a;
+  --panel3: #272649;
+  --cell-empty: #1f1e3a;
+  --border: #302e55;
+  --border-strong: #49467a;
+  --text: #f0f0fa;
+  --muted: #b6b5d3;
+  --accent: #a9adff;
+  --accent-hi: #ccceff;
+  --accent-soft: rgba(169, 173, 255, 0.14);
+  --accent-rgb: 169, 173, 255;
+  --on-accent: #080710;
+  --on-glow2: #080710;
+  --glow2-rgb: 169, 173, 255;
+  --brand: #a9adff;
+  --brand-rgb: 169, 173, 255;
+  --btn-fill: #4142b4;
+  --btn-fill-hover: #5757c2;
+  --btn-edge: #a9adff;
+  --chip-fg: #a9adff;
+  --chip-bg: #1f1e3a;
+  --chrome-fg: #b6b5d3;
+  --chrome-dim: #9392b3;
+  --on-chrome: #f0f0fa;
+}
+
+/* Emerald Field */
+[data-theme="emerald"] {
+  --bg: #06100e;
+  --chrome-bg: #050d0b;
+  --panel: #0e1a18;
+  --panel2: #162624;
+  --panel3: #1e3532;
+  --cell-empty: #162624;
+  --border: #223b36;
+  --border-strong: #365850;
+  --text: #ebf5f2;
+  --muted: #a7bdb7;
+  --accent: #3ddbb0;
+  --accent-hi: #71e5c5;
+  --accent-soft: rgba(61, 219, 176, 0.14);
+  --accent-rgb: 61, 219, 176;
+  --on-accent: #040b0a;
+  --on-glow2: #040b0a;
+  --glow2-rgb: 61, 219, 176;
+  --brand: #3ddbb0;
+  --brand-rgb: 61, 219, 176;
+  --btn-fill: #0f6b57;
+  --btn-fill-hover: #127a60;
+  --btn-edge: #3ddbb0;
+  --chip-fg: #3ddbb0;
+  --chip-bg: #162624;
+  --chrome-fg: #a7bdb7;
+  --chrome-dim: #82988f;
+  --on-chrome: #ebf5f2;
 }
 
 * { box-sizing: border-box; }
@@ -78,8 +291,8 @@ body { min-height: 100%; overflow-x: clip; }
    atmosphere, not a background image. */
 body {
   background:
-    radial-gradient(ellipse 900px 500px at 15% -10%, rgba(0,229,255,0.08), transparent 60%),
-    radial-gradient(ellipse 900px 600px at 100% 110%, rgba(255,46,136,0.06), transparent 60%),
+    radial-gradient(ellipse 900px 500px at 15% -10%, rgba(var(--accent-rgb), 0.08), transparent 60%),
+    radial-gradient(ellipse 900px 600px at 100% 110%, rgba(var(--glow2-rgb), 0.06), transparent 60%),
     var(--bg);
   background-attachment: fixed;
 }
@@ -126,17 +339,27 @@ body {
 }
 
 .header-icon { color: var(--accent); flex-shrink: 0; }
+/* Home: the same size and place (20 px in, top left) on every screen that has it. */
+.topbar .home-btn, .phone-header .home-btn { width: 44px; height: 44px; flex: none; }
+.topbar.setup-topbar { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; min-height: 64px; padding: 8px 20px; }
+/* Where a tall title would center it lower, it stays up with the rest. */
+.setup-topbar .home-btn, .pick-topbar .home-btn { align-self: start; margin-top: 2px; }
+.setup-topbar h1 { justify-content: center; text-align: center; }
+.phone-header.has-home { padding-top: 8px; }
+.phone-header .home-btn { position: absolute; left: 6px; top: 6px; }
+.phone-header.has-home .phone-matchup, .phone-header.has-home .phone-sub { margin-left: 54px; margin-right: 54px; }
+.phone-header.has-home .phone-matchup { flex-wrap: nowrap; }
 
 .topbar h1.brand-pill {
   padding: 8px 18px;
   border-radius: 10px;
-  border: 1px solid #2ecc71;
+  border: 1px solid var(--brand);
   background: var(--chrome-bg);
   animation: brand-pill-glow 2.4s ease-in-out infinite;
 }
 @keyframes brand-pill-glow {
-  0%, 100% { box-shadow: 0 0 0 rgba(46, 204, 113, 0); }
-  50% { box-shadow: 0 0 14px rgba(46, 204, 113, 0.55); }
+  0%, 100% { box-shadow: 0 0 0 rgba(var(--brand-rgb), 0); }
+  50% { box-shadow: 0 0 14px rgba(var(--brand-rgb), 0.55); }
 }
 
 .vs-sep { color: var(--muted); font-weight: 600; text-transform: lowercase; }
@@ -243,12 +466,9 @@ button.ghost.btn-delete:hover, button.ghost.btn-delete:focus-visible {
 
 button, .btn {
   font: inherit;
-  background: var(--accent);
-  /* --accent is a light pastel blue in Midnight Blueprint, not a saturated
-     one — white text on it is low-contrast, so every solid accent/danger/
-     good fill in this file pairs with --on-accent (near-black) instead. */
-  color: var(--on-accent);
-  border: 1px solid var(--accent);
+  background: var(--btn-fill);
+  color: var(--btn-text);
+  border: 1px solid var(--btn-edge);
   padding: 10px 18px;
   border-radius: var(--radius);
   font-weight: 600;
@@ -257,7 +477,7 @@ button, .btn {
   touch-action: manipulation;
   letter-spacing: 0.1px;
 }
-button:hover, .btn:hover { background: var(--accent-hi); border-color: var(--accent-hi); }
+button:hover, .btn:hover { background: var(--btn-fill-hover); border-color: var(--accent); }
 button:active, .btn:active { filter: brightness(0.97); }
 button.secondary {
   background: var(--panel2);
@@ -277,8 +497,8 @@ button.icon-btn {
   border: 1px solid var(--border);
 }
 button.icon-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
-button.danger { background: var(--danger); border-color: var(--danger); color: var(--on-accent); }
-button.danger:hover { background: #f87171; border-color: #f87171; }
+button.danger { background: var(--btn-danger); border-color: var(--btn-danger-edge); color: var(--btn-danger-text); }
+button.danger:hover { background: var(--btn-danger-hover); border-color: var(--danger); }
 /* The claim-squares action stays visually distinct from ordinary confirm
    buttons and the red lock/remove actions — an outlined "good" accent rather
    than a glow, to match the document-like restraint of the rest of the UI. */
@@ -287,7 +507,7 @@ button.pick {
   color: var(--good);
   border: 1px solid var(--good);
 }
-button.pick:hover { background: var(--good); color: var(--on-accent); }
+button.pick:hover { background: rgba(var(--good-rgb), 0.35); color: var(--btn-text); }
 button.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
 button.small { padding: 7px 12px; font-size: 0.85rem; border-radius: var(--radius); }
 button.full-width { width: 100%; text-align: center; }
@@ -354,8 +574,8 @@ input[type=color] {
 }
 .pill:hover { border-color: var(--accent); }
 .pill.active {
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--btn-fill);
+  color: var(--btn-text);
   border-color: var(--accent);
 }
 
@@ -469,7 +689,7 @@ button.fill-player-info {
 button.fill-player-info:hover .player-name { color: var(--accent-hi); }
 .fill-player-info .player-name { display: block; overflow-wrap: anywhere; font-size: 1rem; font-weight: 600; }
 .fill-player-info .player-sub { display: block; font-size: 0.82rem; }
-.fill-player-info.is-part .player-sub { color: #f4d35e; }
+.fill-player-info.is-part .player-sub { color: var(--part); }
 .players-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .players-head h3 { margin: 0; }
 .players-n { color: var(--muted); font-size: 0.9rem; }
@@ -484,8 +704,8 @@ button.fill-player-info:hover .player-name { color: var(--accent-hi); }
 .players-foot button { width: 100%; min-height: 44px; }
 button.paid-pill { min-width: 86px; min-height: 44px; border-radius: 22px; padding: 6px 8px; font-size: 0.86rem; flex-shrink: 0; }
 button.paid-pill.is-paid { background: var(--good-soft); color: var(--good); border-color: var(--good); }
-button.paid-pill.is-part { background: #2e280f; color: #f4d35e; border-color: #f4d35e; }
-button.paid-pill.is-unpaid { background: var(--danger-soft); color: #ff8a80; border-color: var(--danger); }
+button.paid-pill.is-part { background: var(--part-soft); color: var(--part); border-color: var(--part); }
+button.paid-pill.is-unpaid { background: var(--danger-soft); color: var(--bad-text); border-color: var(--danger); }
 button.paid-pill:hover { filter: brightness(1.2); }
 
 .manual-banner {
@@ -566,26 +786,46 @@ button.paid-pill:hover { filter: brightness(1.2); }
    (computed in ui.js) — see teamBadge(). Background/text color come from
    inline style per instance since they vary per team, not per class. */
 .team-badge {
+  /* The logo's disc; the pill is 2 px shorter (a clear 1 px border above and below), so it comes
+     out from behind the logo. Sized by the caller, and never smaller than the name needs. */
+  --d: max(var(--disc, 26px), 1.6em);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 12px 3px 3px;
+  box-sizing: border-box;
+  height: var(--d);
+  gap: max(8px, 0.53em);
+  padding: 0 max(8px, 0.53em) 0 0;
+  border: solid transparent;
+  border-width: 1px 0;
   border-radius: 999px;
+  background-color: var(--pill);
+  background-clip: padding-box;
+  box-shadow: inset 0 0 0 1px var(--edge, transparent);
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1;
   white-space: nowrap;
+  vertical-align: middle;
 }
 .team-badge .team-logo {
   flex-shrink: 0;
+  box-sizing: border-box;
+  width: var(--d);
+  height: var(--d);
+  margin: -1px 0;
+  padding: calc(var(--d) * 0.07);
   border-radius: 50%;
-  background: rgba(255,255,255,0.85);
-  padding: 2px;
+  background: #f1f4f6;
 }
 /* Most team fonts come in one weight. Without this the browser fakes the badge's bold by smearing
-   the letters, which reads as blurry; a font that has a real bold still uses it. */
-.team-badge-name { white-space: nowrap; font-synthesis: none; }
-.team-badge-sm { padding: 2px 9px 2px 2px; font-size: 0.78rem; }
-.team-badge-sm .team-logo { padding: 1px; }
+   the letters, which reads as blurry; a font that has a real bold still uses it. --caps centers
+   the capitals (ui.js TEAM_CAPS). */
+.team-badge-name { position: relative; top: var(--caps, 0); white-space: nowrap; font-synthesis: none; }
+.team-badge-sm { font-size: 0.78rem; }
+.team-badge.mode-nologo, .mirror-header .live-center .team-badge { padding-left: max(8px, 0.53em); }
+@media (max-width: 480px) {
+  .team-badge-sm { gap: 6px; padding-right: 6px; }
+  .team-badge-sm.mode-nologo, .mirror-header .live-center .team-badge-sm { padding-left: 6px; }
+}
 
 /* Space-driven fallback: fitTeamBadges() (ui.js) measures each .badge-fit
    container and adds mode-abbr / mode-nologo to its badges when the full
@@ -596,7 +836,7 @@ button.paid-pill:hover { filter: brightness(1.2); }
    visible to scrollWidth/clientWidth. Both are no-ops on non-flex-item
    containers that already size correctly. */
 .badge-fit { min-width: 0; overflow: hidden; }
-.brand-dollar { color: #2ecc71; }
+.brand-dollar { color: var(--brand); }
 .team-badge .badge-abbr { display: none; }
 .team-badge.mode-abbr .badge-full { display: none; }
 .team-badge.mode-abbr .badge-abbr { display: inline; }
@@ -667,7 +907,15 @@ button.paid-pill:hover { filter: brightness(1.2); }
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
 }
-.live-score-digits { font-size: 1.2rem; font-weight: 800; letter-spacing: 0.5px; }
+.live-score-digits { font-size: 1.2rem; font-weight: 800; letter-spacing: 0.5px; white-space: nowrap; }
+/* On a phone the flag and the "updated" note take their own lines, so the score has room. */
+@media (max-width: 480px) {
+  .gd-phone .live-score-bar { flex-wrap: wrap; justify-content: center; gap: 6px; }
+  .gd-phone .live-center { flex: 1 0 100%; flex-wrap: wrap; gap: 4px 8px; }
+  .gd-phone .live-center .badge-full { display: none; }
+  .gd-phone .live-center .badge-abbr { display: inline; }
+  .gd-phone .live-updated { flex: 1 0 100%; text-align: center; }
+}
 /* The TV header shows the live bar in place of the old "Total Pot" line, so
    it should read as plain header text rather than a floating card; the same
    bar above the grid is now redundant there, so it's hidden. */
@@ -757,6 +1005,14 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: 1.5rem; }
    black pill, tying the corner label back to the border around the cell. */
 .cell.winner .badge { background: #f4c542; color: #1b1400; }
 .cell .name-txt { padding-top: 8px; font-size: 0.78rem; line-height: 1.1; font-weight: 400; }
+/* A player's color arrives as --nc. In every theme but Neon it is softened toward the text color
+   (--nc-mix) so a saturated color doesn't fight the theme. With no --nc the name just inherits. */
+.name-txt { color: var(--nc, inherit); }
+.fill-player-dot { background: var(--nc, transparent); }
+@supports (color: color-mix(in srgb, red, blue)) {
+  .name-txt { color: color-mix(in srgb, var(--nc) var(--nc-mix), var(--text)); }
+  .fill-player-dot { background: color-mix(in srgb, var(--nc) var(--nc-mix), var(--text)); }
+}
 
 /* Unpaid squares: a quiet red ring around the cell — visible on a second
    look, but not competing with the quarter-result badges or the winner
@@ -1018,7 +1274,7 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: 1.5rem; }
 .tv-picking-pill {
   padding: 10px 28px;
   border-radius: 999px;
-  border: 1px solid #2ecc71;
+  border: 1px solid var(--brand);
   background: var(--chrome-bg);
   animation: brand-pill-glow 2.4s ease-in-out infinite;
 }
@@ -1129,10 +1385,10 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
    the TV route) so nothing outside it is touched. */
 .tv-screen .board-grid-outer {
   background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(0,229,255,0.3);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
   border-radius: 18px;
   padding: 14px;
-  box-shadow: 0 0 60px rgba(0,229,255,0.12), 0 30px 70px rgba(0,0,0,0.5);
+  box-shadow: 0 0 60px rgba(var(--accent-rgb), 0.12), 0 30px 70px rgba(0,0,0,0.5);
 }
 .tv-screen .board-table { background: transparent; gap: 3px; padding: 0; }
 .tv-screen .cell {
@@ -1142,21 +1398,21 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
 }
 .tv-screen .cell.head {
   background: transparent;
-  color: #00e5ff;
-  text-shadow: 0 0 10px rgba(0,229,255,0.5);
+  color: var(--accent);
+  text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.5);
 }
 .tv-screen .cell.head.pending { color: #eaf6ff; text-shadow: none; }
 .tv-screen .cell.filled { background: rgba(255,255,255,0.05); }
 .tv-screen .cell.winner {
-  background: rgba(255,46,136,0.14);
-  box-shadow: 0 0 0 1.5px #ff2e88, 0 0 18px rgba(255,46,136,0.55), inset 0 0 10px rgba(255,46,136,0.3);
+  background: rgba(var(--glow2-rgb), 0.14);
+  box-shadow: 0 0 0 1.5px rgb(var(--glow2-rgb)), 0 0 18px rgba(var(--glow2-rgb), 0.55), inset 0 0 10px rgba(var(--glow2-rgb), 0.3);
   animation: tv-neon-winner-glow 2.2s ease-in-out infinite;
 }
 @keyframes tv-neon-winner-glow {
-  0%, 100% { box-shadow: 0 0 0 1.5px #ff2e88, 0 0 18px rgba(255,46,136,0.55), inset 0 0 10px rgba(255,46,136,0.3); }
-  50% { box-shadow: 0 0 0 1.5px #ff2e88, 0 0 30px rgba(255,46,136,0.9), inset 0 0 14px rgba(255,46,136,0.5); }
+  0%, 100% { box-shadow: 0 0 0 1.5px rgb(var(--glow2-rgb)), 0 0 18px rgba(var(--glow2-rgb), 0.55), inset 0 0 10px rgba(var(--glow2-rgb), 0.3); }
+  50% { box-shadow: 0 0 0 1.5px rgb(var(--glow2-rgb)), 0 0 30px rgba(var(--glow2-rgb), 0.9), inset 0 0 14px rgba(var(--glow2-rgb), 0.5); }
 }
-.tv-screen .cell.winner .badge { background: #ff2e88; color: #fff; }
+.tv-screen .cell.winner .badge { background: rgb(var(--glow2-rgb)); color: var(--on-glow2); }
 /* Team-color gradient fade (set inline by board.js's badgeStyle()) stays
    underneath — a light translucent dark wash (inset box-shadow, painted
    above the background but below the label's own text/logo) takes it down
@@ -1165,7 +1421,7 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
    near-invisible against the dark TV background at a heavier dim. */
 .tv-screen .teamA-label,
 .tv-screen .teamB-label {
-  box-shadow: inset 0 0 0 999px rgba(6,7,13,0.12), 0 0 16px rgba(0,229,255,0.35);
+  box-shadow: inset 0 0 0 999px rgba(6,7,13,0.12), 0 0 16px rgba(var(--accent-rgb), 0.35);
 }
 /* Lighter weight than the app-wide default (800) — at that weight, white
    text over the neon-dimmed gradient was hard to make out. A soft dark
@@ -1239,7 +1495,7 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
   position: absolute;
   inset: 0;
   border-radius: 6px;
-  border: 2px solid #00e5ff;
+  border: 2px solid var(--accent);
   opacity: 0;
   pointer-events: none;
   animation: tv-score-ripple 1.6s ease-in-out;
@@ -1690,9 +1946,9 @@ body.tv-fullscreen .tv-meta { font-size: 1.5rem; }
   position: absolute;
   z-index: 3;
   background: var(--panel);
-  border: 1px solid rgba(0,229,255,0.3);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
   border-radius: var(--radius);
-  box-shadow: 0 0 18px rgba(0,229,255,0.35);
+  box-shadow: 0 0 18px rgba(var(--accent-rgb), 0.35);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1712,7 +1968,7 @@ body.tv-fullscreen .tv-meta { font-size: 1.5rem; }
   flex: 0 0 auto;
   width: 100%;
   overflow: hidden;
-  color: #00e5ff;
+  color: var(--accent);
   font-size: clamp(8px, 0.9vw, 12px);
   font-weight: 400;
   line-height: 1.2;
@@ -1803,8 +2059,8 @@ body.tv-fullscreen .tv-meta { font-size: 1.5rem; }
 }
 .paid-toggle input { width: 18px; height: 18px; accent-color: var(--good); cursor: pointer; }
 .paid-toggle.is-paid { background: var(--good-soft); color: var(--good); }
-.paid-toggle.is-part { background: #2e280f; color: #f4d35e; }
-.paid-toggle.is-unpaid { background: var(--danger-soft); color: #ff8a80; }
+.paid-toggle.is-part { background: var(--part-soft); color: var(--part); }
+.paid-toggle.is-unpaid { background: var(--danger-soft); color: var(--bad-text); }
 
 .unpaid-summary {
   margin-top: 16px;
@@ -1826,7 +2082,7 @@ body.phone-mode #app { padding: 0; }
 .phone-screen {
   max-width: 560px;
   margin: 0 auto;
-  padding: 14px 14px calc(24px + env(safe-area-inset-bottom));
+  padding: 4px 14px calc(24px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1890,8 +2146,8 @@ body.phone-mode #app { padding: 0; }
 }
 .phone-tab.done { color: var(--good); }
 .phone-tab.active {
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--btn-fill);
+  color: var(--btn-text);
   border-color: var(--accent);
 }
 
@@ -1941,8 +2197,8 @@ body.phone-mode #app { padding: 0; }
   border-radius: var(--radius);
 }
 .pk-key.selected {
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--btn-fill);
+  color: var(--btn-text);
   border-color: var(--accent);
 }
 .pk-key.pk-clear { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.3px; }
@@ -2250,8 +2506,8 @@ body.player-mode #app { padding: 0; }
 .sp-btn:disabled { opacity: 0.45; cursor: default; }
 .sp-btn:focus-visible, .sp-input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .sp-minus { color: var(--danger); }
-.sp-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-.sp-primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
+.sp-primary { background: var(--btn-fill); color: var(--btn-text); border-color: var(--btn-edge); }
+.sp-primary:hover:not(:disabled) { background: var(--btn-fill-hover); border-color: var(--accent); }
 .sp-small { min-height: 36px; font-size: 0.85rem; }
 .sp-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .sp-ended { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -2313,7 +2569,7 @@ button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color:
 .mg-axis { font-size: 0.7rem; text-align: center; color: var(--accent); line-height: 1.6; min-height: 1.4em; }
 .mg-cell { aspect-ratio: 1; border-radius: 3px; background: transparent; border: 1px solid var(--border); box-sizing: border-box; }
 .mg-cell.is-filled { background: var(--panel3); border-color: var(--border-strong); }
-.mg-cell.is-mine { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft, rgba(0, 229, 255, 0.35)); }
+.mg-cell.is-mine { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft, rgba(var(--accent-rgb), 0.35)); }
 .player-scored-by { font-size: 0.85rem; font-weight: 500; color: var(--muted); }
 
 /* TV, before the lock: the join QR panel beside the filling board, and the code in the pill. */
@@ -2325,9 +2581,9 @@ button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color:
   box-sizing: border-box;
   padding: 18px 16px;
   background: var(--panel);
-  border: 1px solid rgba(0,229,255,0.3);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
   border-radius: var(--radius);
-  box-shadow: 0 0 18px rgba(0,229,255,0.35);
+  box-shadow: 0 0 18px rgba(var(--accent-rgb), 0.35);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2337,7 +2593,7 @@ button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color:
 }
 .tv-join-panel[hidden] { display: none; }
 .tv-join-panel svg { width: 100%; height: auto; display: block; border-radius: 4px; }
-.tv-join-title { font-size: clamp(1.1rem, 1.6vw, 2rem); font-weight: 700; color: #00e5ff; }
+.tv-join-title { font-size: clamp(1.1rem, 1.6vw, 2rem); font-weight: 700; color: var(--accent); }
 .tv-join-or { font-size: clamp(0.8rem, 1vw, 1.2rem); color: var(--muted); }
 .tv-join-url { font-size: clamp(1rem, 1.3vw, 1.6rem); font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
 .tv-join-code-big { font-size: clamp(2rem, 3.2vw, 4.2rem); font-weight: 800; letter-spacing: 0.14em; padding-left: 0.14em; color: #fff; line-height: 1.1; }
@@ -2353,7 +2609,7 @@ button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color:
 .tvp-steps strong { color: var(--text); }
 .tvp-code {
   font-size: clamp(3rem, 15vw, 16rem); font-weight: 800; line-height: 1; letter-spacing: 0.12em; padding-left: 0.12em;
-  color: #fff; text-shadow: 0 0 24px rgba(0, 229, 255, 0.45); max-width: 100%;
+  color: #fff; text-shadow: 0 0 24px rgba(var(--accent-rgb), 0.45); max-width: 100%;
 }
 .tvp-status { margin: 0; font-size: clamp(0.95rem, 1.5vw, 1.8rem); color: var(--muted); }
 .tvp-unpair {
@@ -2531,7 +2787,7 @@ kbd {
   flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 3px 6px; font-size: 0.68rem; line-height: 1.25;
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text);
 }
-.mirror-tip-ok { min-height: 44px; min-width: 44px; padding: 0 10px; font-size: 0.8rem; }
+.mirror-tip-ok { min-height: 44px; min-width: 44px; padding: 0 10px; font-size: 0.8rem; white-space: nowrap; flex: none; }
 .mirror-strip {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 13; max-height: 62vh; overflow-y: auto;
   padding: 0 var(--sar) var(--sab) var(--sal);
@@ -2565,7 +2821,6 @@ kbd {
    Home, the matchup on one line, then Party View and Connect. From 1024 px (not a phone) the meta
    line sits beside the matchup and the join chip and "On the TV" pill show. */
 .topbar.gd-topbar { flex-wrap: nowrap; justify-content: flex-start; gap: 8px; padding: 8px 20px; min-height: 64px; box-sizing: border-box; }
-.gd-topbar .home-btn { min-width: 44px; min-height: 44px; flex: none; }
 .gd-head { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .gd-match { margin: 0; font-size: 1.2rem; font-weight: 800; letter-spacing: 0; display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; min-width: 0; }
 .gd-match > * { flex: none; }
@@ -2578,7 +2833,7 @@ button.gd-bar-btn {
   background: transparent; color: var(--text); border: 1px solid var(--border-strong, var(--border));
 }
 button.gd-bar-btn:hover { background: var(--panel2); }
-button.gd-bar-btn.gd-connect { color: var(--accent-hi, var(--accent)); background: rgba(0, 229, 255, 0.12); }
+button.gd-bar-btn.gd-connect { color: var(--accent-hi, var(--accent)); background: rgba(var(--accent-rgb), 0.12); }
 button.gd-bar-btn.gd-icon-only { width: 44px; padding: 0; }
 button.gd-bar-btn svg { width: 20px; height: 20px; flex: none; }
 .gd-chip-wrap, .gd-onair { display: none; }
@@ -2600,13 +2855,23 @@ button.gd-chip {
 .gd-chip-note:empty { display: none; }
 button.gd-onair {
   align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 22px; font-size: 0.9rem; font-weight: 600;
-  background: rgba(147, 201, 170, 0.15); color: var(--good); border: 1px solid rgba(147, 201, 170, 0.6);
+  background: rgba(var(--good-rgb), 0.15); color: var(--good); border: 1px solid rgba(var(--good-rgb), 0.6);
 }
 .gd-onair-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
 .gd-topbar-phone { padding: 6px 8px; min-height: 60px; }
 .gd-topbar-phone .gd-match { font-size: 1rem; }
 .gd-topbar-phone .gd-match .team-badge { font-size: 0.9rem; }
 .gd-topbar-phone button.gd-bar-btn.gd-connect { padding: 0 12px; }
+/* Game Day on a phone: the matchup alone, centered (no room for the description). */
+.gd-topbar-phone:not(.pick-topbar) .gd-meta { display: none; }
+.gd-topbar-phone:not(.pick-topbar) .gd-match { justify-content: center; }
+/* Both teams fit a small phone's top bar once Connect is its icon. */
+@media (max-width: 480px) {
+  .gd-topbar-phone button.gd-bar-btn.gd-connect { width: 44px; padding: 0; }
+  .gd-topbar-phone .gd-connect span { display: none; }
+  .gd-topbar-phone .gd-match { gap: 5px; }
+  .gd-topbar-phone .gd-match .vs-sep { font-size: 0.8rem; }
+}
 
 /* ---- Picking screen (redesign of R25) ----
    Two columns from 1024 px (one panel with Add squares and Players tabs, then the board), one
@@ -2659,7 +2924,8 @@ button.add-btn, button.lock-btn { min-height: 48px; padding-left: 6px; padding-r
 .lock-sec { border-top: 1px solid var(--border); }
 button.lock-btn { background: transparent; color: var(--accent-hi); border-color: var(--border-strong); box-shadow: none; }
 button.lock-btn:hover { background: var(--accent-soft); color: var(--accent-hi); border-color: var(--accent); }
-.lock-sec.is-ready button.lock-btn { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.lock-sec.is-ready button.lock-btn { background: var(--btn-fill); color: var(--btn-text); border-color: var(--accent); }
+.lock-sec.is-ready button.lock-btn:hover { background: var(--btn-fill-hover); }
 
 .board-head { display: flex; align-items: center; gap: 20px; min-height: 44px; margin-bottom: 12px; }
 .board-head .sold { flex: 1; min-width: 0; }
@@ -2674,20 +2940,21 @@ button.lock-btn:hover { background: var(--accent-soft); color: var(--accent-hi);
 .legend-unpaid { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .pick-fill .board-grid-outer { gap: 4px; }
 .pick-fill .teamA-label, .pick-fill .teamB-label { border-radius: 6px; background: var(--team) padding-box !important; }
+.pick-fill .teamA-label, .pick-fill .teamB-label { box-shadow: inset 0 0 0 1px var(--edge, transparent); }
 .pick-fill .teamB-label { border-left: 3px solid transparent; }
 .pick-fill .teamA-label { border-top: 3px solid transparent; }
 .pick-fill .teamB-label { padding: 3px 10px; font-size: 1.05rem; }
 .pick-fill .teamA-label { padding: 10px 3px; }
 .pick-fill .teamA-label-text { font-size: 1.05rem; }
 .pick-fill .board-table { background: transparent; gap: 3px; padding: 0; }
-.pick-fill .cell { border-radius: 6px; background: #192230; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07); }
+.pick-fill .cell { border-radius: 6px; background: var(--cell-empty); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07); }
 .pick-fill .cell.head { background: var(--panel3); box-shadow: none; }
 .pick-fill .cell.head.pending { color: var(--muted); font-weight: 700; }
 .pick-fill .cell.head.corner { background: transparent; }
 .pick-fill .cell.filled { box-shadow: inset 0 0 0 1px var(--border-strong); }
 @supports (color: color-mix(in srgb, red 50%, blue)) {
-  .pick-fill .cell.head.pending { background: color-mix(in srgb, var(--axis, #202a38) 45%, var(--panel2)); color: #edf2f6; }
-  .pick-fill .cell.filled { background: color-mix(in srgb, var(--who, #202a38) 16%, var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--who, #00e5ff) 38%, transparent); }
+  .pick-fill .cell.head.pending { background: color-mix(in srgb, var(--axis, var(--panel3)) 45%, var(--panel2)); color: var(--text); }
+  .pick-fill .cell.filled { background: color-mix(in srgb, var(--who, var(--panel3)) 16%, var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--who, var(--accent)) 38%, transparent); }
 }
 .pick-fill .cell .name-txt { max-width: 100%; overflow: hidden; text-overflow: ellipsis; word-break: normal; font-weight: 600; }
 .pick-fill .cell.empty-pick:hover { box-shadow: inset 0 0 0 2px var(--pick-color, var(--accent)); }
@@ -2778,6 +3045,7 @@ button.grid-btn { display: none; min-height: 48px; margin-top: 8px; font-size: 1
   .pick-fill.is-wide { --cell-h: calc((100vh - 258px - var(--sat)) / 11); }
   .topbar.pick-topbar:not(.gd-topbar-phone) { min-height: 64px; padding: 4px 20px; }
   .pick-topbar:not(.gd-topbar-phone) .gd-head { gap: 0; }
+  .pick-topbar:not(.gd-topbar-phone) .home-btn { margin-top: 6px; }
   .pick-fill .board-card { padding: 10px 14px; }
   .board-head { margin-bottom: 8px; min-height: 40px; }
   .pick-fill .board-legend { margin-top: 8px; }
@@ -2806,7 +3074,7 @@ button.grid-btn { display: none; min-height: 48px; margin-top: 8px; font-size: 1
 /* The picking screen's top bar: the same Home, matchup and Connect as Game Day, with the matchup
    in the exact center whatever is on either side. */
 .pick-topbar.gd-topbar-phone .gd-meta { white-space: normal; line-height: 1.25; font-size: 0.75rem; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
-.topbar.pick-topbar { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; min-height: 72px; gap: 10px; }
+.topbar.pick-topbar { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 10px; }
 .pick-topbar .home-btn { justify-self: start; }
 .pick-topbar .gd-head { align-items: center; text-align: center; gap: 3px; }
 .pick-topbar .gd-match { max-width: 100%; justify-content: center; }
@@ -2830,8 +3098,8 @@ button.grid-btn { display: none; min-height: 48px; margin-top: 8px; font-size: 1
 .dialog-row small { display: block; font-size: 0.85rem; font-weight: 400; color: var(--muted); }
 .dialog-row input[type=checkbox] { width: 24px; height: 24px; flex: none; accent-color: var(--accent); }
 .dialog-row input[type=number] { width: 96px; flex: none; }
-button.danger-line { min-height: 46px; background: transparent; color: #ff8a80; border-color: var(--danger-border); box-shadow: none; }
-button.danger-line:hover { background: var(--danger-soft); color: #ff8a80; border-color: var(--danger); }
+button.danger-line { min-height: 46px; background: transparent; color: var(--bad-text); border-color: var(--danger-border); box-shadow: none; }
+button.danger-line:hover { background: var(--danger-soft); color: var(--bad-text); border-color: var(--danger); }
 .pick-dialog-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .pick-dialog-actions button { min-height: 48px; }
 .pick-dialog .money-boxes { margin: 0; }
@@ -2891,10 +3159,10 @@ button.pay-full:hover { background: var(--good-soft); color: var(--good); border
 /* ---- Auto-Lock tip (R29): Party View on a touch device that cannot keep the screen awake ---- */
 .sleep-tip {
   position: fixed; left: calc(8px + var(--sal)); right: calc(8px + var(--sar)); bottom: calc(8px + var(--sab)); z-index: 14; display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; background: #2b2317; border: 1px solid #e6b271; border-radius: 8px; color: #f3d6ad; font-size: 0.85rem; line-height: 1.3;
+  padding: 8px 10px; background: var(--warn-soft); border: 1px solid var(--warn); border-radius: 8px; color: var(--text); font-size: 0.85rem; line-height: 1.3;
 }
 .sleep-tip span { flex: 1; }
-.sleep-tip-ok { min-width: 44px; min-height: 44px; padding: 0 10px; background: transparent; border: 1px solid #e6b271; color: #e6b271; font-weight: 700; }
+.sleep-tip-ok { min-width: 44px; min-height: 44px; padding: 0 10px; background: transparent; border: 1px solid var(--warn); color: var(--warn); font-weight: 700; }
 @media (orientation: portrait) { .mirror-screen .sleep-tip { position: static; flex: 0 0 auto; } }
 
 /* ---- Party View on a phone held upright (R29, screen-mirror.js) ----
@@ -2917,7 +3185,7 @@ button.pay-full:hover { background: var(--good-soft); color: var(--good); border
   .mirror-pteams { color: var(--muted); font-weight: 600; }
   .mirror-winning {
     order: 2; display: block; flex: 0 0 auto; text-align: center; padding: 6px; font-weight: 700;
-    background: rgba(0, 229, 255, 0.12); border: 1px solid rgba(0, 229, 255, 0.34); border-radius: 8px;
+    background: rgba(var(--accent-rgb), 0.12); border: 1px solid rgba(var(--accent-rgb), 0.34); border-radius: 8px;
   }
   .mirror-winning[hidden] { display: none; }
   .mirror-board { order: 3; flex: 1 1 0; min-height: 0; width: 100%; }
@@ -2933,7 +3201,8 @@ button.pay-full:hover { background: var(--good-soft); color: var(--good); border
   .mirror-quarters .tvq-top { font-size: 0.75rem; }
   .mirror-quarters .tvq-score { font-size: 0.8rem; }
   .mirror-quarters .tvq-status { font-size: 0.85rem; }
-  .mirror-tip { display: none; }
+  .mirror-tip:not(.is-home) { display: none; }
+  .mirror-tip.is-home { order: 99; }
   .mirror-hint { display: flex; align-items: center; justify-content: center; gap: 8px; flex: 0 0 auto; font-size: 0.8rem; color: var(--muted); }
 }
 
@@ -2995,9 +3264,9 @@ button.home-acct:hover { background: var(--panel2); border-color: var(--border);
   font-size: 0.82rem; font-weight: 700; white-space: nowrap;
 }
 .home-chip-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
-.chip-live { color: #2ecc71; background: rgba(46, 204, 113, 0.14); }
-.chip-soon { color: var(--accent-hi); background: rgba(0, 229, 255, 0.12); }
-.chip-pick { color: #ffc24d; background: rgba(255, 194, 77, 0.13); }
+.chip-live { color: var(--live); background: rgba(var(--live-rgb), 0.14); }
+.chip-soon { color: var(--accent-hi); background: rgba(var(--accent-rgb), 0.12); }
+.chip-pick { color: var(--chip-fg); background: var(--chip-bg); }
 .chip-final { color: var(--muted); background: rgba(179, 193, 205, 0.12); }
 .chip-live .home-chip-dot { animation: home-pulse 2s ease-in-out infinite; }
 @keyframes home-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.8); } }
@@ -3060,7 +3329,7 @@ button.tv-tile {
 button.tv-tile:hover { background: var(--panel); border-color: var(--border); }
 button.tv-tile:focus, button.tv-tile:focus-visible {
   outline: none; border: 5px solid var(--accent); padding: calc(1.7vw - 3px) calc(1.9vw - 3px); transform: scale(1.03);
-  box-shadow: 0 0 0 6px rgba(0, 229, 255, 0.25), 0 0 40px rgba(0, 229, 255, 0.35);
+  box-shadow: 0 0 0 6px rgba(var(--accent-rgb), 0.25), 0 0 40px rgba(var(--accent-rgb), 0.35);
 }
 .tv-tile .home-chip { font-size: clamp(0.95rem, 1.35vw, 1.65rem); padding: 0.35em 0.9em; border-radius: 2em; gap: 0.6em; }
 .tv-tile .home-chip-dot { width: 0.55em; height: 0.55em; }
@@ -3079,3 +3348,57 @@ button.tv-tile-pair:focus { outline: 5px solid var(--accent); outline-offset: 4p
 /* Dialogs (ui.js overlayEl): centered when they fit; a taller one starts at its top and scrolls.
    Centering alone put the top of a tall dialog off the screen, out of reach. */
 .sbs-overlay > * { margin: auto !important; }
+
+/* ---- Theme page (R33) ----
+   Each card wears its own theme (data-theme on the label), so the tokens below resolve to that
+   card's palette, not the page's. */
+.theme-main { max-width: 1200px; }
+.theme-intro { margin: 0 0 18px; color: var(--muted); font-size: 1rem; line-height: 1.45; text-align: center; }
+.theme-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+@media (min-width: 720px) { .theme-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .theme-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+label.theme-card {
+  position: relative; display: block; margin: 0; min-height: 44px; cursor: pointer;
+  background: var(--panel); color: var(--text); font-size: 1rem; font-weight: 400;
+  border: 2px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-card);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+label.theme-card:hover { border-color: var(--border-strong); }
+label.theme-card.is-chosen { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow-card); }
+.theme-radio:focus-visible + .theme-face { outline: 3px solid var(--accent); outline-offset: 5px; border-radius: 10px; }
+.theme-radio { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.theme-face { display: flex; flex-direction: column; gap: 6px; padding: 14px 14px 16px; }
+.theme-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; }
+.theme-name { font-size: 1.1rem; font-weight: 700; }
+.theme-check {
+  display: none; align-items: center; justify-content: center; width: 24px; height: 24px; flex: none;
+  border-radius: 50%; background: var(--accent); color: var(--on-accent);
+}
+.theme-check svg { width: 16px; height: 16px; }
+label.theme-card.is-chosen .theme-check { display: inline-flex; }
+.theme-desc { color: var(--muted); font-size: 0.9rem; }
+.theme-mini {
+  display: flex; flex-direction: column; gap: 10px; margin-top: 8px; padding: 12px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+}
+.theme-mini-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.theme-mini-teams { justify-content: flex-start; flex-wrap: nowrap; }
+.theme-mini-teams .team-badge { flex: 0 1 auto; min-width: 0; }
+.theme-btn {
+  display: inline-block; padding: 5px 14px; border-radius: var(--radius); font-size: 0.85rem; font-weight: 600;
+  background: var(--btn-fill); color: var(--btn-text); border: 1px solid var(--btn-edge);
+}
+.theme-mini-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; }
+.theme-mini-cell {
+  display: flex; align-items: center; justify-content: center; min-width: 0; height: 26px; border-radius: 4px;
+  background: var(--cell-empty); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+.theme-mini-cell.is-filled { background: var(--panel); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.theme-mini-cell .name-txt { font-size: 0.72rem; font-weight: 600; line-height: 1; }
+.theme-pill { padding: 3px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; border: 1px solid; }
+.theme-pill.is-paid { background: var(--good-soft); color: var(--good); border-color: var(--good); }
+.theme-pill.is-part { background: var(--part-soft); color: var(--part); border-color: var(--part); }
+.theme-pill.is-unpaid { background: var(--danger-soft); color: var(--bad-text); border-color: var(--danger); }
+.theme-status { min-height: 1.5em; margin: 16px 0 0; text-align: center; color: var(--muted); font-size: 0.95rem; }
+.theme-status.is-error { color: var(--bad-text); }
+@media (max-width: 719px) { .theme-main.main { padding-left: 16px; padding-right: 16px; } }

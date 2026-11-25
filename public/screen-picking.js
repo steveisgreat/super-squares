@@ -30,7 +30,7 @@
     if (view.id !== game.id) view = { id: game.id, tab: 'add', mode: pasteDraft.id === game.id && pasteDraft.text ? 'paste' : 'one' };
     const headerMeta = [SBS.ui.leagueBadge(game.league), escapeHtml(SBS.ui.shownDescription(game) || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
     // The top bar: Home, the matchup in the exact center, then (wide) the join chip, and Connect.
-    const bar = topbar('', [], { hideIcon: true, homeLeft: true });
+    const bar = topbar('', [], { hideIcon: true });
     bar.classList.add('gd-topbar', 'pick-topbar');
     if (phone) bar.classList.add('gd-topbar-phone');
     const head = el('div', 'gd-head');

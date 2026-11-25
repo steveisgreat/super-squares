@@ -484,15 +484,15 @@
   // `title` is HTML: callers escape what they put in it.
   function topbar(title, extraButtons, opts) {
     const bar = el('div', 'topbar');
-    let homeBtn = null;
+    // Home is always the first thing in the bar, top left.
     if (!opts || opts.hideHome !== true) {
-      homeBtn = el('button', 'icon-btn home-btn', HOME_ICON);
+      const homeBtn = el('button', 'icon-btn home-btn', HOME_ICON);
       homeBtn.type = 'button';
       homeBtn.setAttribute('aria-label', 'Home');
       homeBtn.title = 'Home';
       homeBtn.addEventListener('click', () => SBS.go({ screen: 'home' }));
+      bar.appendChild(homeBtn);
     }
-    if (homeBtn && opts && opts.homeLeft) bar.appendChild(homeBtn);
     const h1Cls = 'badge-fit' + (opts && opts.pill ? ' brand-pill' : '');
     const h1 = el('h1', h1Cls, (opts && opts.hideIcon ? '' : HEADER_ICON) + title);
     const infoLines = detectDeviceInfo();
@@ -504,7 +504,6 @@
     h1.addEventListener('click', () => showAlert(infoLines.join('\n')));
     bar.appendChild(h1);
     const nav = el('div', 'nav');
-    if (homeBtn && !(opts && opts.homeLeft)) nav.appendChild(homeBtn);
     (extraButtons || []).forEach(btn => nav.appendChild(btn));
     bar.appendChild(nav);
     return bar;
@@ -682,6 +681,44 @@
     return contrastWhite >= contrastBlack ? '#f4f7fa' : '#12181f';
   }
 
+  // A team color close to the dark cards (the Bears' navy) would leave its pill invisible. Those
+  // get an outline: the team's second color, or a light one when that is dark too. '' for the rest.
+  // The card color is the page's --panel in the current theme (read once per theme, #12171f if it
+  // can't be read).
+  const CARD_BG_FALLBACK = '#12171f';
+  const cardBgCache = {};
+  function cardBg() {
+    const theme = document.documentElement.dataset.theme || 'classic';
+    if (cardBgCache[theme]) return cardBgCache[theme];
+    let v = '';
+    try { v = getComputedStyle(document.documentElement).getPropertyValue('--panel').trim(); } catch (e) { /* use the fallback */ }
+    const hex = /^#[0-9a-f]{6}$/i.test(v) ? v : CARD_BG_FALLBACK;
+    cardBgCache[theme] = hex;
+    return hex;
+  }
+  function teamEdge(game, side) {
+    const cardColor = cardBg();
+    const contrast = (hex) => {
+      const a = relLuminance(hex) + 0.05, b = relLuminance(cardColor) + 0.05;
+      return Math.max(a, b) / Math.min(a, b);
+    };
+    const style = teamStyle(game, side);
+    if (!isColor(style.primary) || contrast(style.primary) >= 1.45) return '';
+    return isColor(style.secondary) && contrast(style.secondary) >= 2 ? style.secondary : '#aab4be';
+  }
+
+  // The capitals of each team font, in em: how far they sit from the middle of their line (positive
+  // is low) and how tall they are. Measured once from the font files, so a pill can center the name
+  // and draw every team's capitals the same height (at one font size they differ by a third).
+  const TEAM_CAPS = {
+    'Alfa Slab One': [-0.048, 0.795], 'Anton': [-0.015, 0.875], 'Archivo Black': [0.018, 0.69], 'Bebas Neue': [-0.06, 0.72],
+    'Bevan': [-0.045, 0.795], 'Bungee': [-0.01, 0.74], 'Orbitron': [0.022, 0.72], 'Oswald': [0.048, 0.81],
+    'Rye': [-0.028, 0.775], 'Share Tech Mono': [-0.037, 0.72], 'Staatliches': [-0.033, 0.715],
+    'Stardos Stencil': [-0.063, 0.695], 'Teko': [-0.08, 0.645], 'Zilla Slab': [0.02, 0.65]
+  };
+  const BODY_CAPS = [0.055, 0.69]; // Exo 2, for a team with no font of its own
+  const CAP_HEIGHT = 0.72;
+
   function teamColor(game, side) {
     return teamStyle(game, side).primary;
   }
@@ -720,10 +757,16 @@
     const style = teamStyle(game, side);
     const bg = style.primary;
     const fg = readableTextColor(bg);
-    const logo = teamLogoTag(game, side, opts.logoSize || 20);
+    const size = opts.logoSize || 20;
+    const logo = teamLogoTag(game, side, size);
     const cls = 'team-badge' + (opts.cls ? ' ' + opts.cls : '');
+    // The logo's disc: the pill is 2 px shorter, so it reads as coming out from behind the logo.
+    const disc = size + (/team-badge-sm/.test(cls) ? 4 : 6);
+    const edge = teamEdge(game, side);
+    const vars = `--pill:${bg}; --disc:${disc}px;${edge ? ` --edge:${edge};` : ''}`;
+    const [off, caps] = (style.font && TEAM_CAPS[style.font.replace(/'/g, '')]) || BODY_CAPS;
     const fontStyle = style.font ? ` font-family:${style.font}, var(--sans);` : '';
-    return `<span class="${cls}" style="background:${bg}; color:${fg};">${logo}<span class="team-badge-name" style="${fontStyle}"><span class="badge-full">${escapeHtml(name)}</span><span class="badge-abbr">${escapeHtml(style.abbr)}</span></span></span>`;
+    return `<span class="${cls}" style="${vars} color:${fg};">${logo}<span class="team-badge-name" style="--caps:${-off}em; font-size:${(CAP_HEIGHT / caps).toFixed(3)}em;${fontStyle}"><span class="badge-full">${escapeHtml(name)}</span><span class="badge-abbr">${escapeHtml(style.abbr)}</span></span></span>`;
   }
 
   function legalLinks() {
@@ -936,10 +979,10 @@
   SBS.ui = {
     el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake, keepPartyAwake, partyHistory,
     showModal, showConfirm, showAlert, disturbMessage, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin,
-    shownDescription, topbar, statusLabel, leagueLabel, leagueBadge, isTvBrowser, isPhone,
+    shownDescription, topbar, HOME_ICON, statusLabel, leagueLabel, leagueBadge, isTvBrowser, isPhone,
     formatKickoffTime, kickoffNotice,
     teamMeta, teamStyle, applyTeamColors, resetTeamColors, teamLogoTag,
-    legalLinks, teamColor, readableTextColor, teamBadge, fitTeamBadges, teamAbbr, shadeColor,
+    legalLinks, teamColor, teamEdge, readableTextColor, teamBadge, fitTeamBadges, teamAbbr, shadeColor,
     MAXIMIZE_ICON, COPY_ICON, PRINT_ICON, CHEVRON_ICON, CLOSE_ICON
   };
 })();

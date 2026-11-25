@@ -13,6 +13,7 @@
   const PLUS_ICON = ic('<path d="M12 5l0 14"/><path d="M5 12l14 0"/>', 18);
   const USER_ICON = ic('<path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855"/>', 24);
   const DOWN_ICON = ic('<path d="M6 9l6 6l6 -6"/>', 16);
+  const PALETTE_ICON = ic('<path d="M12 21a9 9 0 0 1 0 -18c4.97 0 9 3.582 9 8c0 1.06 -.474 2.078 -1.318 2.828c-.844 .75 -1.989 1.172 -3.182 1.172h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25"/><path d="M8.5 10.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M16.5 10.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/>');
   const DOTS_ICON = ic('<path d="M5 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M19 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/>', 22);
   const PENCIL_ICON = ic('<path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/>');
   const LOCK_ICON = ic('<path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/>');
@@ -331,6 +332,7 @@
         showAlert('Could not sign out everywhere: ' + e.message);
         return;
       }
+      if (window.SBSTheme) window.SBSTheme.forgetHost();
     }
     SBS.go({ screen: 'home' });
   }
@@ -431,36 +433,42 @@
     fitTeamBadges(grid);
   }
 
-  // The account button in the top bar (only with a host session): who is signed in,
-  // Sign out, Sign out everywhere.
+  // The account button in the top bar (only with a host session): Theme, and with sign-in on,
+  // who is signed in, Sign out, Sign out everywhere. With sign-in off it is "Host settings" and
+  // lists only Theme.
   function buildAccountButton(s) {
     const emailTxt = s.mode === 'accounts' && s.email ? s.email : '';
+    const signIn = !!s.authRequired;
     const btn = el('button', 'home-acct',
       `${USER_ICON}${emailTxt ? `<span class="home-acct-email">${escapeHtml(emailTxt)}</span>` : ''}${DOWN_ICON}`);
     btn.type = 'button';
-    btn.setAttribute('aria-label', emailTxt ? `Account: signed in as ${emailTxt}` : 'Account');
+    btn.setAttribute('aria-label', !signIn ? 'Host settings' : emailTxt ? `Account: signed in as ${emailTxt}` : 'Account');
     btn.setAttribute('aria-haspopup', 'dialog');
     btn.setAttribute('aria-expanded', 'false');
     btn.addEventListener('click', () => {
-      const items = [{
-        label: 'Sign out',
-        onSelect: async () => {
-          try {
-            await SBS.api.signOut();
-          } catch (e) {
-            showAlert('Could not sign out: ' + e.message);
-            return;
+      const items = [{ label: 'Theme', icon: PALETTE_ICON, onSelect: () => SBS.go({ screen: 'theme' }) }];
+      if (signIn) {
+        items.push({ divider: true });
+        items.push({
+          label: 'Sign out',
+          onSelect: async () => {
+            try {
+              await SBS.api.signOut();
+            } catch (e) {
+              showAlert('Could not sign out: ' + e.message);
+              return;
+            }
+            SBS.go({ screen: 'home' });
           }
-          SBS.go({ screen: 'home' });
+        });
+        if (emailTxt) {
+          items.push({ label: 'Sign out everywhere', onSelect: () => signOutEverywhere(emailTxt, el('button')) });
         }
-      }];
-      if (emailTxt) {
-        items.push({ label: 'Sign out everywhere', onSelect: () => signOutEverywhere(emailTxt, el('button')) });
       }
       showMenu(btn, {
-        label: 'Account',
+        label: signIn ? 'Account' : 'Host settings',
         alwaysHeader: true,
-        headerTitle: emailTxt ? `Signed in as ${emailTxt}` : 'Signed in as host',
+        headerTitle: !signIn ? 'Host settings' : emailTxt ? `Signed in as ${emailTxt}` : 'Signed in as host',
         items
       });
     });
@@ -538,6 +546,24 @@
     fitTeamBadges(grid);
     const first = grid.querySelector('.tv-tile');
     if (first) first.focus();
+  }
+
+  // The host's theme is read from the server once per page load and sign-in, after Home has drawn: it never
+  // delays Home, never prompts, never polls. If it differs from what this device wears, switch and
+  // draw Home again (team pills are drawn once, so they need it to pick up the new theme).
+  let hostThemeAsked = -1; // SBSTheme.signOuts() when it was asked
+  function syncHostTheme() {
+    const T = window.SBSTheme;
+    if (!T || hostThemeAsked === T.signOuts()) return;
+    const asked = hostThemeAsked = T.signOuts();
+    const before = T.host();
+    SBS.api.getTheme({ prompt: false }).then((r) => {
+      // A choice made on the Theme page while this was on its way is newer (or they signed out).
+      if (!r || !T.known(r.theme) || T.host() !== before || T.signOuts() !== asked) return;
+      T.rememberHost(r.theme);
+      // Anywhere else it is worn from the next screen on.
+      if (r.theme !== before && SBS.currentScreen() === 'home') SBS.render();
+    }).catch(() => { hostThemeAsked = -1; /* keep the theme this device has; ask again next time */ });
   }
 
   async function renderHome() {
@@ -637,8 +663,9 @@
       // again: then these nodes are detached and there is nothing to update.
       if (!s || !main.isConnected || SBS.currentScreen() !== 'home') return;
       if (s.version) versionNote.textContent = 'Super Squares v' + s.version;
-      if (tv || !(s.authRequired && s.host)) return;
-      nav.appendChild(buildAccountButton(s));
+      if (!s.host) return;
+      syncHostTheme();
+      if (!tv) nav.appendChild(buildAccountButton(s));
     }).catch(() => { /* never block Home on the session probe */ });
 
     // Games are created/edited/deleted from other devices in the room (a
@@ -675,7 +702,9 @@
     const app = SBS.appEl;
     resetTeamColors();
     app.innerHTML = '';
-    app.appendChild(topbar(editGame ? `Edit Game — ${escapeHtml(shownDescription(editGame) || editGame.gameDate || '')}` : 'New Game — Setup'));
+    const bar = topbar(editGame ? `Edit Game — ${escapeHtml(shownDescription(editGame) || editGame.gameDate || '')}` : 'New Game — Setup', [], { hideIcon: true });
+    bar.classList.add('setup-topbar');
+    app.appendChild(bar);
     const main = el('div', 'main');
     app.appendChild(main);
 

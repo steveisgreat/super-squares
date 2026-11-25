@@ -40,6 +40,7 @@
 <li><strong>Player view memory (browser localStorage).</strong> On a board's player page, your browser remembers which name you picked from the list so it is preselected next time, and whether you have picked squares there. It stays on your device, is not sent to us, and you can clear it in your browser settings.</li>
 <li><strong>Scorer phone cookie (<code>sbs_scorer</code>).</strong> When a host hands score entry to a phone, that phone gets a cookie for that one board. It lasts up to 24 hours, is HttpOnly, and holds a random value, not personal data. The host can end it at any time. The browser also keeps a note (localStorage) that this phone was a scorer for that board.</li>
 <li><strong>Guest pick cookie (<code>sbs_guest</code>).</strong> Only when a host has allowed guests to pick their own squares, and only after a guest taps Pick squares, their browser gets this cookie for that one board. It lasts up to 180 days, is HttpOnly, and holds a random value, not personal data. It lets the same browser claim and release its own squares and no one else's. Clearing it means the guest can no longer change those squares; the host can.</li>
+<li><strong>Color theme (browser storage).</strong> Your browser remembers the name of a color theme so pages open in it: a host's own (localStorage, until they sign out) and a board's (sessionStorage, until the tab closes). It holds nothing about you.</li>
 <li>We do not use advertising or tracking cookies.</li>
 </ul>
 

@@ -5,7 +5,7 @@
   'use strict';
 
   const SBS = window.SBS = window.SBS || {};
-  const { el, escapeHtml, isColor, teamLogoTag, teamColor, readableTextColor, teamBadge, teamStyle } = SBS.ui;
+  const { el, escapeHtml, isColor, teamLogoTag, teamColor, teamEdge, readableTextColor, teamBadge, teamStyle } = SBS.ui;
 
   // "Qn" for regulation, "OT" (or "2OT", etc.) once the game runs past four
   // quarters — ESPN numbers overtime periods 5, 6, ...
@@ -90,7 +90,8 @@
     const bg = teamColor(game, side);
     const fade = bg + '00';
     const gradientDir = axis === 'x' ? 'to right' : 'to bottom';
-    return `--team:${bg}; background:linear-gradient(${gradientDir}, ${fade}, ${bg}, ${fade}); color:${readableTextColor(bg)};`;
+    const edge = teamEdge(game, side);
+    return `--team:${bg};${edge ? ` --edge:${edge};` : ''} background:linear-gradient(${gradientDir}, ${fade}, ${bg}, ${fade}); color:${readableTextColor(bg)};`;
   }
 
   // A square is flagged when the person holding it still owes for it, so the
@@ -105,7 +106,7 @@
   function nameTxt(game, name) {
     const players = game.players || {};
     const color = players[name] && players[name].color;
-    const style = isColor(color) ? ` style="color:${color};"` : '';
+    const style = isColor(color) ? ` style="--nc:${color};"` : '';
     return `<div class="name-txt"${style}>${escapeHtml(name)}</div>`;
   }
 

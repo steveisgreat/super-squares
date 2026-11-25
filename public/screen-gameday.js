@@ -209,7 +209,7 @@
     const headerMeta = [SBS.ui.leagueBadge(game.league), escapeHtml(SBS.ui.shownDescription(game) || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
     // The top bar (R29): Home, the matchup on one line (full names when they fit, else short ones),
     // then on a wide screen the join chip and the "On the TV" pill, then Party View and Connect.
-    const bar = topbar('', [], { hideIcon: true, homeLeft: true });
+    const bar = topbar('', [], { hideIcon: true });
     bar.classList.add('gd-topbar');
     if (phone) bar.classList.add('gd-topbar-phone');
     const head = el('div', 'gd-head');

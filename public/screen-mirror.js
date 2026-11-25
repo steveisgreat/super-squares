@@ -15,16 +15,23 @@
   const STRIP_MS = 3000;
   const POLL_MS = 8000;
   const TIP_KEY = 'sbs.mirror.tip';
+  const HOME_TIP_KEY = 'sbs.mirror.hometip';
   // Tabler "cast" and "device-mobile-share" (MIT, 24 px outline).
   const CAST_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19l.01 0"/><path d="M7 19a4 4 0 0 0 -4 -4"/><path d="M11 19a8 8 0 0 0 -8 -8"/><path d="M15 19h3a3 3 0 0 0 3 -3v-8a3 3 0 0 0 -3 -3h-12a3 3 0 0 0 -2.8 2"/></svg>';
   const ROTATE_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21h-4a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8"/><path d="M11 4h2"/><path d="M16 22l5 -5"/><path d="M21 21.5v-4.5h-4.5"/><path d="M12 17v.01"/></svg>';
 
-  // The "Do Not Disturb" tip is remembered per browser once dismissed.
-  function tipDismissed() {
-    try { return window.localStorage.getItem(TIP_KEY) === '1'; } catch (e) { return false; }
+  // Each tip is remembered per browser once dismissed.
+  function tipDismissed(key) {
+    try { return window.localStorage.getItem(key) === '1'; } catch (e) { return false; }
   }
-  function dismissTip() {
-    try { window.localStorage.setItem(TIP_KEY, '1'); } catch (e) { /* hidden for this visit only */ }
+  function dismissTip(key) {
+    try { window.localStorage.setItem(key, '1'); } catch (e) { /* hidden for this visit only */ }
+  }
+
+  // An iPhone browser has no fullscreen for a page. Opened from the Home Screen there is no browser
+  // around it (navigator.standalone is then true), so that is worth saying once.
+  function inIphoneBrowser() {
+    return /iPhone|iPod/.test(navigator.userAgent || '') && navigator.standalone !== true;
   }
 
   // A dialog the score panel opened (confirm, alert) keeps the strip up until it closes.
@@ -94,17 +101,21 @@
     header.before(pscore);
     screenEl.appendChild(hint);
 
-    // ---- Do Not Disturb tip ----
-    if (!tipDismissed()) {
-      const tip = el('div', 'mirror-tip');
+    // ---- Tips, one at a time: (iPhone browser) the Home Screen, then Do Not Disturb ----
+    const tips = [{ key: TIP_KEY, text: "Mirroring? Turn on Do Not Disturb so messages don't show on the TV." }];
+    if (inIphoneBrowser()) tips.unshift({ key: HOME_TIP_KEY, cls: ' is-home', text: 'Want full screen? Tap Share, then Add to Home Screen, and open the app from its icon.' });
+    function nextTip() {
+      const t = tips.find(x => !x.seen && !tipDismissed(x.key));
+      if (!t) return;
+      const tip = el('div', 'mirror-tip' + (t.cls || ''));
       tip.setAttribute('role', 'note');
-      const text = el('span', '', "Mirroring? Turn on Do Not Disturb so messages don't show on the TV.");
       const ok = el('button', 'mirror-tip-ok', 'Got it');
       ok.type = 'button';
-      ok.addEventListener('click', (e) => { e.stopPropagation(); dismissTip(); tip.remove(); });
-      tip.append(text, ok);
+      ok.addEventListener('click', (e) => { e.stopPropagation(); t.seen = true; dismissTip(t.key); tip.remove(); nextTip(); });
+      tip.append(el('span', '', t.text), ok);
       side.appendChild(tip);
     }
+    nextTip();
 
     // ---- Score strip ----
     const strip = el('div', 'mirror-strip');
