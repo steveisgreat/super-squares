@@ -323,6 +323,25 @@ the phone Game Day header shows only the matchup.
 one per host, chosen on a Theme page in the account menu; the original palette is "Neon", with solid
 buttons. Player View, Party View, paired TVs and scorer phones wear the board's host's theme.
 
+**R35. Wide Game Day and the Party View grid on the host screens** — `Opus` design (Steve approved the
+mockups), `Sonnet` build — ✅ built 2026-11-25. From 1024 px (not a phone) Game Day fits the
+window with no page scroll: a tabbed panel on the left (Score, Players (n)), the grid on the right. Score
+holds the current-score panel (the key letters sit on the buttons while Keyboard scoring is on; the legend
+is gone, Ctrl+Z still works), then one line per quarter: score, winner, Mark paid out or Paid out (tap to
+undo) and an edit pencil. That replaces the big quarter cards and the panel's own ended list on wide; PUSH,
+rollover, Randomly Draw Winner, Needs settling, the paid-quarter warnings and not overwriting a field
+being typed in all remain. A Live board shows its score read-only (with the period and clock); a down feed
+or a taken-over score shows the panel with Resume live feed; Simulation shows its score; a finished board
+shows Who to pay and Undo. Players is the existing card, and only its list scrolls. Above the grid, on both
+tabs: score and period, what feeds the score (LIVE, SIMULATION, MANUAL, FEED OFFLINE, which replaces the
+board's live-score bar on wide), squares sold, an editable pot and the price. The stat strip goes on wide
+(Still owed is in Players). The top bar centers the matchup, as on the picking screen. Wide Game Day and
+wide picking wear Party View's grid (glass frame, thick fading team bars with the row team's vertical and
+flush to the numbers, stretched squares, glowing numbers, the winner's pulse), sharing its rules through
+`.glass-board`; the quiet red ring for an unpaid square stays on host screens. Below 1024 px and on a
+phone nothing changed, and neither did Party View (computed styles compared with the previous build).
+Not tried: a real iPad, a real touch screen, a window under 560 px tall (it scrolls instead).
+
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
 
 **R8. Cache board reads at the edge** — `Opus` — ✅ built 2026-11-24 ([decision 023](decisions/023-edge-cached-reads.md)), not pushed. Depends on: R3, R4a.

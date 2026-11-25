@@ -74,6 +74,9 @@
     const game = () => opts.getGame();
     const say = (text) => { if (live) live.textContent = text; };
     const keysOffered = () => !!opts.keyboard && !isPhone() && window.matchMedia(WIDE_Q).matches && window.matchMedia(FINE_Q).matches;
+    // Game Day from 1024 px (R35): the panel sits in the left-hand tabbed panel. Its quarters list
+    // is the screen's own, so the panel leaves out its ended list and shows only what is now.
+    const wideNow = () => !!opts.keyboard && !isPhone() && window.matchMedia(WIDE_Q).matches;
 
     // Serialized: taps queue behind one another so the server sees them in
     // order and a fast double-tap never races itself into a conflict.
@@ -153,6 +156,19 @@
       if (await showConfirm(msg)) send({ op: 'final' });
     }
 
+    // The key that adds `points` for this side (Game Day with the switch on), or ''.
+    function keyLetter(g, side, points) {
+      const letters = side === 'a' ? 'qwe' : 'poi';
+      const hit = letters.split('').find(k => { const op = GL.scoreKeyOp(g.league, k); return op && op.points === points; });
+      return hit ? hit.toUpperCase() : '';
+    }
+    function keyCap(text) {
+      const k = el('span', 'sp-key');
+      k.textContent = text;
+      k.setAttribute('aria-hidden', 'true');
+      return k;
+    }
+
     function scoreRow(g, side, cur, finished) {
       const row = el('div', 'sp-team');
       const name = side === 'a' ? g.teamA : g.teamB;
@@ -177,10 +193,15 @@
       row.appendChild(input);
 
       const quick = el('div', 'sp-quick');
-      (QUICK[g.league] || QUICK.other).forEach(p => {
+      const buttons = QUICK[g.league] || QUICK.other;
+      quick.style.setProperty('--n', String(buttons.length));
+      const showKeys = keysOn && keysOffered();
+      buttons.forEach(p => {
         const label = p > 0 ? `+${p}` : '−' + Math.abs(p);
         const b = el('button', 'sp-btn' + (p < 0 ? ' sp-minus' : ''), label);
         b.type = 'button';
+        const letter = showKeys && p > 0 ? keyLetter(g, side, p) : '';
+        if (letter) { b.appendChild(keyCap(letter)); b.setAttribute('aria-keyshortcuts', letter); }
         b.disabled = finished;
         b.setAttribute('data-spkey', `q-${side}-${p}`);
         b.setAttribute('aria-label', `${p > 0 ? 'Add' : 'Subtract'} ${Math.abs(p)} ${p > 0 ? 'to' : 'from'} ${name}`);
@@ -238,10 +259,28 @@
       const cur = GL.manualState(g);
       const finished = g.status === 'finished';
 
+      const wide = wideNow();
       const head = el('div', 'sp-title');
+      // Wide and over: a one-line summary with Undo, since the quarters list shows the rest.
+      if (wide && finished) {
+        const fin = GL.hasResult(g.results && g.results.final) ? { a: Number(g.results.final.a), b: Number(g.results.final.b) } : cur;
+        head.innerHTML = '<h3>Final score</h3>';
+        const sum = el('span', 'sp-period sp-final');
+        sum.textContent = `${g.teamA} ${fin.a} – ${fin.b} ${g.teamB}`;
+        head.appendChild(sum);
+        const undo = el('button', 'sp-btn sp-undo', 'Undo');
+        undo.type = 'button';
+        undo.setAttribute('data-spkey', 'undo');
+        undo.setAttribute('aria-label', 'Undo final score');
+        undo.addEventListener('click', () => send({ op: 'undo' }));
+        head.appendChild(undo);
+        body.appendChild(head);
+        return;
+      }
       head.innerHTML = `<h3>Current score</h3><span class="sp-period">${finished ? 'FINAL' : escapeHtml(periodLabel(cur.period))}</span>`;
       body.appendChild(head);
-      if (keysOffered()) body.appendChild(keysRow(g));
+      // Wide: the switch shares the title's line; on the way down it keeps its own.
+      if (keysOffered()) (wide ? head : body).appendChild(keysRow(g));
 
       // A Live board: say why the panel is here, and offer the way back to the feed.
       if (GL.scoringMode(g) === 'live') {
@@ -269,6 +308,7 @@
         const end = textEl('button', 'sp-btn sp-primary', endLabel(cur.period));
         end.type = 'button';
         end.setAttribute('data-spkey', 'end');
+        if (keysOn && keysOffered()) { end.appendChild(keyCap('Enter')); end.setAttribute('aria-keyshortcuts', 'Enter'); }
         end.addEventListener('click', () => endPeriod(cur.period));
         actions.appendChild(end);
         const fin = el('button', 'sp-btn', 'Final');
@@ -287,7 +327,7 @@
       }
       body.appendChild(actions);
 
-      const ended = GL.QUARTERS.filter(q => g.results && GL.hasResult(g.results[q]));
+      const ended = wide ? [] : GL.QUARTERS.filter(q => g.results && GL.hasResult(g.results[q]));
       if (ended.length) {
         const list = el('ul', 'sp-ended');
         ended.forEach(q => {
@@ -313,25 +353,6 @@
     }
 
     // ---- Keyboard scoring (Game Day, wide screens with a mouse) ----
-    function keyLegend(g) {
-      const box = el('div', 'sp-legend');
-      const line = (keysText, label) => {
-        const row = el('div', 'sp-legend-row');
-        const ks = el('span', 'sp-legend-keys');
-        keysText.forEach(k => { const kb = el('kbd'); kb.textContent = k; ks.appendChild(kb); });
-        const t = el('span', 'sp-legend-text');
-        t.textContent = label;
-        row.append(ks, t);
-        box.appendChild(row);
-      };
-      const pts = (letters) => letters.split('').map(k => { const op = GL.scoreKeyOp(g.league, k); return op ? '+' + op.points : ''; }).filter(Boolean).join(' ');
-      line(['Q', 'W', 'E'].slice(0, pts('qwe').split(' ').length), `${g.teamA} ${pts('qwe')}`);
-      line(['P', 'O', 'I'].slice(0, pts('poi').split(' ').length), `${g.teamB} ${pts('poi')}`);
-      line(['Enter'], 'End the quarter (it asks first)');
-      line([/Mac|iPhone|iPad/.test(navigator.platform || '') ? 'Cmd Z' : 'Ctrl Z'], 'Undo what you scored here');
-      return box;
-    }
-
     function keysRow(g) {
       const wrap = el('div', 'sp-keys');
       const sw = el('button', 'sp-btn sp-switch', '');
@@ -345,8 +366,9 @@
         say(keysOn ? 'Keyboard scoring is on.' : 'Keyboard scoring is off.');
         draw();
       });
+      // The keys show on the buttons while it is on; the rest is said here, not in a legend.
+      sw.title = 'Letters on the buttons add points. Enter ends the quarter (it asks first). ' + (/Mac|iPhone|iPad/.test(navigator.platform || '') ? 'Cmd Z' : 'Ctrl Z') + ' undoes what you scored here.';
       wrap.appendChild(sw);
-      if (keysOn) wrap.appendChild(keyLegend(g));
       return wrap;
     }
 
@@ -433,8 +455,12 @@
       SBS.onLeaveScreen(teardown);
     }
 
+    // Saves a corrected quarter score (Game Day's quarters list): the same guarded 'edit' op as
+    // the panel's own Edit score form. The caller has checked the numbers are whole, 0 to 999.
+    function edit(q, a, b) { editing = null; return send({ op: 'edit', quarter: q, a, b }); }
+
     draw();
-    return { el: root, update: draw, busy: () => pending > 0, clearUndo };
+    return { el: root, update: draw, busy: () => pending > 0, clearUndo, edit };
   }
 
   SBS.scorePanel = { create };

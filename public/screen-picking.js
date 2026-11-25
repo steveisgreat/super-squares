@@ -24,6 +24,7 @@
     const app = SBS.appEl;
     applyTeamColors(game);
     app.innerHTML = '';
+    app.classList.remove('fit-screen'); // set again on a wide screen (R35)
     const reopen = () => SBS.go({ screen: 'picking', game });
 
     const phone = isPhone();
@@ -648,6 +649,7 @@
     boardCard.append(boardHead, claimSlot);
     const boardHolder = el('div');
     boardHolder.id = 'board-holder';
+    boardHolder.dataset.fit = '1'; // board.js keeps its axis bars and names fitted as it resizes (R35)
     boardCard.appendChild(boardHolder);
     const boardFoot = el('div', 'board-legend', '<span class="board-hint"></span><span class="legend-unpaid"><span class="legend-chip"></span> Not paid yet</span>');
     boardCard.appendChild(boardFoot);
@@ -815,6 +817,8 @@
       const focused = document.activeElement;
       layout.classList.toggle('is-wide', wide);
       layout.classList.toggle('is-tabbed', tabbed);
+      boardCard.classList.toggle('glass-board', wide); // the Party View grid (R35)
+      app.classList.toggle('fit-screen', wide);
       foot.classList.toggle('card', !wide && !tabbed);
       if (wide || tabbed) side.appendChild(foot);
       if (tabbed) {
@@ -833,6 +837,7 @@
     [wideQuery, narrowQuery].forEach(q => { if (q.addEventListener) q.addEventListener('change', placeCards); else q.addListener(placeCards); });
     SBS.onLeaveScreen(() => {
       [wideQuery, narrowQuery].forEach(q => { if (q.removeEventListener) q.removeEventListener('change', placeCards); else q.removeListener(placeCards); });
+      app.classList.remove('fit-screen');
     });
     setMode(view.mode);
     drawPlayers();

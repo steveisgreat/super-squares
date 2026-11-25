@@ -204,6 +204,7 @@
     const app = SBS.appEl;
     applyTeamColors(game);
     app.innerHTML = '';
+    app.classList.remove('fit-screen'); // set again below on a wide screen (R35)
     const reopen = () => SBS.go({ screen: 'board', game });
     const phone = isPhone();
     const headerMeta = [SBS.ui.leagueBadge(game.league), escapeHtml(SBS.ui.shownDescription(game) || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
@@ -212,6 +213,7 @@
     const bar = topbar('', [], { hideIcon: true });
     bar.classList.add('gd-topbar');
     if (phone) bar.classList.add('gd-topbar-phone');
+    else bar.classList.add('gd-topbar-center'); // from 1024 px the matchup is centered, as on the picking screen (R35)
     const head = el('div', 'gd-head');
     const match = el('h1', 'gd-match badge-fit',
       `${teamBadge(game, 'A', { logoSize: 20, cls: 'team-badge-sm' })}<span class="vs-sep">vs</span>${teamBadge(game, 'B', { logoSize: 20, cls: 'team-badge-sm' })}`);
@@ -276,9 +278,10 @@
     }
 
     // Blanking the field clears the override and falls back to the actual
-    // collected total (squares sold × price); typing a number overrides it.
-    strip.querySelector('#pot-input').addEventListener('change', async (e) => {
-      const raw = e.target.value.trim();
+    // collected total (squares sold × price); typing a number overrides it. The stat strip's box and
+    // the pot box above the grid on a wide screen (R35) both come here.
+    async function savePot(raw) {
+      raw = raw.trim();
       const before = JSON.parse(JSON.stringify(game));
       if (raw === '') {
         game.potOverride = null;
@@ -304,7 +307,8 @@
         showAlert('Could not save the total pot: ' + err.message);
         renderBoard(game);
       }
-    });
+    }
+    strip.querySelector('#pot-input').addEventListener('change', (e) => savePot(e.target.value));
 
     const layout = el('div', 'pick-layout board-first');
     // Phone: banner for a down feed, then tabs; each tab shows one panel.
@@ -318,8 +322,15 @@
     const boardCard = el('div', 'card');
     layout.appendChild(boardCard);
 
-    const boardHolder = el('div');
+    const boardHolder = el('div', 'gd-board-holder');
+    boardHolder.dataset.fit = '1'; // board.js keeps its axis bars and names fitted as it resizes
     boardCard.appendChild(boardHolder);
+    // Redraws the grid and fits what depends on its size: team pills, long names (R35).
+    function drawBoard(c) {
+      SBS.board.renderFullBoard(boardHolder, game, c);
+      fitTeamBadges(boardHolder);
+      SBS.board.fitNames(boardHolder);
+    }
     SBS.board.renderFullBoard(boardHolder, game, computed);
     boardCard.appendChild(el('div', 'board-legend', '<span class="legend-chip"></span> Square is claimed but not paid for'));
 
@@ -337,8 +348,7 @@
         if (!('liveOverride' in g)) delete game.liveOverride;
         Object.assign(game, g);
         const c = computeGame(game);
-        SBS.board.renderFullBoard(boardHolder, game, c);
-        fitTeamBadges(boardHolder);
+        drawBoard(c);
         refreshQuarterCards(c);
       }
     });
@@ -420,8 +430,7 @@
           if (!('liveOverride' in saved)) delete game.liveOverride;
           Object.assign(game, saved);
           const c = computeGame(game);
-          SBS.board.renderFullBoard(boardHolder, game, c);
-          fitTeamBadges(boardHolder);
+          drawBoard(c);
           refreshQuarterCards(c);
           scorePanel.update();
           updateFeedBanner();
@@ -465,6 +474,23 @@
     // on every save destroyed the score input the host was typing into, which
     // on an iPad also dismissed the keyboard mid-entry.
     const qcards = {};
+    // A wide screen (R35) keeps its panel in sync from here; set once that panel is built.
+    let drawWide = () => {};
+
+    // Final on an empty square: the host draws the winner at random. The quarter card and the
+    // wide quarters list both come here.
+    async function runDraw(res) {
+      const winnerIdx = drawFinalWinner(game);
+      if (winnerIdx === -1) { showAlert('No squares are filled in — cannot draw a winner.'); return; }
+      const row = Math.floor(winnerIdx / 10), col = winnerIdx % 10;
+      if (!game.results.final) game.results.final = {};
+      const drawnAt = Date.now();
+      game.results.final.autoResolve = { key: `${res.row}-${res.col}`, row, col, drawnAt };
+      lastSeenDrawAt = drawnAt;
+      if (activeDrawReveal) activeDrawReveal.cancel();
+      activeDrawReveal = playDrawReveal({ game, row, col, elapsedMs: 0, onDone: () => { activeDrawReveal = null; } });
+      await persist();
+    }
 
     function buildQuarterCards(computedNow) {
       qgrid.innerHTML = '';
@@ -565,21 +591,11 @@
           refs.actionsEl.className = 'qcard-actions-center';
           const drawBtn = el('button', '', 'Randomly Draw Winner');
           drawBtn.style.marginTop = '10px';
-          drawBtn.addEventListener('click', async () => {
-            const winnerIdx = drawFinalWinner(game);
-            if (winnerIdx === -1) { showAlert('No squares are filled in — cannot draw a winner.'); return; }
-            const row = Math.floor(winnerIdx / 10), col = winnerIdx % 10;
-            if (!game.results.final) game.results.final = {};
-            const drawnAt = Date.now();
-            game.results.final.autoResolve = { key: `${res.row}-${res.col}`, row, col, drawnAt };
-            lastSeenDrawAt = drawnAt;
-            if (activeDrawReveal) activeDrawReveal.cancel();
-            activeDrawReveal = playDrawReveal({ game, row, col, elapsedMs: 0, onDone: () => { activeDrawReveal = null; } });
-            await persist();
-          });
+          drawBtn.addEventListener('click', () => runDraw(res));
           refs.actionsEl.appendChild(drawBtn);
         }
       });
+      drawWide(computedNow);
     }
 
     // ---- Payout tracking (R21) ----
@@ -652,8 +668,7 @@
         const saved = await SBS.api.patchPayout(game.id, op);
         Object.assign(game, saved);
         const c = computeGame(game);
-        SBS.board.renderFullBoard(boardHolder, game, c);
-        fitTeamBadges(boardHolder);
+        drawBoard(c);
         refreshQuarterCards(c);
         scorePanel.update();
       } catch (e) {
@@ -662,8 +677,7 @@
         // A refused mark usually means the result moved: show the current one.
         try { Object.assign(game, await SBS.api.getGame(game.id)); } catch (e2) { /* keep what we have */ }
         const c = computeGame(game);
-        SBS.board.renderFullBoard(boardHolder, game, c);
-        fitTeamBadges(boardHolder);
+        drawBoard(c);
         refreshQuarterCards(c);
         scorePanel.update();
       } finally {
@@ -682,8 +696,7 @@
     let players = null;
     function redrawAll() {
       const c = computeGame(game);
-      SBS.board.renderFullBoard(boardHolder, game, c);
-      fitTeamBadges(boardHolder);
+      drawBoard(c);
       refreshQuarterCards(c);
       scorePanel.update();
       updateFeedBanner();
@@ -718,7 +731,354 @@
         // Assigned over, not replaced: the answer to a save has no live-feed fields.
         onSaved: (r) => { Object.assign(game, r.game); redrawAll(); }
       });
+      players.el.classList.remove('card'); // it sits inside the wide panel
       players.draw();
+
+      // ---- Wide Game Day (R35): a tabbed panel on the left, the grid on the right ----
+      const GL = window.GameLogic;
+      const periodLabel = SBS.board.periodLabel;
+      const PENCIL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"></path><path d="M13.5 6.5l4 4"></path></svg>';
+      const CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5l10 -10"></path></svg>';
+
+      const side = el('aside', 'card gd-side');
+      side.setAttribute('aria-label', 'Scoring and players');
+      const tabBar = el('div', 'gd-tabs pick-tabs');
+      tabBar.setAttribute('role', 'tablist');
+      tabBar.setAttribute('aria-label', 'Game Day');
+      const scorePane = el('section', 'gd-pane gd-score-pane');
+      const playersPane = el('section', 'gd-pane players-sec');
+      playersPane.appendChild(players.el);
+      const tabOrder = ['score', 'players'];
+      const panes = { score: scorePane, players: playersPane };
+      const tabEls = {};
+      tabOrder.forEach(k => {
+        const t = el('button', 'gd-tab', k === 'score' ? 'Score' : 'Players');
+        t.type = 'button';
+        t.id = `gd-wtab-${k}`;
+        t.setAttribute('role', 'tab');
+        t.setAttribute('aria-controls', `gd-wpanel-${k}`);
+        panes[k].id = `gd-wpanel-${k}`;
+        panes[k].setAttribute('role', 'tabpanel');
+        panes[k].setAttribute('aria-labelledby', t.id);
+        t.addEventListener('click', () => selectWide(k, false));
+        t.addEventListener('keydown', (e) => {
+          const i = tabOrder.indexOf(k);
+          let n = null;
+          if (e.key === 'ArrowRight') n = tabOrder[(i + 1) % tabOrder.length];
+          else if (e.key === 'ArrowLeft') n = tabOrder[(i + tabOrder.length - 1) % tabOrder.length];
+          else if (e.key === 'Home') n = tabOrder[0];
+          else if (e.key === 'End') n = tabOrder[tabOrder.length - 1];
+          if (n) { e.preventDefault(); selectWide(n, true); }
+        });
+        tabEls[k] = t;
+        tabBar.appendChild(t);
+      });
+      // The tab is remembered for this board, so a redraw (a saved pot, a resize) keeps it.
+      let wideTab = SBS.gamedayTab && SBS.gamedayTab.id === game.id && SBS.gamedayTab.tab === 'players' ? 'players' : 'score';
+      function selectWide(k, focus) {
+        wideTab = k;
+        SBS.gamedayTab = { id: game.id, tab: k };
+        tabOrder.forEach(o => {
+          const on = o === k;
+          tabEls[o].setAttribute('aria-selected', on ? 'true' : 'false');
+          tabEls[o].tabIndex = on ? 0 : -1;
+          panes[o].hidden = !on;
+        });
+        if (focus) tabEls[k].focus();
+      }
+      side.append(tabBar, scorePane, playersPane);
+
+      // Read-only score for a board the host is not scoring (Live with the feed up, Simulation, or
+      // a Live board once it is over). The panel itself takes over whenever the host can score.
+      const liveEl = el('section', 'gd-live');
+      let liveSig = null;
+      const holdsPanel = (g) => GL.manualEntry(g) && (g.status === 'started' || g.status === 'finished');
+      function shown(g) {
+        const ls = g.liveScore;
+        const num = (v) => Number.isFinite(v);
+        if (g.status === 'finished') {
+          const f = g.results && g.results.final;
+          if (GL.hasResult(f)) return { a: Number(f.a), b: Number(f.b), when: 'Final' };
+          if (ls && num(ls.a) && num(ls.b)) return { a: ls.a, b: ls.b, when: 'Final' };
+          return { a: null, b: null, when: 'Final' };
+        }
+        if (GL.scoringMode(g) === 'manual') { const m = GL.manualState(g); return { a: m.a, b: m.b, when: periodLabel(m.period) }; }
+        if (ls && ls.state !== 'pre' && num(ls.a) && num(ls.b)) {
+          return { a: ls.a, b: ls.b, when: ls.completed ? 'Final' : [periodLabel(ls.period), ls.clock].filter(Boolean).join(' ') };
+        }
+        return { a: null, b: null, when: ls && ls.state === 'pre' ? 'Not started' : '' };
+      }
+      // What feeds the score, said once above the grid so it shows on both tabs (the live-score bar
+      // that used to say this is hidden on a wide screen).
+      function statusOf(g) {
+        if (g.status !== 'started') return null;
+        const ls = g.liveScore;
+        const mode = GL.scoringMode(g);
+        if (mode === 'simulation' || (ls && ls.simulation)) return ['SIMULATION', 'sim'];
+        if (mode === 'manual' || (ls && ls.manual)) return ['MANUAL', 'manual'];
+        if (g.liveFeed && g.liveFeed.available === false) return ['FEED OFFLINE', 'off'];
+        return ls && ls.state !== 'pre' ? ['LIVE', 'live'] : null; // nothing is live before kickoff
+      }
+      function drawLive() {
+        const g = game;
+        liveEl.hidden = holdsPanel(g) || (g.status !== 'started' && g.status !== 'finished');
+        if (liveEl.hidden) { liveSig = null; return; }
+        const sc = shown(g);
+        const st = statusOf(g) || (sc.when ? [sc.when, 'live'] : null);
+        const sig = JSON.stringify([sc, st, g.status, GL.scoringMode(g)]);
+        if (sig === liveSig) return;
+        liveSig = sig;
+        const sim = st && st[1] === 'sim';
+        const val = (v) => (v === null ? '–' : String(v));
+        const tile = (side) => `<div class="gd-live-tile"><span class="badge-fit">${teamBadge(g, side, { logoSize: 18, cls: 'team-badge-sm' })}</span><span class="gd-live-pts">${val(side === 'A' ? sc.a : sc.b)}</span></div>`;
+        const chip = g.status === 'finished' ? '' : `<span class="gd-live-chip is-${st ? st[1] : 'live'}">${st ? `<span class="gd-live-dot" aria-hidden="true"></span>${escapeHtml(sc.when || st[0])}` : ''}</span>`;
+        const note = g.status === 'finished' ? '' : `<p class="gd-live-note">${sim ? 'This is a practice game with made-up scores. Each quarter fills in on its own when it ends.' : 'Scores come from the live feed. Each quarter fills in on its own when it ends.'}</p>`;
+        liveEl.innerHTML = `<div class="gd-live-head"><h3>${g.status === 'finished' ? 'Final score' : 'Live score'}</h3>${chip}</div>
+          <div class="gd-live-tiles">${tile('A')}${tile('B')}</div>${note}`;
+        fitTeamBadges(liveEl);
+      }
+
+      // One line per quarter: score, winner, Mark paid out, edit. Rows are built once and filled in
+      // place (a row is left alone while its score is being edited or nothing about it changed).
+      const rows = {};
+      let editingQ = null;
+      const qsec = el('section', 'gd-quarters');
+      const qhead = el('div', 'gd-qhead', '<h3>Quarters</h3><span class="gd-qeach"></span>');
+      const qlist = el('ul', 'gd-qlist');
+      qsec.append(qhead, qlist);
+      QUARTERS.forEach(q => {
+        const li = el('li', 'gd-q');
+        li.dataset.q = q;
+        rows[q] = { li, sig: null };
+        qlist.appendChild(li);
+      });
+      const qName = (q) => (q === 'final' ? 'Final' : QLABEL[q]);
+
+      function focusIn(li, key) {
+        const hit = key && li.querySelector(`[data-gdq="${key}"]`);
+        if (hit) hit.focus();
+      }
+
+      function drawRow(q, i, c, pays, firstPending) {
+        const r = rows[q];
+        if (editingQ === q) return;
+        const res = c.results[q];
+        const pay = pays[q];
+        const scored = res.a !== null && res.b !== null;
+        const digits = res.autoResolved ? drawnDigits(game, res) : null;
+        const sig = JSON.stringify([res.a, res.b, res.resolved, res.pushed, res.needsDraw, res.winnerName, res.autoResolved, digits, res.amount, res.carryIn, pay.state, pay.name, pay.amount, pay.paid, game.status, i === firstPending]);
+        if (sig === r.sig) return;
+        r.sig = sig;
+        const act = document.activeElement;
+        const keep = act && r.li.contains(act) ? act.dataset.gdq : null;
+        const li = r.li;
+        li.innerHTML = '';
+        li.className = 'gd-q is-' + pay.state;
+        const label = qName(q);
+        let who = '';
+        let whoCls = '';
+        let note = null;
+        let noteCls = '';
+        let draw = false;
+        if (!scored) {
+          if (game.status === 'started' && i === firstPending) { who = 'In play'; whoCls = ' is-dim'; }
+          if (res.carryIn > 0) note = `Includes ${money(res.carryIn)} rolled over from an earlier push. It goes to whichever quarter is scored next.`;
+        } else if (res.resolved && res.pushed) {
+          who = 'PUSH';
+          whoCls = ' is-push';
+          note = `PUSH: no one in that square. ${money(res.amount)} rolls into the next payout.`;
+        } else if (res.resolved && res.winnerName) {
+          who = res.winnerName;
+          if (res.autoResolved) note = `Auto-drawn: the square was empty${digits ? `; drawn numbers ${digits.y}-${digits.x}` : ''}.`;
+        } else if (q === 'final' && res.needsDraw) {
+          note = 'That square is empty! A winner must be randomly drawn.';
+          noteCls = ' is-push';
+          draw = true;
+        }
+        li.appendChild(el('span', 'gd-q-lbl', label));
+        li.appendChild(el('span', 'gd-q-score', scored ? `${res.a}–${res.b}` : '–'));
+        const whoEl = el('span', 'gd-q-who' + whoCls);
+        const nameEl = el('span', 'gd-q-name');
+        nameEl.textContent = who;
+        nameEl.title = who;
+        whoEl.appendChild(nameEl);
+        if (pay.name && (pay.state === 'unpaid' || pay.state === 'paid' || pay.state === 'needsSettling')) whoEl.appendChild(el('span', 'gd-q-amt', money(pay.amount)));
+        li.appendChild(whoEl);
+        const payEl = el('span', 'gd-q-pay');
+        if (pay.state === 'unpaid') {
+          const b = payButton('Mark paid out', 'gd-pay is-owed', 'paid', pay);
+          b.setAttribute('aria-label', `Mark ${pay.name} paid out for ${label}, ${money(pay.amount)}`);
+          b.dataset.gdq = 'pay';
+          payEl.appendChild(b);
+        } else if (pay.state === 'paid') {
+          const b = payButton(CHECK + 'Paid out', 'gd-pay is-paid', 'unpaid', pay);
+          b.setAttribute('aria-label', `${label} is paid out to ${pay.name}, ${money(pay.amount)}. Undo`);
+          b.title = 'Tap to undo';
+          b.dataset.gdq = 'pay';
+          payEl.appendChild(b);
+        }
+        li.appendChild(payEl);
+        const editEl = el('span', 'gd-q-edit-slot');
+        // A Manual quarter is scored by ending it; on any other board the host may also fill one in.
+        if (scored || GL.scoringMode(game) !== 'manual') {
+          const b = el('button', 'gd-icon-btn', PENCIL);
+          b.type = 'button';
+          b.dataset.gdq = 'edit';
+          b.setAttribute('aria-label', `Edit ${label} score`);
+          b.title = `Edit ${label} score`;
+          b.addEventListener('click', () => startEdit(q));
+          editEl.appendChild(b);
+        }
+        li.appendChild(editEl);
+        if (pay.state === 'needsSettling') {
+          const nowTxt = pay.name ? `${pay.name} is owed ${money(pay.amount)}` : 'nobody is owed anything for it';
+          const box = el('div', 'gd-q-note is-settle');
+          box.setAttribute('role', 'status');
+          const msg = el('span', 'gd-q-msg', `<strong>Needs settling.</strong> ${escapeHtml(`You paid ${pay.paid.name} ${money(pay.paid.amount)}; now ${nowTxt}. Sort it out with them, then mark it settled.`)}`);
+          const b = payButton('Settled', 'small', 'settle', pay);
+          b.dataset.gdq = 'settle';
+          box.append(msg, b);
+          li.appendChild(box);
+        } else if (note || draw) {
+          const box = el('div', 'gd-q-note' + noteCls);
+          const msg = el('span', 'gd-q-msg');
+          msg.textContent = note;
+          box.appendChild(msg);
+          if (draw) {
+            const b = el('button', 'small', 'Randomly Draw Winner');
+            b.type = 'button';
+            b.dataset.gdq = 'draw';
+            b.addEventListener('click', () => runDraw(res));
+            box.appendChild(b);
+          }
+          li.appendChild(box);
+        }
+        focusIn(li, keep);
+      }
+
+      // The host's correction of a quarter's score. A Manual board goes through the panel's own
+      // guarded 'edit' operation (so the period stays true); any other board saves the document,
+      // as the quarter cards always did. Both warn first when a paid-out quarter would be unsettled.
+      async function putEdit(q, a, b) {
+        const after = JSON.parse(JSON.stringify(game));
+        if (!after.results[q]) after.results[q] = {};
+        after.results[q].a = a;
+        after.results[q].b = b;
+        const disturbed = paidQuartersDisturbed(game, after);
+        if (disturbed.length && !(await showConfirm(disturbMessage(disturbed)))) return;
+        if (!game.results[q]) game.results[q] = {};
+        game.results[q].a = a;
+        game.results[q].b = b;
+        await persist();
+      }
+
+      function startEdit(q) {
+        editingQ = q;
+        drawRows(computeGame(game)); // a row that was being edited goes back to its line
+        const r = rows[q];
+        r.sig = null;
+        const res = computeGame(game).results[q];
+        const li = r.li;
+        li.innerHTML = '';
+        li.className = 'gd-q is-editing';
+        li.appendChild(el('span', 'gd-q-lbl', qName(q)));
+        const form = el('form', 'gd-q-form');
+        form.innerHTML = `<label>${escapeHtml(game.teamA)} <input type="number" min="0" max="999" name="a"></label>
+          <label>${escapeHtml(game.teamB)} <input type="number" min="0" max="999" name="b"></label>`;
+        form.elements.a.value = res.a === null ? '' : String(res.a);
+        form.elements.b.value = res.b === null ? '' : String(res.b);
+        const save = el('button', 'sp-btn sp-primary', 'Save');
+        save.type = 'submit';
+        const cancel = el('button', 'sp-btn', 'Cancel');
+        cancel.type = 'button';
+        const close = () => { editingQ = null; r.sig = null; drawRows(computeGame(game)); focusIn(li, 'edit'); };
+        cancel.addEventListener('click', close);
+        form.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); close(); } });
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const manual = GL.scoringMode(game) === 'manual';
+          const parse = (v) => { v = v.trim(); return v === '' ? '' : /^\d+$/.test(v) ? parseInt(v, 10) : NaN; };
+          const a = parse(form.elements.a.value);
+          const b = parse(form.elements.b.value);
+          // Another board mode may clear a quarter by blanking both boxes, as the quarter cards did.
+          const bad = [a, b].some(v => (v === '' ? manual : !(Number.isInteger(v) && v >= 0 && v <= 999)));
+          if (bad) { showAlert('Scores must be whole numbers from 0 to 999.'); return; }
+          save.disabled = true;
+          try {
+            if (manual) await scorePanel.edit(q, a, b); else await putEdit(q, a, b);
+          } finally {
+            r.sig = null;
+            // Unless the host opened another row while this one saved.
+            const mine = editingQ === q;
+            if (mine) editingQ = null;
+            drawRows(computeGame(game));
+            if (mine) focusIn(li, 'edit');
+          }
+        });
+        form.append(save, cancel);
+        li.appendChild(form);
+        form.elements.a.focus();
+        form.elements.a.select();
+      }
+
+      function drawRows(c) {
+        const pays = payoutStatus(game);
+        let firstPending = -1;
+        QUARTERS.forEach((q, i) => { if (firstPending < 0 && (c.results[q].a === null || c.results[q].b === null)) firstPending = i; });
+        QUARTERS.forEach((q, i) => drawRow(q, i, c, pays, firstPending));
+        const base = QUARTERS.map(q => c.results[q].baseAmount);
+        qhead.querySelector('.gd-qeach').textContent = base.every(v => v === base[0]) ? `${money(base[0])} each` : '';
+      }
+
+      // ---- Above the grid: score and period, squares sold, the pot, the price ----
+      const stage = el('section', 'gd-stage');
+      stage.setAttribute('aria-label', 'Board');
+      const head = el('div', 'gd-stage-head');
+      head.innerHTML = `<div class="gd-now"></div>
+        <div class="gd-stat"><span class="lbl">Sold</span><span class="val" data-v="sold"></span></div>
+        <label class="gd-stat gd-pot"><span class="lbl">Pot</span><span class="gd-pot-in"><span class="gd-cur">$</span><input type="number" min="0" step="1" class="val-input" data-v="pot" aria-label="Total pot"></span><span class="gd-pot-edit">${PENCIL}</span></label>
+        <div class="gd-stat"><span class="lbl">Per square</span><span class="val" data-v="price"></span></div>`;
+      const potIn = head.querySelector('[data-v="pot"]');
+      const sizePot = () => { potIn.style.width = Math.max(2, potIn.value.length + 0.6) + 'ch'; };
+      potIn.addEventListener('input', sizePot);
+      potIn.addEventListener('change', () => savePot(potIn.value));
+      stage.appendChild(head);
+      let nowSig = null;
+      // The full names; the short ones when the line would not fit on one row with the numbers
+      // (fitStage adds .is-short, and CSS swaps them).
+      function fitStage() {
+        head.classList.remove('is-short');
+        if (head.offsetHeight > 56) head.classList.add('is-short');
+      }
+      if (window.ResizeObserver) new ResizeObserver(fitStage).observe(stage);
+      const nm = (g, side) => {
+        const full = side === 'A' ? g.teamA : g.teamB;
+        return `<span class="gd-nm" title="${escapeHtml(full)}"><span class="gd-nm-full">${escapeHtml(full)}</span><span class="gd-nm-abbr" aria-hidden="true">${escapeHtml(teamStyle(g, side).abbr)}</span></span>`;
+      };
+      function drawStage(c) {
+        const g = game;
+        const sc = shown(g);
+        const st = statusOf(g);
+        const names = [...new Set(g.squares.filter(Boolean).map(sq => sq.name))].length;
+        tabEls.players.textContent = `Players (${names})`;
+        const sig = JSON.stringify([sc, st, g.teamA, g.teamB]);
+        if (sig !== nowSig) {
+          nowSig = sig;
+          const val = (v) => (v === null ? '–' : String(v));
+          head.querySelector('.gd-now').innerHTML =
+            `${nm(g, 'A')}<b class="gd-pts">${val(sc.a)}</b><span class="gd-dash" aria-hidden="true">–</span><b class="gd-pts">${val(sc.b)}</b>${nm(g, 'B')}`
+            + (sc.when ? `<span class="gd-when">${escapeHtml(sc.when)}</span>` : '')
+            + (st ? `<span class="gd-src is-${st[1]}">${st[0]}</span>` : '');
+        }
+        head.querySelector('[data-v="sold"]').textContent = String(g.squares.filter(sq => sq).length);
+        head.querySelector('[data-v="price"]').textContent = money(g.squarePrice);
+        if (document.activeElement !== potIn) { potIn.value = String(Math.round(c.pot)); sizePot(); }
+        const edited = g.potOverride !== null && g.potOverride !== undefined && g.potOverride !== '';
+        head.querySelector('.gd-pot').title = edited ? 'The pot was edited by hand. Clear the box to use squares sold × price.' : 'Total pot. Type a number to change it.';
+        fitStage();
+      }
+
+      drawWide = (c) => { drawLive(); drawRows(c); drawStage(c); };
 
       const wideQuery = window.matchMedia('(min-width: 1024px)');
       const fineQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
@@ -727,21 +1087,35 @@
         const focused = document.activeElement;
         layout.classList.toggle('gd-wide', wide);
         boardCard.classList.toggle('gd-board', wide);
+        boardCard.classList.toggle('glass-board', wide);
+        app.classList.toggle('fit-screen', wide);
+        main.classList.toggle('gd-main', wide);
         if (wide) {
-          const order = [boardCard, scorePanel.el, resultsCard, players.el, strip];
-          order.forEach(n => { if (n) layout.appendChild(n); });
+          selectWide(wideTab, false);
+          scorePane.append(scorePanel.el, liveEl, whoCard, qsec);
+          stage.appendChild(boardCard);
+          layout.append(side, stage);
+          resultsCard.remove();
+          strip.remove();
+          drawWide(computeGame(game));
+          scorePanel.update();
         } else {
           resultsCard.insertBefore(scorePanel.el, resultsCard.firstChild);
+          resultsCard.appendChild(whoCard);
           layout.append(boardCard, resultsCard);
-          players.el.remove();
+          side.remove();
+          stage.remove();
           main.insertBefore(strip, layout);
+          scorePanel.update();
         }
         if (focused && focused !== document.activeElement && document.body.contains(focused) && focused !== document.body) focused.focus();
         fitTeamBadges(boardHolder);
+        SBS.board.fitNames(boardHolder);
       };
       [wideQuery, fineQuery].forEach(m => { if (m.addEventListener) m.addEventListener('change', placeCards); else m.addListener(placeCards); });
       SBS.onLeaveScreen(() => {
         [wideQuery, fineQuery].forEach(m => { if (m.removeEventListener) m.removeEventListener('change', placeCards); else m.removeListener(placeCards); });
+        app.classList.remove('fit-screen');
       });
       if (wideQuery.matches) placeCards();
     }
@@ -813,8 +1187,7 @@
         Object.assign(game, saved);
         checkDrawSync(game);
         const newComputed = computeGame(game);
-        SBS.board.renderFullBoard(boardHolder, game, newComputed);
-        fitTeamBadges(boardHolder);
+        drawBoard(newComputed);
         refreshQuarterCards(newComputed);
         scorePanel.update();
       } catch (e) {
@@ -846,14 +1219,13 @@
         // A save may have started while the poll was out: its answer wins.
         if (!fresh || saveTimer || scorePanel.busy()) return;
         const feedChanged = !!(fresh.liveFeed && fresh.liveFeed.available === false) !== !!(game.liveFeed && game.liveFeed.available === false);
-        if (feedChanged) { game.liveFeed = fresh.liveFeed; updateFeedBanner(); scorePanel.update(); }
+        if (feedChanged) { game.liveFeed = fresh.liveFeed; updateFeedBanner(); scorePanel.update(); drawWide(computeGame(game)); }
         const saved = fresh.updatedAt !== game.updatedAt;
         if (saved || SBS.boardKey(fresh) !== SBS.boardKey(game)) {
           SBS.takeBoard(game, fresh);
           if (saved) checkDrawSync(game);
           const newComputed = computeGame(game);
-          SBS.board.renderFullBoard(boardHolder, game, newComputed);
-          fitTeamBadges(boardHolder);
+          drawBoard(newComputed);
           refreshQuarterCards(newComputed);
           scorePanel.update();
           updateFeedBanner();

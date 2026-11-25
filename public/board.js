@@ -145,6 +145,7 @@
       syncCornerInsets(holder);
       fitAxisLabel(teamALabel, teamALabel.querySelector('.teamA-label-text'), 'A', true);
       fitAxisLabel(teamBLabel, teamBLabel.querySelector('span'), 'B', false);
+      watchFit(holder);
     }
 
     return { mount };
@@ -333,6 +334,19 @@
     teamALabel.style.height = `calc(100% - ${ch}px)`;
   }
 
+  // A holder marked data-fit (wide Game Day and wide picking, R35) holds a board that fills the room
+  // it is given: when that room changes (a window resize, the layout switching, a tab) the axis bars
+  // and the names are fitted again. One observer per holder, which survives its redraws.
+  function watchFit(holder) {
+    if (!holder.dataset.fit || holder._fitWatch || !window.ResizeObserver) return;
+    let frame = 0;
+    holder._fitWatch = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => { syncCornerInsets(holder); fitAxisLabels(holder); fitNames(holder); });
+    });
+    holder._fitWatch.observe(holder);
+  }
+
   // Full name first; the short one only when the full one overflows its axis bar.
   function refitAxisLabel(labelEl, textEl) {
     if (!textEl || !textEl.dataset.full) return;
@@ -354,7 +368,7 @@
   // sizes written in another, so 100 squares cost one layout.
   const MIN_NAME_PX = 7;
   function fitNames(root) {
-    const names = Array.prototype.slice.call((root || document).querySelectorAll('.mirror-screen .name-txt, .pick-fill .name-txt'));
+    const names = Array.prototype.slice.call((root || document).querySelectorAll('.mirror-screen .name-txt, .pick-fill .name-txt, .glass-board .name-txt'));
     if (!names.length) return;
     names.forEach(n => { n.style.fontSize = ''; });
     const sizes = names.map(n => {
@@ -377,5 +391,5 @@
     axisResizeTimer = setTimeout(() => { document.querySelectorAll('.pick-fill .board-grid-outer').forEach(syncCornerInsets); fitAxisLabels(document); fitNames(document); }, 120);
   });
 
-  SBS.board = { renderPickBoard, renderFullBoard, renderLiveScoreBar, syncCornerInsets, fitAxisLabels, fitNames };
+  SBS.board = { renderPickBoard, renderFullBoard, renderLiveScoreBar, syncCornerInsets, fitAxisLabels, fitNames, periodLabel };
 })();
