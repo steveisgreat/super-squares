@@ -207,7 +207,7 @@
     app.classList.remove('fit-screen'); // set again below on a wide screen (R35)
     const reopen = () => SBS.go({ screen: 'board', game });
     const phone = isPhone();
-    const headerMeta = [SBS.ui.leagueBadge(game.league), escapeHtml(SBS.ui.shownDescription(game) || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
+    const headerMeta = [escapeHtml(SBS.ui.shownDescription(game) || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
     // The top bar (R29): Home, the matchup on one line (full names when they fit, else short ones),
     // then on a wide screen the join chip and the "On the TV" pill, then Party View and Connect.
     const bar = topbar('', [], { hideIcon: true });

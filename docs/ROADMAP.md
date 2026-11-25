@@ -313,6 +313,9 @@ Connect's Scoring section (before the lock) are gone. "Guest picks" is now "Play
 picks in Player View"; the guest page is Player View. Part payments:
 [decision 020](decisions/020-paid-per-square.md). Not tried on a real iPad or phone. The privacy
 and terms pages still say "guest picks" (wording waits for the lawyer review).
+*Changed 2026-11-25:* the sold bar is four stat panels (Sold, Open, Pot, Per square) on every size, the One
+player / Paste a list buttons are gone, and an icon at the top right of the panel opens Paste a list in a
+dialog (the text is kept if it is closed).
 
 **R32. Team pills, glass buttons and Home placement** — `Sonnet` — ✅ built 2026-11-24. Team pills:
 the logo disc is 2 px taller than the pill, names are centered and every team font's capitals are

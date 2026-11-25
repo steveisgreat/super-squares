@@ -1,6 +1,6 @@
 # 013 — Team and league logos restored
 
-**Date:** 2026-11-24 · **Status:** accepted (Steve's call, 2026-11-24); **amended 2026-11-25:** the NFL league logo is removed · **Roadmap:** R4
+**Date:** 2026-11-24 · **Status:** accepted (Steve's call, 2026-11-24); **amended 2026-11-25:** league logos and names are removed · **Roadmap:** R4
 · **Replaces:** the "no team logos" part of 005. The rest of 005 stands: marketing says
 "the Big Game", never "Super Bowl".
 
@@ -11,8 +11,9 @@ loaded at runtime from ESPN's public logo CDN (`a.espncdn.com`) by team abbrevia
 No logo files are bundled. A logo that fails to load becomes the generic helmet (or, for
 a league logo, its text), so nothing looks broken offline.
 
-**Amended 2026-11-25 (Steve's call):** the NFL league logo (the shield) is gone; its badge is the
-word "NFL". NFL and NBA team logos and the NBA league logo stay.
+**Amended 2026-11-25 (Steve's call):** the app shows no league logo and no league name: the whole league
+badge is gone (the NFL shield first, then the badge). Setup still offers the leagues to choose from.
+NFL and NBA team logos stay.
 
 ## Risks Steve accepted
 - **Trademark.** Team and league logos are registered marks. Showing them in a product

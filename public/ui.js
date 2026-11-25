@@ -550,32 +550,6 @@
     return when ? `Kickoff: ${escapeHtml(when)}` : '';
   }
 
-  const LEAGUE_LABELS = { nfl: 'NFL', nba: 'NBA', other: 'Other' };
-  const leagueKey = (league) => (Object.keys(LEAGUE_LABELS).includes(league) ? league : 'other');
-  function leagueLabel(league) { return LEAGUE_LABELS[leagueKey(league)]; }
-
-  // League-level (not team-level) logos, from the same ESPN CDN as the team
-  // logos above. The NFL shield is left out on purpose (decision 013): its badge, like
-  // 'other', is just the word.
-  const LEAGUE_LOGO_URL = {
-    nba: 'https://a.espncdn.com/i/teamlogos/leagues/500/nba.png'
-  };
-
-  function leagueBadge(league) {
-    const key = leagueKey(league);
-    const cls = `league-badge league-${key}`;
-    const label = leagueLabel(league);
-    const logo = LEAGUE_LOGO_URL[key];
-    if (!logo) return `<span class="${cls}">${label}</span>`;
-    // If the CDN logo 404s, the image-error listener below hides it and
-    // reveals the text fallback that's already sitting there — same "never
-    // show a broken image" rule the team logos follow.
-    return `<span class="${cls}" title="${label}">`
-      + `<img src="${logo}" class="league-badge-logo" alt="${label}">`
-      + `<span class="league-badge-text" style="display:none;">${label}</span>`
-      + `</span>`;
-  }
-
   // ---------- Team colours / logos ----------
   // NFL/NBA colors are auto-detected from free-text team names; 'other' has no
   // team database at all, so its colors always come from the host's own
@@ -663,7 +637,7 @@
   }
 
   // A logo that fails to load (CDN down, unknown abbreviation, offline LAN)
-  // swaps to the helmet, or for a league logo to its text. One capturing
+  // swaps to the helmet. One capturing
   // listener instead of inline onerror= attributes, which the
   // Content-Security-Policy forbids (vercel.json). Image error events don't
   // bubble, so this listens in the capture phase.
@@ -672,9 +646,6 @@
     if (!(img instanceof HTMLImageElement)) return;
     if (img.classList.contains('team-logo') && img.src !== HELMET_DATA_URI) {
       img.src = HELMET_DATA_URI;
-    } else if (img.classList.contains('league-badge-logo')) {
-      img.style.display = 'none';
-      if (img.nextElementSibling) img.nextElementSibling.style.display = 'inline';
     }
   }, true);
 
@@ -985,21 +956,22 @@
     };
   }
 
-  // Tabler outline icons (MIT, 24 px): arrows-maximize, copy, printer, chevron-right, x.
+  // Tabler outline icons (MIT, 24 px): arrows-maximize, copy, printer, chevron-right, clipboard-text, x.
   const ic = d => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   const MAXIMIZE_ICON = ic('<path d="M16 4l4 0l0 4"/><path d="M14 10l6 -6"/><path d="M8 20l-4 0l0 -4"/><path d="M4 20l6 -6"/><path d="M16 20l4 0l0 -4"/><path d="M14 14l6 6"/><path d="M8 4l-4 0l0 4"/><path d="M4 4l6 6"/>');
   const COPY_ICON = ic('<path d="M7 9.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"/><path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"/>');
   const PRINT_ICON = ic('<path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2"/><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4"/><path d="M7 13m0 2a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z"/>');
   const CHEVRON_ICON = ic('<path d="M9 6l6 6l-6 6"/>');
+  const PASTE_ICON = ic('<path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"/><path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z"/><path d="M9 12h6"/><path d="M9 16h6"/>');
   const CLOSE_ICON = ic('<path d="M18 6l-12 12"/><path d="M6 6l12 12"/>');
 
   SBS.ui = {
     el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake, keepPartyAwake, partyHistory,
     showModal, showConfirm, showAlert, disturbMessage, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin, signInConsent,
-    shownDescription, topbar, HOME_ICON, statusLabel, leagueLabel, leagueBadge, isTvBrowser, isPhone,
+    shownDescription, topbar, HOME_ICON, statusLabel, isTvBrowser, isPhone,
     formatKickoffTime, kickoffNotice,
     teamMeta, teamStyle, applyTeamColors, resetTeamColors, teamLogoTag,
     legalLinks, teamColor, teamEdge, readableTextColor, teamBadge, fitTeamBadges, teamAbbr, shadeColor,
-    MAXIMIZE_ICON, COPY_ICON, PRINT_ICON, CHEVRON_ICON, CLOSE_ICON
+    MAXIMIZE_ICON, COPY_ICON, PRINT_ICON, CHEVRON_ICON, PASTE_ICON, CLOSE_ICON
   };
 })();

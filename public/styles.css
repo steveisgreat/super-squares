@@ -405,20 +405,6 @@ h3 { font-family: var(--serif); font-size: 1.15rem; color: var(--text); font-wei
 .main > .card:has(#league-group) { max-width: 720px; margin-left: auto; margin-right: auto; }
 
 
-.league-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 32px;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.league-badge.league-nfl, .league-badge.league-other { background: var(--good-soft); color: var(--good); padding: 4px 12px; border-radius: 999px; }
-.league-badge-logo { height: 20px; width: auto; display: block; }
-
 .archive-wrap { margin-top: 4px; }
 .archive-toggle {
   background: transparent;
@@ -2862,7 +2848,7 @@ button.gd-onair {
 .main.pick-main { max-width: 1800px; padding: 16px 24px calc(16px + var(--sab)); }
 .pick-fill { display: flex; flex-direction: column; gap: 16px; max-width: 760px; margin: 0 auto; }
 .pick-fill > .card { margin: 0; border-radius: 10px; }
-.pick-fill .gd-tab[hidden], .pick-fill > [hidden], .pick-sec[hidden], .one-pane[hidden], .paste-card[hidden], .room-opt[hidden] { display: none; }
+.pick-fill .gd-tab[hidden], .pick-fill > [hidden], .pick-sec[hidden], .one-pane[hidden], .room-opt[hidden] { display: none; }
 .pick-sec h3 { margin: 0 0 4px; }
 .pick-sec > p { margin: 0 0 12px; color: var(--muted); font-size: 0.9rem; line-height: 1.45; }
 .pick-side, .pick-foot.card { padding: 0; }
@@ -2871,10 +2857,11 @@ button.gd-onair {
 .players-sec .players-head { display: none; } /* the tab says it */
 .players-sec .money-box { flex-direction: row; align-items: baseline; justify-content: space-between; padding: 6px 12px; }
 .players-sec .money-box .val { font-size: 1.1rem; }
-.pick-seg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; margin-bottom: 14px; border-radius: 10px; background: var(--bg); }
-.pick-seg button { min-height: 44px; padding: 0 8px; border: 0; border-radius: 7px; box-shadow: none; background: transparent; color: var(--muted); font-size: 0.9rem; font-weight: 700; }
-.pick-seg button:hover { color: var(--text); background: var(--panel2); }
-.pick-seg button[aria-pressed="true"] { background: var(--panel3); color: var(--text); }
+.add-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; margin-bottom: 8px; }
+.pick-sec .add-head h3 { margin: 0; }
+.add-head .paste-open { flex: none; width: 44px; height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.pick-sec > p.added-note { margin: 0 0 8px; color: var(--accent-hi); font-weight: 600; }
+.added-note:empty { display: none; }
 .pick-fields { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }
 .pick-form label, .paste-card label { margin-top: 0; }
 .pick-total { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 10px; padding: 8px 12px; border-radius: 8px; background: var(--panel2); color: var(--muted); }
@@ -2885,8 +2872,8 @@ button.gd-onair {
 button.add-btn, button.lock-btn { min-height: 48px; padding-left: 6px; padding-right: 6px; font-size: 1rem; font-weight: 800; white-space: nowrap; }
 .tap-hint { margin: 10px 0 0; text-align: center; color: var(--muted); font-size: 0.9rem; }
 .full-note { margin: 0; text-align: left; }
-.add-sec.is-full .pick-seg, .add-sec.is-full .one-pane, .add-sec.is-full .paste-card,
-.add-sec.is-claiming .pick-seg, .add-sec.is-claiming .pick-fields, .add-sec.is-claiming .add-btn, .add-sec.is-claiming .tap-hint { display: none; }
+.add-sec.is-full .add-head, .add-sec.is-full .one-pane,
+.add-sec.is-claiming .add-head, .add-sec.is-claiming .added-note, .add-sec.is-claiming .pick-fields, .add-sec.is-claiming .add-btn, .add-sec.is-claiming .tap-hint { display: none; }
 .add-sec .manual-banner { flex-direction: column; align-items: stretch; gap: 2px; margin: 0 0 4px; }
 .manual-banner .manual-for { font-size: 0.85rem; color: var(--muted); }
 .manual-banner .manual-name { font-size: 1.5rem; font-weight: 800; line-height: 1.2; color: var(--text); overflow-wrap: anywhere; }
@@ -2907,14 +2894,10 @@ button.lock-btn:hover { background: var(--accent-soft); color: var(--accent-hi);
 .lock-sec.is-ready button.lock-btn { background: var(--btn-fill); color: var(--btn-text); border-color: var(--accent); }
 .lock-sec.is-ready button.lock-btn:hover { background: var(--btn-fill-hover); }
 
-.board-head { display: flex; align-items: center; gap: 20px; min-height: 44px; margin-bottom: 12px; }
-.board-head .sold { flex: 1; min-width: 0; }
-.sold-line { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
-.sold-line strong { font-size: 1.15rem; color: var(--text); }
-.sold-bar { height: 6px; border-radius: 3px; background: var(--panel3); overflow: hidden; }
-.sold-bar div { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.2s ease; }
-.board-stat { display: flex; flex-direction: column; text-align: right; }
-.board-stat .val.is-pot { color: var(--accent); }
+.board-head { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.board-stat { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; padding: 6px 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); text-align: center; }
+.board-stat .lbl { white-space: nowrap; }
+.board-stat.is-pot .val { color: var(--accent); }
 .pick-fill .board-card { padding: 14px; }
 .pick-fill .board-legend { justify-content: space-between; gap: 16px; margin-top: 12px; font-weight: 500; }
 .legend-unpaid { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
@@ -2951,7 +2934,8 @@ button.grid-btn { display: none; min-height: 48px; margin-top: 8px; font-size: 1
 
 /* ---- The phone's three tabs ---- */
 .pick-fill.is-tabbed { gap: 10px; max-width: 560px; }
-.is-tabbed .board-head { gap: 14px; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.is-tabbed .board-head { gap: 6px; margin: 0; }
+.is-tabbed .board-stat .val { font-size: 1.15rem; }
 .is-tabbed > .pick-tabs { margin: 0; padding: 0; }
 .is-tabbed > .pick-tabs .gd-tab { min-height: 48px; padding: 0 4px; white-space: nowrap; }
 .is-tabbed > .board-card { padding: 10px 8px; }
@@ -3023,11 +3007,14 @@ button.grid-btn { display: none; min-height: 48px; margin-top: 8px; font-size: 1
   .topbar.pick-topbar:not(.gd-topbar-phone) { min-height: 64px; padding: 4px 20px; }
   .pick-topbar:not(.gd-topbar-phone) .gd-head { gap: 0; }
   .pick-topbar:not(.gd-topbar-phone) .home-btn { margin-top: 6px; }
-  .board-head { margin-bottom: 8px; min-height: 40px; }
+  .board-head { margin-bottom: 8px; }
+  .board-stat { padding: 2px 4px; }
+  .board-stat .val { font-size: 1.15rem; }
+  .add-head { margin-bottom: 4px; }
   .pick-fill .board-legend { margin-top: 8px; }
   .pick-fill .teamB-label { padding: 0 10px; }
   .pick-side .pick-sec, .pick-foot .pick-sec { padding: 10px 16px 12px; }
-  .pick-seg, .players-sec .money-boxes { margin-bottom: 8px; }
+  .players-sec .money-boxes { margin-bottom: 8px; }
   .players-foot { margin-top: 8px; }
   .pick-form .checkbox-label { margin: 0; }
   button.add-btn, button.lock-btn { min-height: 44px; padding-top: 6px; padding-bottom: 6px; }

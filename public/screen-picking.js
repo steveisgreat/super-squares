@@ -15,8 +15,8 @@
   // loses it. One board at a time.
   let pasteDraft = { id: null, text: '' };
 
-  // Which tab and which way of adding is open, kept the same way (every save redraws the screen).
-  let view = { id: null, tab: 'add', mode: 'one' };
+  // Which tab is open, kept the same way (every save redraws the screen).
+  let view = { id: null, tab: 'add' };
 
   const NAME_RACE = 'Someone just picked under that name. Check the list and try again.';
 
@@ -28,8 +28,8 @@
     const reopen = () => SBS.go({ screen: 'picking', game });
 
     const phone = isPhone();
-    if (view.id !== game.id) view = { id: game.id, tab: 'add', mode: pasteDraft.id === game.id && pasteDraft.text ? 'paste' : 'one' };
-    const headerMeta = [SBS.ui.leagueBadge(game.league), escapeHtml(SBS.ui.shownDescription(game) || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
+    if (view.id !== game.id) view = { id: game.id, tab: 'add' };
+    const headerMeta = [escapeHtml(SBS.ui.shownDescription(game) || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
     // The top bar: Home, the matchup in the exact center, then (wide) the join chip, and Connect.
     const bar = topbar('', [], { hideIcon: true });
     bar.classList.add('gd-topbar', 'pick-topbar');
@@ -231,30 +231,21 @@
     const claimTab = () => (tabbed ? 'grid' : 'add');
     side.append(tabBar, addSec, playersSec);
 
-    // ---- Add squares: one player, or a pasted list ----
+    // ---- Add squares: one player; the icon in the corner opens Paste a list ----
     const onePane = el('div', 'one-pane');
-    const canPaste = game.pickMode !== 'manual';
-    const seg = el('div', 'pick-seg');
-    if (canPaste) {
-      seg.setAttribute('role', 'group');
-      seg.setAttribute('aria-label', 'How to add squares');
-      [['one', 'One player'], ['paste', 'Paste a list']].forEach(([k, label]) => {
-        const b = textEl('button', '', label);
-        b.type = 'button';
-        b.dataset.mode = k;
-        b.addEventListener('click', () => setMode(k));
-        seg.appendChild(b);
-      });
-      addSec.appendChild(seg);
-    } else {
-      view.mode = 'one';
+    const addHead = el('div', 'add-head', '<h3>Add a player</h3>');
+    if (game.pickMode !== 'manual') {
+      const pasteOpen = el('button', 'icon-btn paste-open', SBS.ui.PASTE_ICON);
+      pasteOpen.type = 'button';
+      pasteOpen.title = 'Paste a list';
+      pasteOpen.setAttribute('aria-label', 'Paste a list of players');
+      pasteOpen.setAttribute('aria-haspopup', 'dialog');
+      pasteOpen.addEventListener('click', () => openPasteDialog(pasteOpen));
+      addHead.appendChild(pasteOpen);
     }
-    function setMode(k) {
-      view.mode = k;
-      seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === k)));
-      onePane.hidden = k !== 'one';
-      if (pasteCard) pasteCard.hidden = k !== 'paste';
-    }
+    const addedNote = el('p', 'added-note');
+    addedNote.setAttribute('role', 'status');
+    addSec.append(addHead, addedNote);
 
     const errBox = el('div', 'error-msg hidden');
     errBox.setAttribute('role', 'alert');
@@ -290,11 +281,11 @@
       totalRow.innerHTML = show ? `<span>${paidInput.checked ? 'Total paid' : 'Total owed'}</span><strong>${money(n * price)}</strong>` : '';
     }
     countInput.addEventListener('input', () => { drawTotal(); clearErr(); });
-    nameInput.addEventListener('input', clearErr);
+    nameInput.addEventListener('input', () => { clearErr(); addedNote.textContent = ''; });
     paidInput.addEventListener('change', drawTotal);
     // The name and the number of squares, both required, or null with the reason shown.
     function readForm(noName) {
-      const refuse = (msg, input) => { setMode('one'); showErr(msg); input.focus(); return null; };
+      const refuse = (msg, input) => { showErr(msg); input.focus(); return null; };
       const name = nameInput.value.trim();
       if (!name) return refuse(noName, nameInput);
       if (!isPlayerName(name)) return refuse('That name is not allowed. Choose a different name.', nameInput);
@@ -325,7 +316,7 @@
     if (tapToClaim) onePane.appendChild(el('p', 'tap-hint', actionBtn ? 'or tap open squares on the board' : 'Type a name, then tap open squares on the board.'));
     addSec.appendChild(el('p', 'claim-note', 'Finish the pick on the Grid tab, or cancel it there.'));
     const fullNote = el('p', 'tap-hint full-note hidden', 'Every square is taken. Tap a square on the board to remove it or give it to someone else.');
-    addSec.insertBefore(fullNote, canPaste ? seg : errBox);
+    addSec.insertBefore(fullNote, errBox);
 
     // ---- Manual selection state ----
     let manualSelecting = false;
@@ -522,7 +513,6 @@
       manualPaid = paidInput.checked;
       manualRename = out.rename || null;
       manualHadName = hadName;
-      setMode('one');
       selectTab(claimTab());
       refreshPreview();
     }
@@ -639,13 +629,10 @@
     lockSec.appendChild(lockBtn);
     foot.append(picksSec, lockSec);
 
-    // ---- The board: what is sold above it, how to use it below ----
+    // ---- The board: the stat panels above it, how to use it below ----
     const boardHead = el('div', 'board-head');
-    boardHead.innerHTML = `
-      <div class="sold"><div class="sold-line"><span><strong data-v="sold"></strong> of 100 sold</span><span data-v="open"></span></div>
-        <div class="sold-bar" aria-hidden="true"><div></div></div></div>
-      <div class="board-stat"><span class="lbl">Pot</span><span class="val is-pot" data-v="pot"></span></div>
-      <div class="board-stat"><span class="lbl">Per square</span><span class="val" data-v="price"></span></div>`;
+    boardHead.innerHTML = [['sold', 'Sold'], ['open', 'Open'], ['pot', 'Pot'], ['price', 'Per square']]
+      .map(([k, label]) => `<div class="board-stat is-${k}"><span class="val" data-v="${k}"></span><span class="lbl">${label}</span></div>`).join('');
     boardCard.append(boardHead, claimSlot);
     const boardHolder = el('div');
     boardHolder.id = 'board-holder';
@@ -660,10 +647,9 @@
       const full = open === 0;
       const put = (k, v) => { boardHead.querySelector(`[data-v="${k}"]`).textContent = v; };
       put('sold', String(filled));
-      put('open', `${open} open`);
+      put('open', String(open));
       put('pot', money(filled * game.squarePrice));
       put('price', money(game.squarePrice));
-      boardHead.querySelector('.sold-bar div').style.width = filled + '%';
       boardFoot.querySelector('.board-hint').textContent = manualSelecting ? 'Tap more squares, or tap a picked one to undo.'
         : tapToClaim && !full ? 'Tap an open square to claim it, or a name to see who has it.' : 'Tap a name to see who has it.';
       addSec.classList.toggle('is-full', full && !manualSelecting);
@@ -706,36 +692,70 @@
       labelTabs();
     }
 
-    // ---- Paste a list of players (auto and both modes) ----
+    // ---- Paste a list of players (auto and both modes): a dialog, drawn while it is open ----
     let pasteCard = null;
     let pasteBox = null;
     let pasteNote = '';
     let pasteStatus = null;
     let pasteMsg = null;
     let pasteBtn = null;
-    if (canPaste) {
-      pasteCard = el('div', 'paste-card');
-      pasteCard.innerHTML = `<label for="paste-list">One player per line: name, squares, then “unpaid” if they still owe.</label>
-        <textarea id="paste-list" rows="5" spellcheck="false" autocomplete="off" placeholder="Lee 5&#10;Ann 3 unpaid"></textarea>`;
+    let closePaste = () => {};
+    function openPasteDialog(opener) {
+      if (pasteCard) return;
+      const overlay = overlayEl('0.65');
+      pasteCard = el('div', 'card pick-dialog paste-card');
+      pasteCard.setAttribute('role', 'dialog');
+      pasteCard.setAttribute('aria-modal', 'true');
+      pasteCard.setAttribute('aria-labelledby', 'paste-title');
+      pasteCard.innerHTML = `<h3 id="paste-title">Paste a list</h3>
+        <label for="paste-list">One player per line: name, squares, then “unpaid” if they still owe.</label>
+        <textarea id="paste-list" rows="7" spellcheck="false" autocomplete="off" placeholder="Lee 5&#10;Ann 3 unpaid"></textarea>`;
       pasteBox = pasteCard.querySelector('#paste-list');
       pasteStatus = el('div', 'paste-status');
       pasteStatus.setAttribute('role', 'status');
       pasteMsg = el('div', 'paste-msg');
       pasteMsg.setAttribute('role', 'status');
-      pasteBtn = el('button', 'full-width add-btn', 'Add everyone');
-      pasteBtn.type = 'button';
-      pasteBtn.addEventListener('click', addPasted);
-      pasteCard.appendChild(pasteStatus);
-      pasteCard.appendChild(pasteMsg);
-      pasteCard.appendChild(pasteBtn);
-      addSec.appendChild(pasteCard);
+      const actions = el('div', 'pick-dialog-actions');
+      const cancel = textEl('button', 'secondary', 'Cancel');
+      pasteBtn = textEl('button', '', 'Add everyone');
+      [cancel, pasteBtn].forEach(b => { b.type = 'button'; actions.appendChild(b); });
+      pasteCard.append(pasteStatus, pasteMsg, actions);
+      overlay.appendChild(pasteCard);
+      document.body.appendChild(overlay);
+      // The text stays in the draft when the dialog closes, so a stray tap loses nothing.
+      pasteNote = '';
       if (pasteDraft.id === game.id) pasteBox.value = pasteDraft.text;
       pasteBox.addEventListener('input', () => {
         pasteDraft = { id: game.id, text: pasteBox.value };
         pasteNote = '';
         updatePaste();
       });
+      // An alert on top keeps its own keys.
+      function onKey(e) {
+        if (document.body.lastElementChild !== overlay) return;
+        if (e.key === 'Escape') { if (!saving) closePaste(); return; }
+        if (e.key !== 'Tab') return;
+        const items = [pasteBox, cancel, pasteBtn].filter(n => !n.disabled);
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+      closePaste = () => {
+        closePaste = () => {};
+        document.removeEventListener('keydown', onKey);
+        overlay.remove();
+        pasteCard = pasteBox = pasteStatus = pasteMsg = pasteBtn = null;
+        if (opener && opener.isConnected) opener.focus();
+      };
+      document.addEventListener('keydown', onKey);
+      overlay.addEventListener('mousedown', (e) => { if (e.target === overlay && !saving) closePaste(); });
+      cancel.addEventListener('click', () => { if (!saving) closePaste(); });
+      pasteBtn.addEventListener('click', addPasted);
+      updatePaste();
+      pasteBox.focus();
     }
+    SBS.onLeaveScreen(() => closePaste());
 
     function updatePaste() {
       if (!pasteCard) return;
@@ -787,9 +807,10 @@
         return afterGameChange();
       }
       replaceGame(game, r.game);
-      pasteBox.value = '';
       pasteDraft = { id: null, text: '' };
-      pasteNote = added ? `Added ${added.rows.length} player${added.rows.length === 1 ? '' : 's'}, ${added.total} square${added.total === 1 ? '' : 's'}.` : 'Added.';
+      pasteNote = '';
+      closePaste();
+      addedNote.textContent = added ? `Added ${added.rows.length} player${added.rows.length === 1 ? '' : 's'}, ${added.total} square${added.total === 1 ? '' : 's'}.` : 'Added.';
       afterGameChange();
     }
 
@@ -839,7 +860,6 @@
       [wideQuery, narrowQuery].forEach(q => { if (q.removeEventListener) q.removeEventListener('change', placeCards); else q.removeListener(placeCards); });
       app.classList.remove('fit-screen');
     });
-    setMode(view.mode);
     drawPlayers();
     drawPicksRow();
     updatePaste();
@@ -894,7 +914,7 @@
       if (document.querySelector('.pick-dialog, .connect-layer')) return true;
       const a = document.activeElement;
       if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && a.type !== 'checkbox' && main.contains(a)) return true;
-      return !!nameInput.value || !!countInput.value || !!(pasteBox && pasteBox.value);
+      return !!nameInput.value || !!countInput.value;
     }
 
     // Poll for changes made on another device (the iPad and the PC are often
