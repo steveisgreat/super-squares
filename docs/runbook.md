@@ -113,10 +113,10 @@ needs a change there. On previews it blocks the Vercel toolbar, which is expecte
   `/tv` on the preview (rewrite in `vercel.json`).
 - **Before the push that ships R24:** apply `migrations/006_scorer_grants.sql` to production
   (decision 018). Only the scorer-phone hand-off uses it, so without it only that fails.
-- **Before the push that ships R37 (and R38, which adds no migration):** apply `migrations/010_helpers.sql` to production (decision 025). Only helper
+- **R37 (and R38, which adds no migration):** `migrations/010_helpers.sql` was applied to production on 2026-11-25, before the push (decision 025). Only helper
   features use it, so without it only those fail (the host's Helpers screen says so). A phone holding a scorer code
-  from before needs a new one, so don't ship R37 on a game day. Apply it to the
-  `ci-tests` branch first, or CI's Postgres tests fail. Rollback needs no database change.
+  from before needs a new one, so don't ship R37 on a game day. It was applied to
+  `ci-tests` the same day and the Postgres suites pass there. Rollback needs no database change.
 - **R33:** `migrations/007_host_themes.sql` was applied to production on 2026-11-24
   (decision 021). Without it every board shows the default theme and choosing one answers 503.
 - **R13:** `migrations/008_referrals.sql` alters the tables of 002, which production doesn't have
