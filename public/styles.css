@@ -416,7 +416,7 @@ h3 { font-family: var(--serif); font-size: 1.15rem; color: var(--text); font-wei
   text-transform: uppercase;
   color: var(--muted);
 }
-.league-badge.league-other { background: var(--good-soft); color: var(--good); padding: 4px 12px; border-radius: 999px; }
+.league-badge.league-nfl, .league-badge.league-other { background: var(--good-soft); color: var(--good); padding: 4px 12px; border-radius: 999px; }
 .league-badge-logo { height: 20px; width: auto; display: block; }
 
 .archive-wrap { margin-top: 4px; }

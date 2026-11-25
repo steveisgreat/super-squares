@@ -555,9 +555,9 @@
   function leagueLabel(league) { return LEAGUE_LABELS[leagueKey(league)]; }
 
   // League-level (not team-level) logos, from the same ESPN CDN as the team
-  // logos above. 'other' has no logo at all — its badge is just the word.
+  // logos above. The NFL shield is left out on purpose (decision 013): its badge, like
+  // 'other', is just the word.
   const LEAGUE_LOGO_URL = {
-    nfl: 'https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png',
     nba: 'https://a.espncdn.com/i/teamlogos/leagues/500/nba.png'
   };
 
