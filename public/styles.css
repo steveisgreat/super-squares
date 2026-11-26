@@ -286,6 +286,15 @@ html, body {
    the outer one with the top of the screen out of reach. (clip, unlike hidden, makes no scroller.) */
 html { height: 100%; overflow-x: hidden; }
 body { min-height: 100%; overflow-x: clip; }
+/* Scrollbars wear the theme everywhere: the page and every overflow:auto box (lists, sheets,
+   dialogs, side panes). scrollbar-color inherits, so this one rule covers them all, and each
+   [data-theme] swaps the tokens. Chrome, Edge and Firefox use the standard properties (and then
+   ignore the ::-webkit rules); Safari uses the ::-webkit rules. */
+html { scrollbar-color: var(--border-strong) transparent; }
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border: 3px solid transparent; border-radius: 6px; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--accent); }
 /* Same ambient glow the TV Grid View uses, now behind every screen — two
    soft, fixed radial blobs well below the content so they read as
    atmosphere, not a background image. */
