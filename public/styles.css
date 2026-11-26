@@ -540,7 +540,7 @@ button.full-width { width: 100%; text-align: center; }
 button:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
 
 label { display: block; margin: 14px 0 6px; font-weight: 500; color: var(--muted); font-size: var(--fs-sm); }
-input[type=text], input[type=email], input[type=number], input[type=date], input[type=datetime-local], select {
+input[type=text], input[type=email], input[type=password], input[type=number], input[type=date], input[type=datetime-local], select {
   width: 100%;
   padding: 11px 12px;
   border-radius: var(--radius);
@@ -3682,11 +3682,15 @@ button.eg-side strong { font-size: var(--fs-lg); }
 /* Edit game as a popup (screen-edit.js openPopup): a centered dialog from 768 px, a full-screen sheet
    below. The head and foot stay put; only the body scrolls. */
 html.eg-lock { overflow: hidden; }
-.eg.eg-popup { flex: none; width: 100%; max-width: 720px; min-height: 0; height: auto; max-height: 90vh; max-height: 90dvh; overflow: hidden; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); }
+/* A window like every other dialog (.card, .sp-sheet): the panel color with the strong border, not the
+   page background. Its sections sit one step up, and the note one more. */
+.eg.eg-popup { flex: none; width: 100%; max-width: 720px; min-height: 0; height: auto; max-height: 90vh; max-height: 90dvh; overflow: hidden; background: var(--panel); border: 1px solid var(--border-strong, var(--border)); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); }
 .eg-popup:focus { outline: none; }
-.eg-popup .eg-head { position: static; padding-top: 10px; flex: none; }
+.eg-popup .eg-head { position: static; padding-top: 10px; flex: none; background: var(--panel); }
 .eg-popup .eg-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.eg-popup .eg-foot { position: static; flex: none; padding-bottom: 14px; }
+.eg-popup .eg-foot { position: static; flex: none; padding-bottom: 14px; background: var(--panel); }
+.eg-popup .eg-sec { background: var(--panel2); }
+.eg-popup .eg-note { background: var(--panel3); }
 @media (max-width: 767px) {
   .eg-overlay { padding: 0 !important; }
   .eg.eg-popup { max-width: none; height: 100vh; height: 100dvh; max-height: none; border: 0; border-radius: 0; }

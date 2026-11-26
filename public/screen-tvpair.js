@@ -179,7 +179,7 @@
       <section class="room-opt" aria-labelledby="room-help-h">
         <h4 id="room-help-h">Helpers</h4>
         <p><strong>Give someone a job.</strong> Their phone can keep score or manage squares on this board. No account needed.</p>
-        <div class="room-row"><button type="button" id="room-helpers" class="secondary">Helpers</button></div>
+        <div class="room-row"><button type="button" id="room-helpers">Helpers</button></div>
       </section>`;
     overlay.appendChild(box);
     document.body.appendChild(overlay);
