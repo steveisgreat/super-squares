@@ -202,6 +202,9 @@
 
   // The Edit game panel open on a wide Game Day: { id, state } (screen-edit.js).
   let gdEdit = null;
+  // Removes the layout listeners of the last wide render. A redraw in place (after a score save)
+  // runs no screen cleanups, so without this each one would add another pair.
+  let unplaceCards = null;
 
   function renderBoard(game) {
     const app = SBS.appEl;
@@ -944,10 +947,17 @@
         fitTeamBadges(boardHolder);
         SBS.board.fitNames(boardHolder);
       };
+      if (unplaceCards) unplaceCards();
       [wideQuery, fineQuery].forEach(m => { if (m.addEventListener) m.addEventListener('change', placeCards); else m.addListener(placeCards); });
-      SBS.onLeaveScreen(() => {
-        gdEdit = null;
+      unplaceCards = () => {
         [wideQuery, fineQuery].forEach(m => { if (m.removeEventListener) m.removeEventListener('change', placeCards); else m.removeListener(placeCards); });
+        unplaceCards = null;
+      };
+      SBS.onLeaveScreen(() => {
+        // Reopening this same board (after Manage players) keeps the open form and its changes.
+        const next = SBS.getRoute();
+        if (!(next && next.screen === 'board' && next.game && next.game.id === game.id)) gdEdit = null;
+        if (unplaceCards) unplaceCards();
         app.classList.remove('fit-screen');
       });
       if (wideQuery.matches) placeCards();

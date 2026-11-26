@@ -173,7 +173,13 @@
           return valueOf(b, 'scoring') === 'live' ? probe({ teamA: b.teamA === 'Probe A' ? 'Probe B' : 'Probe A' }) : null;
         case 'kickoffTime': return probe({ kickoffTime: '2000-01-01T00:00:00.000Z' });
         case 'swap': return probe({ swap: true });
-        case 'squarePrice': case 'payouts': return probe({ squarePrice: price >= 1 ? price - 0.01 : price + 0.01 });
+        case 'squarePrice': case 'payouts': {
+          // Both ways: one cent the wrong way can drop a quarter below zero on a board with a
+          // small total pot, which is that amount's refusal, not the stage's.
+          const up = probe({ squarePrice: Math.round((price + 0.01) * 100) / 100 });
+          if (!up || price < 0.01) return up;
+          return probe({ squarePrice: Math.round((price - 0.01) * 100) / 100 });
+        }
         case 'potOverride': return probe({ potOverride: Math.round(potOf(b)) + 1000000 });
         case 'autoCutoffEnabled': case 'autoCutoffTime': return probe({ autoCutoffEnabled: !valueOf(b, 'autoCutoffEnabled') });
         case 'pickMode': return probe({ pickMode: valueOf(b, 'pickMode') === 'auto' ? 'both' : 'auto' });
@@ -216,6 +222,10 @@
       }
       if (m.autoCutoffEnabled && !m.autoCutoffTime && (draft.autoCutoffEnabled || draft.autoCutoffTime)) {
         return { error: 'Choose a cutoff date and time, or turn auto cutoff off.' };
+      }
+      if (draft.guestPick && m.guestPick.on) {
+        const max = m.guestPick.max;
+        if (!Number.isInteger(max) || max < 1 || max > 100) return { error: 'Most squares per person must be a whole number from 1 to 100.' };
       }
       const r = judge(operation(false));
       if (r.error) return { error: r.error };
@@ -337,10 +347,14 @@
     }
 
     // Another device changed a field the host changed here: theirs or mine, for that field only.
-    function conflict(field) {
+    function conflict(field, message) {
       const swapped = draft.swap && (field === 'teamA' || field === 'teamB');
       const key = swapped ? 'swap' : field;
-      if (!draft[key]) return;
+      // Nothing here to choose between: say why the save stopped rather than nothing at all.
+      if (!key || !draft[key]) {
+        state.error = message || 'This game was changed on another device. Check it and try again.';
+        return draw();
+      }
       const group = draft[key].group;
       const keys = group ? Object.keys(draft).filter(k => draft[k].group) : [key];
       const name = LABEL[group ? 'game' : key];
@@ -416,7 +430,7 @@
       else if (e.code !== 'conflict' && e.code !== 'unacked' && e.code !== 'marks') state.error = e.message;
       draw();
       if (lost) return;
-      if (e.code === 'conflict') return conflict(e.field);
+      if (e.code === 'conflict') return conflict(e.field, e.message);
       if (e.code === 'unacked' || e.code === 'marks') {
         const p = preview();
         if (!p.empty && !p.error) review(p, { warnings: e.warnings, marks: e.code === 'marks' });
