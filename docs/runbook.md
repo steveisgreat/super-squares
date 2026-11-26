@@ -120,8 +120,8 @@ needs a change there. On previews it blocks the Vercel toolbar, which is expecte
 - **R39:** `migrations/011_board_changes.sql` was applied to production on 2026-11-26, before the push
   (decision 025; applied to `ci-tests` 2026-11-25). Without it nothing fails: changes are not recorded and the host's list stays empty.
   It only adds a table.
-- **Before the push that ships R45a:** apply `migrations/012_usage_counters.sql` to production (applied to `ci-tests`
-  2026-11-26; decision 027). Without it nothing fails: no service counts are kept and the admin page shows none. It only adds a
+- **R45a:** `migrations/012_usage_counters.sql` was applied to production on 2026-11-26, before the push (and to `ci-tests`;
+  decision 027). `ADMIN_EMAILS` is set on Vercel Production. `#admin` opens only in accounts mode, so it refuses everyone until R2. Without it nothing fails: no service counts are kept and the admin page shows none. It only adds a
   table. Set `ADMIN_EMAILS` on Vercel (Production) to Steve's sign-in email; unset means nobody can open `#admin`.
 - **R33:** `migrations/007_host_themes.sql` was applied to production on 2026-11-24
   (decision 021). Without it every board shows the default theme and choosing one answers 503.
