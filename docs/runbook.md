@@ -62,8 +62,8 @@ start. Do not add a keepalive or scheduled ping.
 Once, after R16 (sending domain). R10's firewall rule is already live (below).
 
 1. Deploy with `AUTH_MODE` unset. Password mode keeps working.
-2. Apply `migrations/002_host_accounts.sql`, then `008_referrals.sql` and `009_host_consent.sql`
-   (both alter the tables 002 makes). **Without 008 and 009 every sign-in fails.** Check that
+2. Apply `migrations/002_host_accounts.sql`, then `008_referrals.sql`, `009_host_consent.sql` and
+   `013_heard_about_us.sql` (all alter the tables 002 makes). **Without 008, 009 and 013 every sign-in fails.** Check that
    `TERMS_VERSION` in `lib/auth.js` is the reviewed version, not a `draft-` one.
 3. `node --env-file=.env.local scripts/assign-owner.js <email>` prints the database host
    and the counts. Check both, then run it again with `--apply`.
@@ -123,10 +123,11 @@ needs a change there. On previews it blocks the Vercel toolbar, which is expecte
 - **R45a:** `migrations/012_usage_counters.sql` was applied to production on 2026-11-26, before the push (and to `ci-tests`;
   decision 027). `ADMIN_EMAILS` is set on Vercel Production. `#admin` opens only in accounts mode, so it refuses everyone until R2. Without it nothing fails: no service counts are kept and the admin page shows none. It only adds a
   table. Set `ADMIN_EMAILS` on Vercel (Production) to Steve's sign-in email; unset means nobody can open `#admin`.
-- **R45c:** `migrations/013_heard_about_us.sql` must be applied to production **before** the push that
-  ships R45c (applied to `ci-tests` 2026-11-26). Sign-in writes `login_requests.src` and `hosts.src`, and
-  `#admin` reads the new `hosts` columns, so both fail without it once accounts mode is on. It only adds
-  columns. Optional env (Production only) for the Database and Hosting cards: `NEON_API_KEY` +
+- **R45c:** `migrations/013_heard_about_us.sql` alters the tables of 002, which production doesn't have
+  yet (checked 2026-11-26), so it goes on with them: "Turn on host accounts", step 2. Applied to
+  `ci-tests` 2026-11-26. Sign-in writes `login_requests.src` and `hosts.src`, and `#admin` reads the new
+  `hosts` columns, so both fail without it once accounts mode is on. Password mode never reads them. It
+  only adds columns. Optional env (Production only) for the Database and Hosting cards: `NEON_API_KEY` +
   `NEON_PROJECT_ID` (`misty-lake-58761091`), `VERCEL_API_TOKEN` + `VERCEL_PROJECT_ID` + `VERCEL_TEAM_ID`
   (from `.vercel/project.json`). Neither provider offers a read-only key (see decision 027 section 5).
 - **R33:** `migrations/007_host_themes.sql` was applied to production on 2026-11-24
