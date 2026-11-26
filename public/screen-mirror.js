@@ -284,7 +284,7 @@
         if (res.a === null || res.b === null) {
           statusTxt = 'Awaiting';
         } else if (res.resolved && res.pushed) {
-          statusTxt = 'PUSH'; statusCls = 'push';
+          statusTxt = SBS.board.pushText(computed.results, q); statusCls = 'push';
         } else if (res.resolved && res.winnerName) {
           statusTxt = res.winnerName; statusCls = 'win';
           if (res.autoResolved) {

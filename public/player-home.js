@@ -91,7 +91,7 @@
       if (res.a === null || res.b === null) {
         winnerTxt = 'Not yet'; winnerCls = 'ph-pending';
       } else if (res.resolved && res.pushed) {
-        winnerTxt = 'Push (rolled over)'; winnerCls = 'ph-pending';
+        winnerTxt = SBS.board.pushText(computed.results, q); winnerCls = 'ph-push';
       } else if (res.resolved && res.winnerName) {
         const mine = res.winnerName === me;
         winnerTxt = `${escapeHtml(res.winnerName)} &middot; ${money(res.amount)}`;

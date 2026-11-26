@@ -254,7 +254,7 @@
         li.appendChild(textEl('span', 'sp-val', ended ? `${r.a}–${r.b}` : '–'));
         const who = textEl('span', 'sp-who', '');
         if (ended) {
-          who.textContent = r.winnerName ? `${r.winnerName} wins ${money(GL.payoutAmount(r))}` : r.pushed ? 'PUSH' : r.needsDraw ? 'Needs a draw' : '';
+          who.textContent = r.winnerName ? `${r.winnerName} wins ${money(GL.payoutAmount(r))}` : r.pushed ? SBS.board.pushText(c.results, q) : r.needsDraw ? 'Needs a draw' : '';
           if (!r.winnerName) who.classList.add('is-push');
         }
         li.appendChild(who);

@@ -621,44 +621,7 @@ input[type=color] {
 .actions { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
 
 /* --- Step 2: Picking --- */
-.stat-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.stat-box {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-card);
-  padding: 4px 18px;
-  text-align: center;
-  transition: border-color 0.12s ease;
-}
-.stat-box .val { font-variant-numeric: tabular-nums; font-size: 1.7rem; font-weight: 700; color: var(--accent); letter-spacing: -0.01em; line-height: 1.1; }
-.stat-box .lbl { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-top: 0; line-height: 1.1; }
-.stat-box.warn { border-left-color: var(--danger); }
-.stat-box.warn .val { color: var(--danger); }
-.stat-box.clickable { cursor: pointer; }
-.stat-box.clickable:hover { border-color: var(--accent); }
-.stat-box input.val-input {
-  font-family: inherit;
-  background: transparent;
-  border: none;
-  border-bottom: 1px dashed var(--border-strong);
-  border-radius: 0;
-  text-align: center;
-  width: 100%;
-  padding: 0 0 2px;
-}
-.stat-box input.val-input:focus { border-bottom-color: var(--accent); box-shadow: none; }
-.pot-edited-tag { text-transform: none; color: var(--accent-hi); font-weight: 600; }
-
-.pot-input-wrap { display: flex; align-items: baseline; justify-content: center; gap: 2px; }
-.pot-input-wrap .pot-currency { font-size: 1.7rem; font-weight: 700; color: var(--accent); }
-.pot-input-wrap input.val-input { width: auto; max-width: 100px; flex: 0 1 auto; }
+.pot-edited-tag { color: var(--accent-hi); font-size: 0.7rem; font-weight: 600; }
 
 .pick-layout {
   display: grid;
@@ -1344,7 +1307,7 @@ body.tv-fullscreen .tv-kickoff-clock { font-size: 2rem; }
 .tv-screen .tvq-status { font-size: 0.82rem; }
 @media (min-width: 1024px) { .tv-screen .tvq-status { font-size: 1rem; } }
 .tv-qchip.win .tvq-status { color: var(--good); font-weight: 700; }
-.tv-qchip.push .tvq-status { color: var(--warn); font-weight: 700; }
+.tv-qchip.push .tvq-status { color: var(--warn); font-weight: 700; white-space: normal; }
 body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
 
 /* --- EXPERIMENTAL: Neon glassmorphism theme for the TV Grid View's grid
@@ -2244,6 +2207,7 @@ body.player-mode #app { padding: 0; }
 .ph-winner { flex: 1; text-align: right; font-weight: 600; }
 .ph-winner.ph-mine { color: var(--good); font-weight: 800; }
 .ph-winner.ph-pending { color: var(--muted); font-weight: 500; }
+.ph-winner.ph-push { color: var(--warn); font-weight: 500; }
 .ph-drawn { font-weight: 500; opacity: 0.75; font-size: 0.85em; }
 
 /* ---- The score pad (score-panel.js, decision 025) ---- */
@@ -2312,7 +2276,7 @@ button.sp-link:hover { color: var(--text); }
 .sp-q { font-weight: 700; color: var(--muted); }
 .sp-val { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .sp-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sp-who.is-push { color: var(--danger); }
+.sp-who.is-push { color: var(--warn); white-space: normal; }
 button.sp-fix { min-height: 44px; min-width: 44px; padding: 0 6px; background: none; border: 0; box-shadow: none; color: var(--accent); font-size: 0.95rem; font-weight: 700; }
 button.sp-fix:hover { background: var(--panel2); }
 .sp-sheet { width: 100%; max-width: 420px; margin: 5vh 0 0; padding: 18px; border-radius: 14px; border: 1px solid var(--border-strong, var(--border)); box-shadow: var(--shadow-pop); display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; }
@@ -2323,7 +2287,7 @@ button.sp-fix:hover { background: var(--panel2); }
 .sp-sheet-score strong { font-size: 2.2rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .sp-dash { color: var(--muted); }
 .sp-sheet-note { padding: 12px; border-radius: 10px; background: var(--good-soft); color: var(--good); text-align: center; font-size: 1.1rem; font-weight: 700; overflow-wrap: anywhere; }
-.sp-sheet-note.is-push { background: var(--danger-soft); color: var(--danger); }
+.sp-sheet-note.is-push { background: var(--warn-soft); color: var(--warn); }
 .sp-sheet-warn { padding: 8px 12px; border-radius: 8px; background: var(--warn-soft); border: 1px solid var(--warn); }
 .sp-sheet-small { color: var(--muted); font-size: 0.95rem; line-height: 1.35; }
 .sp-sheet-live { color: var(--text); min-height: 2.6em; }
@@ -2374,7 +2338,6 @@ button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color:
 .gd-phone .cell .name-txt { font-size: 0.5rem; padding-top: 6px; line-height: 1; overflow: hidden; max-width: 100%; white-space: nowrap; text-overflow: ellipsis; }
 .gd-phone .cell .badge { font-size: 0.45rem; padding: 0 2px; }
 .gd-phone .cell .badges { top: 0; right: 1px; }
-.gd-phone .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 /* ---- Join code card, share button (R22) ---- */
 .join-code { font-size: clamp(2rem, 11vw, 3rem); font-weight: 800; letter-spacing: 0.18em; padding-left: 0.18em; color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1.1; }
@@ -2834,6 +2797,19 @@ button.lock-btn:hover { background: var(--accent-soft); color: var(--accent-hi);
 .board-stat { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; padding: 6px 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); text-align: center; }
 .board-stat .lbl { white-space: nowrap; }
 .board-stat.is-pot .val { color: var(--accent); }
+/* Game Day's tiles: the pot is typed into, and what is unpaid opens Manage Players. */
+label.board-stat { margin: 0; }
+.board-stat .pot-line { display: flex; align-items: baseline; justify-content: center; max-width: 100%; }
+.board-stat input.val-input {
+  width: 4ch; height: 1.15em; min-width: 0; min-height: 0; padding: 0;margin: 0; background: transparent; border: 0; border-bottom: 1px dashed var(--border-strong);
+  border-radius: 0; box-shadow: none; color: var(--accent); font: inherit; line-height: inherit; text-align: left; -moz-appearance: textfield; appearance: textfield;
+}
+.board-stat input.val-input::-webkit-outer-spin-button, .board-stat input.val-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.board-stat input.val-input:focus { border-bottom-color: var(--accent); box-shadow: none; }
+.board-stat.clickable { cursor: pointer; }
+.board-stat.clickable:hover { border-color: var(--accent); }
+.board-stat.is-unpaid.warn { border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.board-stat.is-unpaid.warn .val { color: var(--danger); }
 .pick-fill .board-card { padding: 14px; }
 .pick-fill .board-legend { justify-content: space-between; gap: 16px; margin-top: 12px; font-weight: 500; }
 .legend-unpaid { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
@@ -2845,14 +2821,9 @@ button.lock-btn:hover { background: var(--accent-soft); color: var(--accent-hi);
 .pick-fill:not(:where(.is-wide)) .teamB-label { padding: 3px 10px; font-size: 1.05rem; }
 .pick-fill:not(:where(.is-wide)) .teamA-label { padding: 10px 3px; }
 .pick-fill:not(:where(.is-wide)) .teamA-label-text { font-size: 1.05rem; }
-.pick-fill:not(:where(.is-wide)) .board-table { background: transparent; gap: 3px; padding: 0; }
-.pick-fill:not(:where(.is-wide)) .cell { border-radius: 6px; background: var(--cell-empty); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07); }
-.pick-fill:not(:where(.is-wide)) .cell.head { background: var(--panel3); box-shadow: none; }
-.pick-fill:not(:where(.is-wide)) .cell.head.pending { color: var(--muted); font-weight: 700; }
-.pick-fill:not(:where(.is-wide)) .cell.head.corner { background: transparent; }
+.pick-fill:not(:where(.is-wide)) .cell:not(:where(.head)) { background: var(--cell-empty); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07); }
 .pick-fill:not(:where(.is-wide)) .cell.filled { box-shadow: inset 0 0 0 1px var(--border-strong); }
 @supports (color: color-mix(in srgb, red 50%, blue)) {
-  .pick-fill:not(:where(.is-wide)) .cell.head.pending { background: color-mix(in srgb, var(--axis, var(--panel3)) 45%, var(--panel2)); color: var(--text); }
   .pick-fill:not(:where(.is-wide)) .cell.filled { background: color-mix(in srgb, var(--who, var(--panel3)) 16%, var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--who, var(--accent)) 38%, transparent); }
 }
 .pick-fill .cell .name-txt { max-width: 100%; overflow: hidden; text-overflow: ellipsis; word-break: normal; font-weight: 600; }
@@ -2871,7 +2842,8 @@ button.grid-btn { display: none; min-height: 48px; margin-top: 8px; font-size: 1
 /* ---- The phone's three tabs ---- */
 .pick-fill.is-tabbed { gap: 10px; max-width: 560px; }
 .is-tabbed .board-head { gap: 6px; margin: 0; }
-.is-tabbed .board-stat .val { font-size: 1.15rem; }
+.is-tabbed .board-stat .val, .gd-phone .board-stat .val { font-size: 1.15rem; }
+.gd-phone .board-head { gap: 6px; margin: 0 0 10px; }
 .is-tabbed > .pick-tabs { margin: 0; padding: 0; }
 .is-tabbed > .pick-tabs .gd-tab { min-height: 48px; padding: 0 4px; white-space: nowrap; }
 .is-tabbed > .board-card { padding: 10px 8px; }
@@ -3463,12 +3435,12 @@ label.theme-card.is-chosen .theme-check { display: inline-flex; }
 .gd-q-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .gd-q-amt { font-size: 0.8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gd-q-who.is-dim .gd-q-name { color: var(--muted); font-weight: 500; }
-.gd-q-who.is-push .gd-q-name { color: var(--danger); }
+.gd-q-who.is-push .gd-q-name { color: var(--warn); white-space: normal; }
 button.gd-pay { min-height: 44px; padding: 0 12px; border-radius: 22px; font-size: 0.82rem; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; box-shadow: none; }
 button.gd-pay.is-owed { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
 button.gd-pay.is-paid { background: var(--good-soft); color: var(--good); border-color: var(--good); }
 .gd-q-note { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; padding: 0 0 10px; color: var(--muted); font-size: 0.88rem; line-height: 1.35; }
-.gd-q-note.is-push { color: var(--danger); }
+.gd-q-note.is-push { color: var(--warn); }
 .gd-q-note.is-settle { margin-bottom: 10px; padding: 8px 10px; background: var(--warn-soft); border: 1px solid var(--warn); border-radius: 8px; color: var(--warn); }
 .gd-q-msg { flex: 1 1 12em; min-width: 0; overflow-wrap: anywhere; }
 /* A narrow panel: Mark paid out moves under the score, so the winner's name keeps its room. */
@@ -3512,10 +3484,11 @@ button.gd-pay.is-paid { background: var(--good-soft); color: var(--good); border
 .pick-fill.is-tabbed .cell.head.corner, .gd-phone .cell.head.corner { background: var(--panel); }
 .pick-fill.is-tabbed .cell.filled, .gd-phone .cell.filled { background: var(--panel3); box-shadow: none; }
 @supports (color: color-mix(in srgb, red 50%, blue)) {
-  .pick-fill.is-tabbed .cell.head:not(.corner), .gd-phone .cell.head:not(.corner) { background: color-mix(in srgb, var(--axis, var(--panel3)) 45%, var(--panel2)); color: var(--text); }
   .pick-fill.is-tabbed .cell.filled, .gd-phone .cell.filled { background: color-mix(in srgb, var(--who, var(--muted)) 24%, var(--panel)); }
   .is-tabbed .cell .name-txt, .gd-phone .cell .name-txt { color: color-mix(in srgb, var(--nc, var(--text)) 60%, #fff); }
 }
+/* Picking's "?" is the drawn numbers' square, only quieter. */
+.pick-fill .board-table .cell.head.pending { color: var(--muted); text-shadow: none; }
 .gd-phone .cell.pushed { background: #2b1515; }
 .pick-fill.is-tabbed .cell.empty-pick:hover, .pick-fill.is-tabbed .cell.is-tappable:hover { box-shadow: inset 0 0 0 2px var(--pick-color, var(--accent)); }
 .pick-fill.is-tabbed .cell.empty-pick[role=button].selected { background: var(--pick-color, var(--accent)); box-shadow: none; }

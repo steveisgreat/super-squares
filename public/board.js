@@ -16,6 +16,17 @@
     return otNum > 1 ? `${otNum}OT` : 'OT';
   }
 
+  // "Push, rolls to Q2" for a pushed quarter, read from computeGame(...).results. As compute.js
+  // carries it: the money passes through later pushes to the next quarter that pays (or is waiting
+  // for the final draw), else, with none scored yet, to the first one still to be scored.
+  function pushText(results, q) {
+    const { QUARTERS, QLABEL } = window.GameLogic;
+    const later = QUARTERS.slice(QUARTERS.indexOf(q) + 1);
+    const to = later.find(k => !results[k].pushed && (results[k].resolved || results[k].needsDraw))
+      || later.find(k => !results[k].resolved);
+    return to ? `Push, rolls to ${to === 'final' ? 'Final' : QLABEL[to]}` : 'Push';
+  }
+
   // "updated 3 min ago" for a manual score. The text is refreshed in place
   // every 20 seconds by the client-side timer below, so it stays honest
   // between polls without any server work.
@@ -217,16 +228,12 @@
     const tappable = [];
 
     table.appendChild(el('div', 'cell head corner', ''));
-    // "?" until the lock draws the numbers, on a tint of the team the axis belongs to.
-    const head = (axis, side) => {
-      const h = el('div', `cell head ${axis} pending`, '?');
-      h.style.setProperty('--axis', teamColor(game, side));
-      return h;
-    };
-    for (let c = 0; c < 10; c++) table.appendChild(head('x', 'B'));
+    // "?" until the lock draws the numbers, in the same header square the numbers use.
+    const head = (axis) => el('div', `cell head ${axis} pending`, '?');
+    for (let c = 0; c < 10; c++) table.appendChild(head('x'));
 
     for (let r = 0; r < 10; r++) {
-      table.appendChild(head('y', 'A'));
+      table.appendChild(head('y'));
       for (let c = 0; c < 10; c++) {
         const idx = r * 10 + c;
         const sq = game.squares[idx];
@@ -322,16 +329,12 @@
     const table = el('div', 'board-table');
 
     table.appendChild(el('div', 'cell head corner', ''));
-    // --axis and --who carry the team and player colors; the phone grid tints its squares with them.
-    const head = (axis, side, nums, i) => {
-      const h = el('div', `cell head ${axis}` + (nums ? '' : ' pending'), nums ? escapeHtml(nums[i]) : '–');
-      h.style.setProperty('--axis', teamColor(game, side));
-      return h;
-    };
-    for (let c = 0; c < 10; c++) table.appendChild(head('x', 'B', game.axisX, c));
+    // --who carries the player's color; the phone grid tints its squares with it.
+    const head = (axis, nums, i) => el('div', `cell head ${axis}` + (nums ? '' : ' pending'), nums ? escapeHtml(nums[i]) : '–');
+    for (let c = 0; c < 10; c++) table.appendChild(head('x', game.axisX, c));
 
     for (let r = 0; r < 10; r++) {
-      table.appendChild(head('y', 'A', game.axisY, r));
+      table.appendChild(head('y', game.axisY, r));
       for (let c = 0; c < 10; c++) {
         const sq = game.squares[r * 10 + c];
         const labels = computed.cellLabels[`${r}-${c}`] || [];
@@ -457,5 +460,5 @@
     axisResizeTimer = setTimeout(() => { document.querySelectorAll('.pick-fill .board-grid-outer').forEach(syncCornerInsets); fitAxisLabels(document); fitNames(document); }, 120);
   });
 
-  SBS.board = { tapNames, quarterText, renderPickBoard, renderFullBoard, renderLiveScoreBar, syncCornerInsets, fitAxisLabels, fitNames, periodLabel };
+  SBS.board = { tapNames, quarterText, renderPickBoard, renderFullBoard, renderLiveScoreBar, syncCornerInsets, fitAxisLabels, fitNames, periodLabel, pushText };
 })();

@@ -257,33 +257,30 @@
     const computed = computeGame(game);
 
     const isPotEdited = game.potOverride !== null && game.potOverride !== undefined && game.potOverride !== '';
-    const strip = el('div', 'stat-strip');
+    const strip = el('div', 'board-head');
     const filled = game.squares.filter(s => s).length;
     const unpaidNow = unpaidTotal(game);
     strip.innerHTML = `
-      <div class="stat-box">
-        <div class="pot-input-wrap">
-          <span class="pot-currency">$</span>
-          <input type="number" id="pot-input" class="val val-input" min="0" step="1" value="${Math.round(computed.pot)}">
-        </div>
-        <div class="lbl">Total Pot${isPotEdited ? ' <span class="pot-edited-tag">(edited)</span>' : ''}</div>
-      </div>
-      <div class="stat-box"><div class="val">${filled}</div><div class="lbl">Squares Sold</div></div>
-      <div class="stat-box"><div class="val">${money(game.squarePrice)}</div><div class="lbl">Per Square</div></div>
-      <div class="stat-box ${unpaidNow > 0 ? 'warn' : ''} clickable" id="unpaid-stat"><div class="val">${money(unpaidNow)}</div><div class="lbl">Unpaid Total</div></div>
+      <div class="board-stat is-sold"><span class="val" data-v="sold">${filled}</span><span class="lbl">Sold</span></div>
+      <label class="board-stat is-pot"><span class="val pot-line">$<input type="number" id="pot-input" class="val-input" min="0" step="1" value="${Math.round(computed.pot)}"></span><span class="lbl">Pot${isPotEdited ? ' <span class="pot-edited-tag">(edited)</span>' : ''}</span></label>
+      <div class="board-stat is-price"><span class="val">${money(game.squarePrice)}</span><span class="lbl">Per square</span></div>
+      <div class="board-stat is-unpaid${unpaidNow > 0 ? ' warn' : ''} clickable" id="unpaid-stat"><span class="val" data-v="unpaid">${money(unpaidNow)}</span><span class="lbl">Unpaid</span></div>
     `;
     main.appendChild(strip);
     strip.querySelector('#unpaid-stat').addEventListener('click', () => openManagePlayersModal(game, reopen));
+    // The box is as wide as the number in it, so the "$" sits against it.
+    const stripPot = strip.querySelector('#pot-input');
+    const sizeStripPot = () => { stripPot.style.width = Math.max(1, stripPot.value.length) + 'ch'; };
+    stripPot.addEventListener('input', sizeStripPot);
+    sizeStripPot();
     // Brings the numbers up to date in place (a poll, a Paid pill). The pot box is left alone while
     // the host is typing in it.
     function drawStrip() {
-      const boxes = strip.querySelectorAll('.stat-box');
-      boxes[1].querySelector('.val').textContent = String(game.squares.filter(sq => sq).length);
+      strip.querySelector('[data-v="sold"]').textContent = String(game.squares.filter(sq => sq).length);
       const unpaid = unpaidTotal(game);
-      boxes[3].querySelector('.val').textContent = money(unpaid);
-      boxes[3].classList.toggle('warn', unpaid > 0);
-      const potIn = strip.querySelector('#pot-input');
-      if (document.activeElement !== potIn) potIn.value = String(Math.round(computeGame(game).pot));
+      strip.querySelector('[data-v="unpaid"]').textContent = money(unpaid);
+      strip.querySelector('#unpaid-stat').classList.toggle('warn', unpaid > 0);
+      if (document.activeElement !== stripPot) { stripPot.value = String(Math.round(computeGame(game).pot)); sizeStripPot(); }
     }
 
     // Blanking the field clears the override and falls back to the actual
@@ -528,7 +525,9 @@
       const pay = pays[q];
       const scored = res.a !== null && res.b !== null;
       const digits = res.autoResolved ? drawnDigits(game, res) : null;
-      const sig = JSON.stringify([res.a, res.b, res.resolved, res.pushed, res.needsDraw, res.winnerName, res.autoResolved, digits, res.amount, res.carryIn, pay.state, pay.name, pay.amount, pay.paid, game.status, i === firstPending]);
+      // Scoring a later quarter changes where an earlier push rolls, so the phrase is in the signature.
+      const push = res.pushed ? SBS.board.pushText(c.results, q) : '';
+      const sig = JSON.stringify([push, res.a, res.b, res.resolved, res.pushed, res.needsDraw, res.winnerName, res.autoResolved, digits, res.amount, res.carryIn, pay.state, pay.name, pay.amount, pay.paid, game.status, i === firstPending]);
       if (sig === r.sig) return;
       r.sig = sig;
       const act = document.activeElement;
@@ -546,9 +545,9 @@
         if (game.status === 'started' && i === firstPending) { who = 'In play'; whoCls = ' is-dim'; }
         if (res.carryIn > 0) note = `Includes ${money(res.carryIn)} rolled over from an earlier push. It goes to whichever quarter is scored next.`;
       } else if (res.resolved && res.pushed) {
-        who = 'PUSH';
+        who = push;
         whoCls = ' is-push';
-        note = `PUSH: no one in that square. ${money(res.amount)} rolls into the next payout.`;
+        note = `No one in that square. ${money(res.amount)} rolls into the next payout.`;
       } else if (res.resolved && res.winnerName) {
         who = res.winnerName;
         if (res.autoResolved) note = `Auto-drawn: the square was empty${digits ? `; drawn numbers ${digits.y}-${digits.x}` : ''}.`;
@@ -1660,7 +1659,7 @@
         if (res.a === null || res.b === null) {
           statusTxt = 'Awaiting'; statusCls = 'pending';
         } else if (res.resolved && res.pushed) {
-          statusTxt = 'PUSH'; statusCls = 'push';
+          statusTxt = SBS.board.pushText(computed.results, q); statusCls = 'push';
         } else if (res.resolved && res.winnerName) {
           statusTxt = res.winnerName; statusCls = 'win';
           if (res.autoResolved) {
