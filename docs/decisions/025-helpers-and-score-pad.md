@@ -1,7 +1,7 @@
 # 025 — Helpers: two jobs on one board, inside Player View, and one score pad
 
 **Date:** 2026-11-25 · **Status:** accepted (Steve approved the two-job design and mockup
-2026-11-25); section 6 (the score pad, R36), the helpers and Score tab (R37) and the squares manager (R38) built 2026-11-25; R39 not built. The points marked *(recommended)* in section 7 can still change ·
+2026-11-25); section 6 (the score pad, R36), the helpers and Score tab (R37) and the squares manager (R38) built 2026-11-25; recent changes (R39) built 2026-11-25. The points marked *(recommended)* in section 7 can still change ·
 **Roadmap:** R36–R39 · **Related:** 008, 009, 011, 012, 015, 016, 018 (its access and lifetime rules
 are replaced when R37 ships), 019, 020
 
@@ -68,7 +68,7 @@ before lock, because a squares manager works while the board fills.
 
 ### 5. Writes: limited operations only
 A helper never gets `PUT /api/game/:id`. Authorization stays in `lib/api.js`
-(`denyUnlessOwnerOrHelper(job)`), one check per route.
+(`allowOwnerOrHelper(job)`), one check per route.
 
 - **`PATCH /api/game/:id/score`**: owner or scorekeeper. New operation `draw`: refused unless the
   final needs a draw; the server picks the square and stamps the time, so nobody's browser chooses
@@ -159,6 +159,19 @@ boxes). That is money logic: test-first.
 - Player View's tabs and welcome come from a list of jobs, so a job that ends takes only its own tab. Neither the operations nor the
   tab use the helper's own name or squares; a non-player works on a board with no squares yet. With both jobs, Continue opens Score once the
   board is started, else Players.
+
+### 11. As built: R39 (2026-11-25)
+- `GET /api/game/:id/changes` (owner only) → `{ changes: [{ id, at, helperId, label, text }] }`, newest first, at most 50.
+  The list sits under the helpers on the Helpers screen, read when it opens and after the host changes a helper there.
+- Recorded: each score and squares operation that wrote something, a helper added, joined, removed, or given other jobs.
+  Not recorded: refused operations, ones that were already so (a repeated claim or paid mark), a new code, payout
+  marks, whole-document saves, and "sign out everywhere" or a job ending by itself.
+- Who: the helper whose job let the request in. A signed-in owner whose phone also took a code is the host. With
+  sign-in off every device is the host, so there the helper cookie names the entry. A join is always the helper's.
+- The text is written once, by `lib/changes.js`, with names as they were then; it is cut to 120 characters.
+- The write is one awaited insert (with its trim) after the operation is stored, and it never throws. Without
+  migration 011 nothing is written and the list is empty. The fs backend keeps `data/<id>.changes.json`.
+- `useHelperToken` now returns the helper's `id` too.
 
 ## Consequences
 - **Deploy order:** migration 010 before R37; 011 before R39. Without them only helper features fail.

@@ -1452,7 +1452,7 @@
 
   return {
     PLAYER_COLORS, pickPlayerColor,
-    applyGuestOp, applySquaresOp, guestCap, guestNameOf, paidSquareCount, unpaidSquares, cleanGuestName, nameKey,
+    applyGuestOp, applySquaresOp, guestCap, DEFAULT_GUEST_MAX, guestNameOf, paidSquareCount, unpaidSquares, cleanGuestName, nameKey,
     THEMES, isTheme, owedSummary, paidAfterAdd, hostAddSquares, setPaidCount, pruneEmptyPlayers, unpaidGuestPicks, parsePlayerList,
     QUARTERS, QLABEL, STATUSES, LEAGUES, SCORING_MODES,
     scoringMode, manualEntry, applyScoreOp, scorePlays, scoreKeyOp, inverseScoreOp, undoTarget, belowEndedQuarter, manualState, hasResult,

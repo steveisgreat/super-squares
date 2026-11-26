@@ -26,6 +26,7 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `lib/auth.js` | Mode (`authMode`: accounts, password, off, misconfigured), signed cookies `sbs_session` (accounts) and `sbs_host` (password), sign-in tokens and codes, `identify(req)` (decisions 009, 012) |
 | `lib/mailer.js` | The sign-in email, one `fetch` to Resend |
 | `lib/store.js` | Storage contract and backend switch (decision 008) |
+| `lib/changes.js` | The wording of the host's "Recent changes" entries (R39) |
 | `lib/store-fs.js`, `lib/store-pg.js` | The two backends; both apply auto-cutoff on read (Postgres: only if the row is unchanged since it was read) |
 | `lib/version.js` | App version from `package.json`; adds `+<short hash>` on Vercel non-production |
 | `lib/scores/` | Score providers (decision 001): `espn.js` and `balldontlie.js` adapters, `index.js` (config, failover, no-backward merge, quarter completion), `slate.js` (the shared slate: one claimed refresh per league and date every 15 s, merge into a board, `listGames` for the picker) |
@@ -52,6 +53,7 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `GET`, `POST /api/game/:id/helpers` | host only (decision 025); list → `{ helpers: [{ id, label, canScore, canSquares, connected, waiting }] }`; add `{ label, canScore, canSquares, link? }` → `{ id, token, expiresInSeconds }` (5 minutes, 24 hours with `link`); 409 at 5 helpers or a day after the final |
 | `PATCH`, `DELETE /api/game/:id/helpers/:helper` | host only; switch the jobs, remove that helper → `{ helpers }` |
 | `POST /api/game/:id/helpers/:helper/code` | host only; a new one-time code for that helper, cancels the waiting one |
+| `GET /api/game/:id/changes` | host only (R39, decision 025); the board's last 50 score, squares and helper changes → `{ changes: [{ id, at, helperId, label, text }] }`, newest first; `helperId` null is the host |
 | `POST /api/helper` | anonymous; `{ token }` spends the code once, sets `sbs_helper` (180 d, `Path=/api/game/<id>`) → `{ gameId }`; 401 otherwise |
 | `GET /api/game/:id/role` | public; `{ role: 'host' \| 'helper' \| 'none' }` for this device, plus `label`, `canScore`, `canSquares` on a helper's phone |
 | `POST /api/tv` | anonymous; a TV asks to pair → `{ code, token }` (decision 017) |
@@ -89,6 +91,10 @@ Accounts (`migrations/002_host_accounts.sql`): `hosts`, `login_requests`, and
 Helpers (`migrations/010_helpers.sql`): `helpers`, one row per helper: label, two jobs, the one-time
 code's hash, then that phone's cookie hash (decision 025). Without the table only helper features
 fail. `scorer_grants` (006) is left in place, unused.
+
+Recent changes (`migrations/011_board_changes.sql`): `board_changes`, the last 50 per board: time, helper id (null = the
+host), the helper's label then, and a short text. Rows go with the board; writes are best effort. Without the table
+the list is empty.
 
 Live scores (`migrations/003_live_slates.sql`): `live_slates (league, et_date, payload jsonb, checked_at, fetched_at)`,
 one row per league and ET date, shared by every Live board. `checked_at` is the throttle: a

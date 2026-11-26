@@ -374,8 +374,9 @@ with a real iPhone and Android phone; `/code-review high` clean.
 paid or part paid, remove unpaid squares, player picks on/off and limit; after lock, paid marks only.
 *Done:* rule and race tests from decision 025; browser check at 360 and 390 px; `/code-review high` clean.
 
-**R39. Recent changes** — `Sonnet` build, `Opus` review (migration 011) — Depends on: R37 (covers
-squares once R38 ships).
+**R39. Recent changes** — `Sonnet` build, `Opus` review (migration 011) — ✅ built 2026-11-25, not pushed
+(Postgres tests passed on `ci-tests`, where 011 is applied; `/code-review high` done; real phones not checked). Depends on:
+R37 (covers squares once R38 ships).
 A host-only list of who did what on the board, the last 50. A failed log write never fails a score.
 *Done:* host-only access test; entries for score, squares and helper changes; deleted with the board.
 

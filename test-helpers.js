@@ -1,7 +1,7 @@
 // Helpers (R37, decision 025): the store contract (fs always; Postgres when DATABASE_URL is set,
-// pointed at a throwaway Neon branch with migrations 001 to 010 applied) and the routes (accounts
+// pointed at a throwaway Neon branch with migrations 001 to 011 applied) and the routes (accounts
 // mode with a stand-in store, then password, off and misconfigured). The clock is injected, so
-// nothing sleeps.
+// nothing sleeps. Recent changes (R39) are tested here too.
 //
 // Run with:  node test-helpers.js   (or: npm test)
 'use strict';
@@ -64,7 +64,7 @@ async function storeContract(label, s, { newGame, accounts, version }) {
     const a = await make(g, T0);
     eq(await s.listHelpers(g, version, T0), [{ id: a.id, label: 'Dana', canScore: true, canSquares: false, connected: false, waiting: true }], 'waiting');
     const u = await use(a.tokenHash, T0 + MIN);
-    eq(u.r, { gameId: g, label: 'Dana', canScore: true, canSquares: false }, 'used');
+    eq(u.r, { id: a.id, gameId: g, label: 'Dana', canScore: true, canSquares: false }, 'used');
     eq(await flags(g, T0 + MIN), [[true, false]], 'connected');
     eq(await access(g, u.sessionHash, T0 + MIN), { id: a.id, label: 'Dana', canScore: true, canSquares: false }, 'access');
     eq(await allowed(other, u.sessionHash, T0 + MIN), false, 'another board');
@@ -221,6 +221,44 @@ async function storeContract(label, s, { newGame, accounts, version }) {
   });
 }
 
+// ---------- recent changes (R39): the store contract ----------
+
+async function changesContract(label, s, newGame) {
+  const entry = (gameId, text, extra) => Object.assign({ gameId, helperId: null, label: null, text }, extra);
+  const bare = (list) => list.map(c => [c.helperId, c.label, c.text, c.at]);
+  const at = (n) => new Date(T0 + n * MIN).toISOString();
+
+  await check(`${label}: changes list newest first, per board, with who`, async () => {
+    const g = await newGame();
+    const other = await newGame();
+    const who = crypto.randomUUID();
+    eq(await s.listChanges(g), [], 'empty');
+    await s.logChange(entry(g, 'first'), T0);
+    await s.logChange(entry(g, 'second', { helperId: who, label: 'Dana' }), T0 + MIN);
+    await s.logChange(entry(other, 'elsewhere'), T0);
+    eq(bare(await s.listChanges(g)), [[who, 'Dana', 'second', at(1)], [null, null, 'first', at(0)]], 'list');
+  });
+
+  await check(`${label}: only the newest 50 are kept, and long text is cut`, async () => {
+    const g = await newGame();
+    for (let i = 0; i < 53; i++) await s.logChange(entry(g, `n${i}`), T0 + i * 1000);
+    const list = await s.listChanges(g);
+    eq([list.length, list[0].text, list[49].text], [50, 'n52', 'n3'], 'kept');
+    await s.logChange(entry(g, 'x'.repeat(300)), T0 + HOUR);
+    eq((await s.listChanges(g))[0].text.length, 120, 'cut');
+  });
+
+  await check(`${label}: changes go with the board, and logging never throws`, async () => {
+    const g = await newGame();
+    await s.logChange(entry(g, 'kept'), T0);
+    await s.deleteGame(g);
+    eq(await s.listChanges(g), [], 'deleted');
+    await s.logChange(entry(g, 'late'), T0);
+    await s.logChange(entry('not-a-board', 'junk'), T0);
+    eq(await s.listChanges(g), [], 'nothing for a gone board');
+  });
+}
+
 // ---------- fs: the real helpers file is put back afterwards ----------
 const FILE = path.join(__dirname, 'data', 'helpers.json');
 const hadFile = fs.existsSync(FILE);
@@ -302,10 +340,12 @@ function standIn() {
       [GAME_B]: { doc: board(GAME_B), owner: B }, [GAME_NONE]: { doc: board(GAME_NONE), owner: null },
       [GAME_PICKING]: { doc: Object.assign(board(GAME_PICKING), { status: 'picking', axisX: null, axisY: null }), owner: A }
     },
-    helpers: [], writes: 0, lookups: 0, missing: false
+    helpers: [], changes: [], writes: 0, lookups: 0, missing: false, logDown: false
   };
   const current = (r) => db.games[r.gameId] && db.games[r.gameId].owner && db.hosts[db.games[r.gameId].owner] === r.hostVersion;
   const fakes = {
+    async logChange(c) { if (db.logDown) throw new Error('log is down'); db.changes.unshift(c); },
+    async listChanges(gameId) { return db.changes.filter(c => c.gameId === gameId); },
     async getGame(id) { return db.games[id] ? JSON.parse(JSON.stringify(db.games[id].doc)) : null; },
     async updateGame(id, game) { db.writes++; db.games[id].doc = game; return { ok: true, game }; },
     async deleteGame(id) { db.writes++; delete db.games[id]; return true; },
@@ -329,7 +369,7 @@ function standIn() {
       const r = db.helpers.find(x => x.tokenHash === tokenHash && accounts && current(x));
       if (!r) return null;
       Object.assign(r, { tokenHash: null, sessionHash });
-      return { gameId: r.gameId, label: r.label, canScore: r.canScore, canSquares: r.canSquares };
+      return { id: r.id, gameId: r.gameId, label: r.label, canScore: r.canScore, canSquares: r.canSquares };
     },
     async helperAccess({ gameId, sessionHash, accounts }) {
       db.lookups++;
@@ -673,6 +713,61 @@ async function accountsRoutes() {
     eq((await call('GET', base())).statusCode, 401, 'list, anonymous');
   });
 
+  const changes = (cookie, id) => call('GET', `/api/game/${id || GAME_A}/changes`, { cookie });
+
+  await test('only the owner reads recent changes', async () => {
+    const h = await join({ canSquares: true });
+    eq((await changes(hostCookie(A))).statusCode, 200, 'owner');
+    eq((await changes()).statusCode, 401, 'anonymous');
+    eq((await changes(h.cookie)).statusCode, 401, 'a helper with both jobs');
+    eq((await changes(hostCookie(B))).statusCode, 403, 'another host');
+    eq((await changes(`${hostCookie(B)}; ${h.cookie}`)).statusCode, 403, 'another host who helps here');
+    eq((await changes(hostCookie(A, 9))).statusCode, 401, 'ended session');
+    eq((await changes(hostCookie(A), GAME_NONE)).statusCode, 403, 'unowned');
+    eq((await changes(hostCookie(A), crypto.randomUUID())).statusCode, 404, 'unknown board');
+    eq((await call('POST', `/api/game/${GAME_A}/changes`, { cookie: hostCookie(A), body: {} })).statusCode, 404, 'no write there');
+    eq((await call('GET', `/api/game/${GAME_A}/changes`, { cookie: hostCookie(A) })).headers['cache-control'], 'no-store', 'cache');
+  });
+
+  await test('score, squares and helper changes are recorded with who did them', async () => {
+    const h = await join({ canSquares: true });
+    eq((await tap(h.cookie)).statusCode, 200, 'helper scores');
+    eq((await squares(h.cookie, PAY)).statusCode, 200, 'helper marks paid');
+    eq((await squares(hostCookie(A), PAY)).statusCode, 200, 'already so: nothing changed');
+    eq((await tap(`${hostCookie(A)}; ${h.cookie}`)).statusCode, 200, 'the host, on a phone that took a code');
+    const set = (canScore) => call('PATCH', `${base()}/${h.id}`, { cookie: hostCookie(A), body: { canScore, canSquares: true } });
+    await set(true); // the same jobs: nothing changed
+    await set(false);
+    await call('DELETE', `${base()}/${h.id}`, { cookie: hostCookie(A) });
+    await call('DELETE', `${base()}/${h.id}`, { cookie: hostCookie(A) }); // already gone
+    const list = (await changes(hostCookie(A))).json.changes.reverse();
+    eq(list.map(c => [c.helperId === h.id ? c.label : c.helperId, c.text]), [
+      [null, 'Added helper Dana (keep score and manage squares)'],
+      ['Dana', 'Helper Dana joined'],
+      ['Dana', 'Chiefs +7, now 7–0'],
+      ['Dana', 'Marked Ann paid (100)'],
+      [null, 'Chiefs +7, now 14–0'],
+      [null, 'Changed jobs of Dana: manage squares'],
+      [null, 'Removed helper Dana']
+    ], 'entries');
+  });
+
+  await test('a refused operation is not recorded', async () => {
+    const h = await join({ canScore: false, canSquares: true });
+    const before = t.db.changes.length;
+    eq((await tap(h.cookie)).statusCode, 401, 'no job');
+    eq((await squares(h.cookie, { op: 'paid', name: 'Ann', paidSquares: 1, have: 3, was: 0 })).statusCode, 409, 'stale');
+    eq(t.db.changes.length, before, 'entries');
+  });
+
+  await test('a failed log write fails nothing', async () => {
+    t.db.logDown = true;
+    const h = await join({ canSquares: true });
+    eq((await tap(h.cookie)).statusCode, 200, 'score');
+    eq((await squares(h.cookie, PAY)).statusCode, 200, 'squares');
+    eq((await call('DELETE', `${base()}/${h.id}`, { cookie: hostCookie(A) })).statusCode, 200, 'remove');
+  });
+
   await test('a foreign Origin is refused on every helper write', async () => {
     const made = await add();
     const headers = { origin: 'https://evil.example' };
@@ -707,7 +802,7 @@ async function accountsRoutes() {
 // conditional on. `s` takes the place of the store behind the routes; `made(id)` notes a board to delete.
 async function squaresRace(label, s, made) {
   const real = {};
-  const names = ['getGame', 'updateGame', 'createGame', 'createHelper', 'useHelperToken', 'helperAccess', 'setHelperJobs', 'removeHelper', 'listHelpers', 'assignJoinCode'];
+  const names = ['getGame', 'updateGame', 'createGame', 'createHelper', 'useHelperToken', 'helperAccess', 'setHelperJobs', 'removeHelper', 'listHelpers', 'assignJoinCode', 'logChange', 'listChanges'];
   const open = { status: 'picking', axisX: null, axisY: null, squares: new Array(100).fill(null), players: {} };
   const start = async (extra, jobs) => {
     const g = await s.createGame(Object.assign(board(), open, extra), null);
@@ -746,6 +841,18 @@ async function squaresRace(label, s, made) {
     eq((await b.send({ op: 'removeUnpaid', name: 'Gus', have: 3, unpaid: 2 })).statusCode, 200, 'remove');
     const g = await s.getGame(b.id);
     eq([heldBy(g, 'Gus'), g.players.Gus.paid, g.guestPick.max], [1, true, 4], 'stored');
+  });
+
+  await test('what the manager did is recorded', async () => {
+    const b = await start();
+    await b.send({ op: 'picks', on: true, max: 4 });
+    await b.send({ op: 'claim', name: 'Bo', count: 2, have: 0 });
+    await b.send({ op: 'paid', name: 'Bo', paidSquares: 1, have: 2, was: 0 });
+    await b.send({ op: 'removeUnpaid', name: 'Bo', have: 2, unpaid: 1 });
+    eq((await s.listChanges(b.id)).map(c => [c.label, c.text]), [
+      ['Pat', 'Removed 1 square not paid for from Bo'], ['Pat', 'Marked Bo part paid (1 of 2)'], ['Pat', 'Added 2 squares for Bo'],
+      ['Pat', 'Turned player picks on, set the pick limit to 4'], ['Pat', 'Helper Pat joined']
+    ], 'entries');
   });
 
   await test('a lock in between refuses everything but a paid mark', async () => {
@@ -908,6 +1015,35 @@ async function fsRoutes() {
     await pick(4, 'removed');
   });
 
+  await check('recent changes: password mode, over the real store', async () => {
+    const g = await newBoard();
+    setEnv({ HOST_PASSWORD: 'correct horse' });
+    const host = String((await call('POST', '/api/session', { body: { password: 'correct horse' } })).headers['set-cookie']).split(';')[0];
+    const added = (await call('POST', `/api/game/${g.id}/helpers`, { cookie: host, body: { label: 'Sam', canScore: true, canSquares: true } })).json;
+    const cookie = phoneCookie(await call('POST', '/api/helper', { body: { token: added.token } }));
+    const op = async (route, who, body) => {
+      const r = await call('PATCH', `/api/game/${g.id}/${route}`, { cookie: who, body });
+      eq(r.statusCode, 200, `${body.op}: ${r.body.slice(0, 120)}`);
+    };
+    await op('score', cookie, TAP);
+    await op('score', host, { op: 'end' });
+    await op('score', cookie, { op: 'undo' });
+    await op('squares', cookie, PAY);
+    const read = (who) => call('GET', `/api/game/${g.id}/changes`, { cookie: who });
+    eq([(await read(cookie)).statusCode, (await read()).statusCode], [401, 401], 'helper and anonymous');
+    eq((await read(host)).json.changes.map(c => [c.label, c.text]), [
+      ['Sam', 'Marked Ann paid (100)'], ['Sam', 'Undo'], [null, 'Ended Q1 at 7–0'], ['Sam', 'Chiefs +7, now 7–0'],
+      ['Sam', 'Helper Sam joined'], [null, 'Added helper Sam (keep score and manage squares)']
+    ], 'entries');
+    // With sign-in off every device is the host, so the phone's cookie says who it was.
+    setEnv({});
+    await op('score', cookie, TAP);
+    await op('score', undefined, TAP);
+    eq((await read()).json.changes.slice(0, 2).map(c => c.label), [null, 'Sam'], 'auth off');
+    await call('DELETE', `/api/game/${g.id}`);
+    eq((await read()).json, { changes: [] }, 'gone with the board');
+  });
+
   await check('auth off: every device is the host, and the flow still works', async () => {
     const g = await newBoard();
     eq((await call('GET', `/api/game/${g.id}/role`)).json, { role: 'host' }, 'role');
@@ -956,6 +1092,11 @@ async function main() {
     assert(!raw.includes(token) && !raw.includes(session) && !raw.includes(waiting), 'raw secret on disk');
     assert(raw.includes(hash(waiting)) && raw.includes(hash(session)), 'hash missing');
   });
+  await changesContract('fs changes', store, async () => {
+    const g = await store.createGame(board(), null);
+    createdFs.push(g.id);
+    return g.id;
+  });
   await accountsRoutes();
   await fsRoutes();
   await squaresRace('fs squares', Object.assign({}, store), (id) => createdFs.push(id));
@@ -978,6 +1119,7 @@ async function main() {
       await storeContract('pg accounts', pg, { accounts: true, version: host.session_version, newGame: newGame(host.id) });
       await storeContract('pg password', pg, { accounts: false, version: null, newGame: newGame(null) });
       await squaresRace('pg squares', pg, (id) => games.push(id));
+      await changesContract('pg changes', pg, newGame(host.id));
 
       const add = (g, v, tokenHash) => pg.createHelper({ gameId: g, hostVersion: v, label: 'Dana', canScore: true, canSquares: false, tokenHash, tokenSeconds: 300, max: 5 }, T0);
 

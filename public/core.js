@@ -198,6 +198,7 @@
     patchSquares: (id, op) => rawRequest(`/api/game/${id}/squares`, json('PATCH', op)),
     // Helpers (R37). The phone's calls are raw: it has no host session.
     getHelpers: (id, o) => request(`/api/game/${id}/helpers`, null, o),
+    getChanges: (id, o) => request(`/api/game/${id}/changes`, null, o),
     addHelper: (id, body) => request(`/api/game/${id}/helpers`, json('POST', body)),
     setHelperJobs: (id, helperId, jobs) => request(`/api/game/${id}/helpers/${helperId}`, json('PATCH', jobs)),
     newHelperCode: (id, helperId, link) => request(`/api/game/${id}/helpers/${helperId}/code`, json('POST', { link })),

@@ -2424,6 +2424,12 @@ button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color:
 .helpers-status.is-ok { color: var(--live); }
 .helpers-list { display: flex; flex-direction: column; gap: 10px; }
 .helpers-list:empty { display: none; }
+.helpers-changes { border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.helpers-changes ul { list-style: none; margin: 0; padding: 0; }
+.helpers-changes li { padding: 8px 0; border-bottom: 1px solid var(--border); line-height: 1.35; overflow-wrap: anywhere; }
+.helpers-changes li:last-child { border-bottom: 0; }
+.helpers-change-meta { display: flex; justify-content: space-between; gap: 10px; font-size: .9rem; }
+.helpers-change-meta time { flex: none; color: var(--muted); }
 .helpers-item { border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; }
 .helpers-item-head, .helpers-job { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .helpers-who { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }

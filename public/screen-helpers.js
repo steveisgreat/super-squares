@@ -1,6 +1,7 @@
 // Helpers (R37, decision 025). Three pieces:
-//   * the host's Helpers panel: who helps on this board, their jobs, and the one-time code or link
-//     that connects one phone (a dialog from Connect and Home, a tab on wide Game Day);
+//   * the host's Helpers panel: who helps on this board, their jobs, the one-time code or link
+//     that connects one phone, and the board's recent changes (R39) (a dialog from Connect and
+//     Home, a tab on wide Game Day);
 //   * the page that code opens on the phone (#helper-<token>), which spends it on a tap;
 //   * where an old #score-<id> link goes.
 // What a helper does is in Player View (screen-player.js). A helper is never signed in as the host.
@@ -43,10 +44,60 @@
     return b;
   };
 
+  // ---------- Host: recent changes (R39) ----------
+  // Read when the list opens and after the host changes a helper here; never on a timer.
+  function ago(at) {
+    const mins = Math.floor((Date.now() - Date.parse(at)) / 60000);
+    if (!(mins >= 1)) return 'just now';
+    if (mins < 60) return `${mins} min ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} hr ago`;
+    const days = Math.floor(hours / 24);
+    return days === 1 ? '1 day ago' : `${days} days ago`;
+  }
+
+  // Labels and text hold names people typed: textContent only.
+  function recentChanges(game) {
+    const root = el('section', 'helpers-changes');
+    const note = textEl('p', 'helpers-text', 'Loading…');
+    const list = el('ul', '');
+    root.append(textEl('h4', '', 'Recent changes'), note, list);
+    let asked = 0;
+    async function load() {
+      const mine = ++asked;
+      let changes;
+      try {
+        // The helpers call beside this one asks for the sign-in if it is needed.
+        changes = (await SBS.api.getChanges(game.id, { prompt: false })).changes;
+      } catch (e) {
+        if (mine !== asked) return;
+        list.replaceChildren();
+        note.textContent = "Recent changes couldn't be loaded.";
+        note.hidden = false;
+        return;
+      }
+      if (mine !== asked) return;
+      list.replaceChildren(...changes.map(c => {
+        const row = el('li', '');
+        const meta = el('div', 'helpers-change-meta');
+        const time = textEl('time', '', ago(c.at));
+        time.dateTime = c.at;
+        time.title = new Date(c.at).toLocaleString();
+        meta.append(textEl('strong', '', c.helperId ? c.label : 'Host'), time);
+        row.append(meta, textEl('span', '', c.text));
+        return row;
+      }));
+      note.textContent = 'No score, squares or helper changes yet.';
+      note.hidden = changes.length > 0;
+    }
+    return { el: root, load };
+  }
+
   // ---------- Host: the panel ----------
   // opts: { setHead(title, onBack | null), onDone? }. Returns { el, show, stop }.
   function createPanel(game, opts) {
     const root = el('div', 'helpers-panel');
+    const recent = recentChanges(game);
     let helpers = [];
     let timer = null;
     let round = 0; // a slow answer about an earlier view is ignored
@@ -71,6 +122,7 @@
       const status = statusLine();
       root.replaceChildren(textEl('p', 'helpers-text', "Give someone a job on this board. They keep their own squares and don't need an account."), status);
       status.say('Loading…');
+      recent.load();
       try {
         helpers = (await SBS.api.getHelpers(game.id)).helpers;
       } catch (e) {
@@ -89,7 +141,7 @@
       const add = button('helpers-add', `${USER_PLUS_ICON}<span>Add a helper</span>`, () => showAdd());
       root.replaceChildren(
         textEl('p', 'helpers-text', "Give someone a job on this board. They keep their own squares and don't need an account."),
-        list, status, add);
+        list, status, add, recent.el);
       status.say(message, kind);
     }
 
@@ -106,7 +158,7 @@
         const mine = round;
         try {
           helpers = (await SBS.api.removeHelper(game.id, h.id)).helpers;
-          if (live(mine)) { drawList(`${h.label} was removed.`); focusAdd(); }
+          if (live(mine)) { drawList(`${h.label} was removed.`); recent.load(); focusAdd(); }
         } catch (e) {
           if (live(mine)) status.say(e.message, 'error');
         }
@@ -125,6 +177,7 @@
             helpers = (await SBS.api.setHelperJobs(game.id, h.id, want)).helpers;
             if (!live(mine)) return;
             drawList();
+            recent.load();
             const again = root.querySelector(`[data-sw="${h.id}-${job.key}"]`);
             if (again) again.focus();
           } catch (e) {
