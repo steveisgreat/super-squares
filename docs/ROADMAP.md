@@ -502,6 +502,42 @@ rows and end to end in the browser in accounts mode (360, 1366 and 1920 px); `/c
 sign-in (needs R16), a real phone. Wording waits for the lawyer review. Nothing sends the news yet;
 whatever does needs an unsubscribe link that works signed out.
 
+**R45. Admin usage page** — `Opus` (admin access, migration, outside API keys), `Sonnet` (front end) —
+Depends on: R2 (real data once host accounts are live). Steve approved the design 2026-11-25 (inline mockups in a
+design session). Not a host page: it tracks use of the whole site, for Steve.
+- **Access:** `#admin`, open only to accounts in `ADMIN_EMAILS`. One `GET /api/admin/stats` route, answered
+  `no-store`; it returns counts only, never board contents. Host emails are masked (`j•••@gmail.com`), with the
+  full email shown one at a time on click. A range picker covers the last 7 days, 30 days or the season.
+- **Headline counts:** hosts (and new this week), boards created, boards locked, players on boards, live now and
+  TVs paired.
+- **Signups and new boards per day** (chart).
+- **Host funnel:** signed up → created a board → locked one → finished a game → came back for a second board.
+- **Growth loop:** hosts from "Host your own board" (R13), next-season opt-ins (R34), the Terms version accepted
+  (R6), and the top referring boards.
+- **Where hosts heard about us:** an optional one-question step after a host's first sign-in (a friend, Search,
+  TikTok/Reels/Shorts, a Facebook or Reddit group, an ad, something else with a short text box; Skip). It's skipped
+  when a referral code already says "a friend's board". Ad and video links carry `?src=<tag>`, kept and sent with
+  sign-in like `ref`. Stored on `hosts` (migration). The card shows the answers, skips, tagged links and the
+  latest "something else" text. The privacy page must say we ask.
+- **Hosts by game:** per real game and date, the hosts, boards, guests and share locked, matched by the feed event
+  ID or league, date and teams; "Other or no game picked" collects the rest. Tap a game for its boards' stages.
+- **Guests per host:** median, average and most; a chart of hosts by guest count; top hosts. A guest is a distinct
+  player name on the host's boards; phones are distinct pick-device keys (player-picks boards only).
+- **How boards are run:** scoring mode, league, player picks on, a helper, shown on a TV, average squares sold.
+- **Services:** score feeds (calls and failures per provider, times we fell back to BALLDONTLIE and for how long,
+  feed fully down, peak calls a minute against the ≤4 target, the last failover) and Resend (sent today against
+  100 a day, this month against 3,000, failures, sign-ins refused by our limit, code and link use). Both come from
+  a new daily counter table (migration, and an fs equivalent): one upsert per outside call, and a failed count
+  never fails the call. Database: compute hours and storage from the Neon API, plus row counts, cold starts and
+  the slowest query. Hosting: Fluid Active CPU, function calls and errors, the share of board reads served from
+  cache, p95, firewall blocks and the production deploy, from the Vercel API. The two keys (`NEON_API_KEY`,
+  `VERCEL_API_TOKEN`) are read-only and used only by the admin route. A card with no key shows "Open dashboard".
+- **Recent hosts:** masked email, joined, boards and stage, last sign-in, where they came from.
+- No page-view analytics: the privacy page's "no analytics" stays true.
+*Done:* a decision entry (admin access, the counters, the outside keys, the heard-about-us question); access tests
+(a non-admin host and a signed-out visitor get 403 in every auth mode); counter tests in both stores; privacy
+page updated; browser check at 1366 and 1920 px; `/code-review high` clean.
+
 ### Milestone 3 — Go to market (2027-01-11 → 2027-02-14)
 
 **R12. Landing and search pages** — merged into R17 (2026-11-23), which ships
