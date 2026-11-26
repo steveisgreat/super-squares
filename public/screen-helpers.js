@@ -288,10 +288,9 @@
       const again = button('secondary', 'New code', () => showCode(h, null));
       again.hidden = true;
       const textBtn = button('secondary helpers-text-btn', `${MESSAGE_ICON}<span>Text them a link instead</span>`, makeLink);
-      const done = button('', 'Done', () => showList(true));
-      actions.append(textBtn, again, done);
+      actions.append(textBtn, again);
       root.replaceChildren(title, qrBox, status, text, actions);
-      done.focus();
+      textBtn.focus();
 
       function drop(words, kind) {
         clearInterval(timer);
@@ -368,7 +367,6 @@
         drop(`The link is ready. It works once, for 24 hours. Send it only to ${h.label}. To cancel it, remove ${h.label} from the list.`);
         again.hidden = true;
         textBtn.remove();
-        done.className = 'secondary';
         const send = [];
         const words = `Help run our squares board: ${link}`;
         // "?&body=" is the one form both iPhone and Android read.

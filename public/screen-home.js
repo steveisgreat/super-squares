@@ -239,19 +239,49 @@
   }
 
   // ---------- Cards ----------
+  // The middle of the scoreboard: a status word, then one big line and one small one.
+  // Kickoff pending shows the time; otherwise the date ("Feb 14", or "Today"), with the
+  // weekday under it, and the year too when it is not this year.
+  function scoreboardMiddle(g) {
+    const c = chipFor(g);
+    const word = { 'chip-final': 'Final', 'chip-live': 'Live', 'chip-soon': 'Kickoff', 'chip-pick': 'Picking' }[c.cls];
+    let big = '';
+    let small = '';
+    const d = g.gameDate ? new Date(g.gameDate + 'T00:00:00') : null;
+    const dated = d && !isNaN(d.getTime());
+    if (c.cls === 'chip-soon') {
+      big = c.text.replace(/^Kickoff /, '');
+      small = whenLabel(g.gameDate);
+    } else if (dated && g.gameDate === todayValue()) {
+      big = 'Today';
+    } else if (dated) {
+      big = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      const weekday = d.toLocaleDateString(undefined, { weekday: d.getFullYear() !== new Date().getFullYear() ? 'short' : 'long' });
+      small = d.getFullYear() !== new Date().getFullYear() ? `${weekday}, ${d.getFullYear()}` : weekday;
+    }
+    return `<span class="sb-status ${c.cls}"><span class="home-chip-dot" aria-hidden="true"></span>${escapeHtml(word)}</span>
+      ${big ? `<span class="sb-big">${escapeHtml(big)}</span>` : ''}${small ? `<span class="sb-small">${escapeHtml(small)}</span>` : ''}`;
+  }
+
+  function scoreboardTeam(g, side) {
+    const name = (side === 'A' ? g.teamA : g.teamB) || (side === 'A' ? 'Team A' : 'Team B');
+    return `<div class="sb-team">${teamLogoTag(g, side, 48)}<span class="sb-name">${escapeHtml(name)}</span></div>`;
+  }
+
+  // The scoreboard card: a logo and name on each side, the status and date between them,
+  // then a footer: the main action, Party View, and the ••• menu.
   function buildGameCard(g) {
     const name = matchName(g);
     const desc = shownDescription(g);
     const c = el('article', 'home-card');
     c.setAttribute('aria-label', `${name}, ${chipFor(g).text}`);
     c.innerHTML = `
-      <div class="home-card-top">${chipHtml(g)}<span class="home-when">${escapeHtml(whenLabel(g.gameDate))}</span></div>
-      <button class="home-more" type="button" aria-label="${escapeHtml('More for ' + name)}" aria-haspopup="dialog" aria-expanded="false">${DOTS_ICON}</button>
-      <div class="home-match badge-fit">${teamBadge(g, 'A', { logoSize: 22, cls: 'home-badge' })}<span class="vs-sep">vs</span>${teamBadge(g, 'B', { logoSize: 22, cls: 'home-badge' })}</div>
+      <div class="sb-row">${scoreboardTeam(g, 'A')}<div class="sb-mid">${scoreboardMiddle(g)}</div>${scoreboardTeam(g, 'B')}</div>
       ${desc ? `<div class="home-desc">${escapeHtml(desc)}</div>` : ''}
       <div class="home-actions">
         <button class="home-primary" type="button" aria-label="${escapeHtml(primaryLabel(g) + ': ' + name)}"><span>${escapeHtml(primaryLabel(g))}</span>${CHEVRON_ICON}</button>
         <button class="home-party" type="button" aria-label="${escapeHtml('Party View for ' + name)}" title="Party View">${MAXIMIZE_ICON}<span class="home-party-text">Party View</span></button>
+        <button class="home-more" type="button" aria-label="${escapeHtml('More for ' + name)}" aria-haspopup="dialog" aria-expanded="false">${DOTS_ICON}</button>
       </div>`;
     // The card body is a mouse convenience; the primary button is the keyboard target.
     c.addEventListener('click', () => openGame(g.id));
@@ -656,19 +686,19 @@
     app.innerHTML = '';
     const tv = isTvBrowser();
     let newBtn = null;
-    const extra = [];
-    if (!tv) {
-      newBtn = el('button', 'home-new', `${PLUS_ICON}<span>New game</span>`);
-      newBtn.type = 'button';
-      newBtn.addEventListener('click', () => SBS.go({ screen: 'setup' }));
-      extra.push(newBtn);
-    }
-    const bar = topbar('<span><span class="brand-dollar">B</span>ig <span class="brand-dollar">G</span>ame <span class="brand-dollar">G</span>rids</span>', extra, { hideHome: true, pill: true });
+    const bar = topbar('<span><span class="brand-dollar">B</span>ig <span class="brand-dollar">G</span>ame <span class="brand-dollar">G</span>rids</span>', [], { hideHome: true, pill: true });
     bar.classList.add('home-topbar');
     if (tv) bar.classList.add('tv-topbar');
     app.appendChild(bar);
     const main = el('div', 'main home-main');
     app.appendChild(main);
+    // New game sits under the header row, above the games: full width on a phone.
+    if (!tv) {
+      newBtn = el('button', 'home-new', `${PLUS_ICON}<span>New game</span>`);
+      newBtn.type = 'button';
+      newBtn.addEventListener('click', () => SBS.go({ screen: 'setup' }));
+      main.appendChild(newBtn);
+    }
 
     let games = [];
     let needsSignIn = false;

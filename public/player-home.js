@@ -247,9 +247,8 @@
       box.append(list,
         textEl('p', '', 'The last digit of each team’s score picks the winning square. The Final score includes overtime.'),
         textEl('p', '', 'If nobody holds the winning square for Q1, the half or Q3, that payout rolls over to the next quarter scored. If nobody holds the Final square, the host draws a winner at random from the claimed squares.'),
-        textEl('p', 'ph-host-pays', 'The host collects and pays, never the app.'),
-        button('', 'Done', shut));
-    });
+        textEl('p', 'ph-host-pays', 'The host collects and pays, never the app.'));
+    }, { closeX: true });
   }
 
   // "Kickoff in 3 days 4 hours"; redrawn by the page's one-second clock.

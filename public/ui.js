@@ -989,9 +989,22 @@
   const PASTE_ICON = ic('<path d="M19 8h-14"/><path d="M5 12h9"/><path d="M11 16h-6"/><path d="M15 16h6"/><path d="M18 13v6"/>');
   const CLOSE_ICON = ic('<path d="M18 6l-12 12"/><path d="M6 6l12 12"/>');
 
+  // The one way a dialog closes: an X in its top-right corner (no Done or Close button).
+  // Pins the X to `box` and leaves room for it beside the title.
+  function addCloseX(box, onClose) {
+    const x = el('button', 'icon-btn dialog-x', CLOSE_ICON);
+    x.type = 'button';
+    x.setAttribute('aria-label', 'Close');
+    x.addEventListener('click', () => onClose());
+    box.classList.add('has-dialog-x');
+    box.appendChild(x);
+    return x;
+  }
+
   // A small dialog on top of everything. `build(box, close)` fills it. Escape and a tap outside
   // close it. Nothing in it has focus unless build says so, so a stray Enter confirms nothing.
-  function openSheet(title, build) {
+  // `opts.closeX` adds the corner X, for a sheet with no Cancel of its own.
+  function openSheet(title, build, opts = {}) {
     const back = document.activeElement;
     const overlay = overlayEl('0.72');
     overlay.classList.add('sp-overlay');
@@ -1021,6 +1034,7 @@
     document.body.appendChild(overlay);
     box.focus();
     build(box, close);
+    if (opts.closeX) addCloseX(box, close);
     return close;
   }
 
@@ -1121,6 +1135,6 @@
     formatKickoffTime, kickoffNotice,
     teamMeta, teamStyle, applyTeamColors, resetTeamColors, teamLogoTag,
     legalLinks, teamColor, teamEdge, readableTextColor, teamBadge, fitTeamBadges, teamAbbr, shadeColor,
-    MAXIMIZE_ICON, COPY_ICON, PRINT_ICON, QR_ICON, CHEVRON_ICON, PASTE_ICON, CLOSE_ICON
+    MAXIMIZE_ICON, COPY_ICON, PRINT_ICON, QR_ICON, CHEVRON_ICON, PASTE_ICON, CLOSE_ICON, addCloseX
   };
 })();

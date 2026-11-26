@@ -149,9 +149,9 @@
       });
     }
     add(isPhone() ? 'secondary' : '', navigator.share ? 'Share link' : 'Copy link', () => shareBoard(game, note));
-    const done = add('secondary', 'Done', close);
     box.appendChild(actions);
     box.appendChild(note);
+    const done = SBS.ui.addCloseX(box, close);
     overlay.appendChild(box);
     document.body.appendChild(overlay);
     actions.firstChild.focus();
@@ -1132,7 +1132,7 @@
       : `<div class="phone-link">${escapeHtml(url)}</div>`;
 
     const actions = el('div', 'actions');
-    const openHere = el('button', 'secondary', 'Open it on this device');
+    const openHere = el('button', 'secondary', 'Open it here');
     openHere.addEventListener('click', () => {
       close();
       window.open(`${location.origin}${location.pathname}#player-${id}`, '_blank');
@@ -1140,12 +1140,10 @@
     const print = el('button', 'secondary qr-print', `${SBS.ui.PRINT_ICON}<span>Print</span>`);
     print.type = 'button';
     print.addEventListener('click', () => printSign(game));
-    const done = el('button', '', 'Done');
-    done.addEventListener('click', () => close());
-    actions.appendChild(done);
     actions.appendChild(print);
     actions.appendChild(openHere);
     box.appendChild(actions);
+    const done = SBS.ui.addCloseX(box, close);
 
     function close() {
       if (!overlay.parentNode) return;

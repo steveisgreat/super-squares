@@ -557,11 +557,11 @@
       const giveBtn = textEl('button', 'secondary', 'Give to someone else');
       const goBtn = textEl('button', '', 'Give square');
       goBtn.classList.add('hidden');
-      const closeBtn = textEl('button', 'secondary', 'Close');
-      [removeBtn, giveBtn, goBtn, closeBtn].forEach(b => { b.type = 'button'; });
-      actions.appendChild(removeBtn); actions.appendChild(giveBtn); actions.appendChild(goBtn); actions.appendChild(closeBtn);
+      [removeBtn, giveBtn, goBtn].forEach(b => { b.type = 'button'; });
+      actions.appendChild(removeBtn); actions.appendChild(giveBtn); actions.appendChild(goBtn);
       box.appendChild(giveWrap);
       box.appendChild(actions);
+      const closeBtn = SBS.ui.addCloseX(box, () => close());
       overlay.appendChild(box);
       document.body.appendChild(overlay);
       removeBtn.focus();
@@ -574,7 +574,6 @@
       }
       document.addEventListener('keydown', onKey);
       overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-      closeBtn.addEventListener('click', close);
 
       const same = (doc) => doc.squares[idx] && doc.squares[idx].name === sq.name && doc.squares[idx].at === sq.at;
       const changed = 'That square just changed. The board has been refreshed.';

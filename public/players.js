@@ -208,11 +208,12 @@
       <div class="error-msg hidden" role="alert"></div>
       <div class="pick-dialog-actions">
         <button type="button" class="pay-full" data-act="full">Paid in full</button>
-        <button type="button" data-act="done">Done</button>
+        <button type="button" data-act="done">Save</button>
       </div>`;
     overlay.appendChild(box);
     document.body.appendChild(overlay);
     const q = (act) => box.querySelector(`[data-act="${act}"]`);
+    SBS.ui.addCloseX(box, () => close());
     function draw() {
       box.querySelector('.pay-count').textContent = `${n} of ${p.count}`;
       box.querySelector('[data-v="paid"]').textContent = money(n * price);
@@ -397,10 +398,8 @@
       box.innerHTML = '';
       const headRow = el('div', 'manage-modal-head');
       headRow.innerHTML = `<h3>Manage Players</h3>`;
-      const closeX = el('button', 'ghost modal-close', 'Close');
-      closeX.addEventListener('click', () => overlay.remove());
-      headRow.appendChild(closeX);
       box.appendChild(headRow);
+      SBS.ui.addCloseX(box, () => overlay.remove());
 
       if (summaries.length === 0) {
         box.appendChild(el('p', '', 'No squares have been picked yet.'));
