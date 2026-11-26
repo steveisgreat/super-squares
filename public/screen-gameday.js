@@ -1672,11 +1672,12 @@
       tvQuarters.innerHTML = QUARTERS.map(q => {
         const res = computed.results[q];
         const scoreTxt = (res.a === null || res.b === null) ? '– – –' : `${res.a}–${res.b}`;
-        let statusTxt, statusCls;
+        let statusTxt, statusCls, pushShort = '';
         if (res.a === null || res.b === null) {
           statusTxt = 'Awaiting'; statusCls = 'pending';
         } else if (res.resolved && res.pushed) {
           statusTxt = SBS.board.pushText(computed.results, q); statusCls = 'push';
+          pushShort = SBS.board.pushText(computed.results, q, true);
         } else if (res.resolved && res.winnerName) {
           statusTxt = res.winnerName; statusCls = 'win';
           if (res.autoResolved) {
@@ -1696,7 +1697,9 @@
               <span class="tvq-digits">${scoreTxt}</span>
               ${badgeB}
             </div>
-            <div class="tvq-status">${escapeHtml(statusTxt)}</div>
+            ${pushShort
+              ? `<div class="tvq-status" title="${escapeHtml(statusTxt)}" aria-label="${escapeHtml(statusTxt)}"><span class="tvq-long">${escapeHtml(statusTxt)}</span><span class="tvq-short" aria-hidden="true">${escapeHtml(pushShort)}</span></div>`
+              : `<div class="tvq-status">${escapeHtml(statusTxt)}</div>`}
           </div>
         `;
       }).join('');

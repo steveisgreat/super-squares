@@ -19,12 +19,15 @@
   // "Push, rolls to Q2" for a pushed quarter, read from computeGame(...).results. As compute.js
   // carries it: the money passes through later pushes to the next quarter that pays (or is waiting
   // for the final draw), else, with none scored yet, to the first one still to be scored.
-  function pushText(results, q) {
+  // `short` gives "Push → Q2", for a narrow phone-portrait TV chip.
+  function pushText(results, q, short) {
     const { QUARTERS, QLABEL } = window.GameLogic;
     const later = QUARTERS.slice(QUARTERS.indexOf(q) + 1);
     const to = later.find(k => !results[k].pushed && (results[k].resolved || results[k].needsDraw))
       || later.find(k => !results[k].resolved);
-    return to ? `Push, rolls to ${to === 'final' ? 'Final' : QLABEL[to]}` : 'Push';
+    const toLabel = to ? (to === 'final' ? 'Final' : QLABEL[to]) : '';
+    if (short) return to ? `Push → ${toLabel}` : 'Push';
+    return to ? `Push, rolls to ${toLabel}` : 'Push';
   }
 
   // "updated 3 min ago" for a manual score. The text is refreshed in place
@@ -543,7 +546,17 @@
   function fitNames(root) {
     const names = Array.prototype.slice.call((root || document).querySelectorAll('.mirror-screen .name-txt, .pick-fill .name-txt, .glass-board .name-txt, .gd-phone .name-txt'));
     if (!names.length) return;
-    names.forEach(n => { n.style.fontSize = ''; });
+    // Party View on its side: a two-word name may wrap at the space onto two lines (never inside a
+    // word) before it is cut; the check after the sizes are set puts a name that still won't fit back.
+    const wrapSideways = sideways.matches && !compactBoard.matches;
+    names.forEach(n => {
+      n.style.fontSize = '';
+      const full = n.querySelector('.nm-full');
+      const wrap = wrapSideways && n.closest('.mirror-screen') && /\s/.test(((full || n).textContent || '').trim());
+      n.style.whiteSpace = wrap ? 'normal' : '';
+      n.style.lineHeight = wrap ? '1' : ''; // two 11 px lines fit a 24 px square
+      n.style.paddingTop = wrap ? '0' : '';
+    });
     if (compactBoard.matches) return; // initials have a fixed size (styles.css)
     const sizes = names.map(n => {
       // 1 px off each: the browser rounds these. Height matters for two words in a short square.
@@ -558,6 +571,13 @@
       return Math.max(min, Math.floor(px * 10) / 10);
     });
     names.forEach((n, i) => { if (sizes[i]) n.style.fontSize = sizes[i] + 'px'; });
+    if (wrapSideways) {
+      names.forEach(n => {
+        if (n.style.whiteSpace !== 'normal') return;
+        const room = n.parentElement.clientHeight;
+        if (n.scrollWidth > n.clientWidth + 1 || (room && n.offsetHeight > room)) { n.style.whiteSpace = ''; n.style.lineHeight = ''; n.style.paddingTop = ''; }
+      });
+    }
   }
 
   // A resize or a turn of the phone changes how much room the axis bars have (one listener for

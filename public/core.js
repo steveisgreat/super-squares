@@ -134,10 +134,27 @@
       }
       // Signed in from another tab since the 401.
       if (session && session.host) return true;
-      if (session && session.mode === 'accounts') return SBS.ui.showEmailPrompt();
+      if (session && session.mode === 'accounts') {
+        const ok = await SBS.ui.showEmailPrompt();
+        if (ok) askHeardAfterSignIn();
+        return ok;
+      }
       return passwordSignIn(message);
     })().finally(() => { signInPending = null; });
     return signInPending;
+  }
+
+  // R45c: Home asks "where did you hear about us" on its own draw. A host who signs in from any other
+  // host screen (a Game Day link) is asked right after, never on a TV/Party View or over an open
+  // sheet or dialog. showHeardSheet itself keeps it to once per page load.
+  function askHeardAfterSignIn() {
+    rawRequest('/api/session').then((s) => {
+      if (!s || !s.host || s.askHeard !== true) return;
+      const screen = SBS.currentScreen && SBS.currentScreen();
+      if (screen === 'tv' || screen === 'tv-pair' || screen === 'mirror') return;
+      if (document.querySelector('.sbs-overlay, [role="dialog"]')) return;
+      if (SBS.ui.showHeardSheet) SBS.ui.showHeardSheet();
+    }).catch(() => { /* optional: Home asks again on its next draw */ });
   }
 
   // A 401 means this device isn't signed in as the host — prompt once, then
@@ -442,8 +459,14 @@
 
   // Pasting a sign-in link into a tab that is already open only changes the
   // hash; so does typing #admin. Other deep links are read at load, as before.
+  // Back from one of these to a URL with no hash (or any other hash) must leave the screen too:
+  // the page is not reloaded, so the screen the new hash maps to is drawn here.
+  const LIVE_HASH = /^#((login|helper|handoff)-|admin$)/i;
+  let lastHash = window.location.hash || '';
   window.addEventListener('hashchange', () => {
-    if (!/^#((login|helper|handoff)-|admin$)/i.test(window.location.hash || '')) return;
+    const prev = lastHash;
+    lastHash = window.location.hash || '';
+    if (!LIVE_HASH.test(lastHash) && !LIVE_HASH.test(prev)) return;
     // The prompt asking for this very link would otherwise cover the page.
     SBS.ui.closeEmailPrompt();
     SBS.go(SBS.parseInitialRoute());

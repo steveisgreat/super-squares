@@ -1353,6 +1353,12 @@ body.tv-fullscreen .tv-kickoff-clock { font-size: var(--fs-3xl); }
 @media (min-width: 1024px) { .tv-screen .tvq-status { font-size: var(--fs-md); } }
 .tv-qchip.win .tvq-status { color: var(--good); font-weight: 700; }
 .tv-qchip.push .tvq-status { color: var(--warn); font-weight: 700; white-space: normal; }
+/* Phone portrait: the push note shows its short form ("Push → Q3") on one line. */
+.tvq-short { display: none; }
+@media (max-width: 479px) {
+  .tv-screen .tvq-long { display: none; }
+  .tv-screen .tvq-short { display: inline; white-space: nowrap; }
+}
 body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
 
 /* --- EXPERIMENTAL: Neon glassmorphism theme for the TV Grid View's grid
