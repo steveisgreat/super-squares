@@ -1,6 +1,7 @@
 # 026 — Editing a locked game: three lines, judged on the server
 
-**Date:** 2026-11-25 · **Status:** accepted (Steve approved the design 2026-11-25); not built ·
+**Date:** 2026-11-25 · **Status:** accepted (Steve approved the design 2026-11-25); server rules built
+2026-11-25 (R40); the form (R41), unlock and wrong game (R42) and the players' list (R43) not built ·
 **Roadmap:** R40–R43 · **Related:** 004, 007, 008, 011, 012, 015, 019, 020, 023, 025 (its host column in
 section 1 is narrowed after lock, see section 2)
 
@@ -121,3 +122,20 @@ Test-first on `gameUnderWay` (each mode; feed down, stale, unmatched, postponed)
 every stage; a line crossed between read and write; `saw` and `ack` refusals; paid marks kept and cleared; no negative amount; unlock with a
 past cutoff; wrong game with a quarter paid out. On the routes: owner only in all auth modes, helpers refused, foreign `Origin`; the `PUT` guards,
 including a missing `updatedAt` and a lock from an old page; both stores.
+
+## As built (R40, 2026-11-25)
+- `public/compute.js`: `gameUnderWay`, `settingsStage`, `firstQuarterEnded`, `applySettingsOp` (`lock`, `edit`) and
+  `guardPut`; tests in `test-settings.js` (the table at every stage, both stores, every auth mode).
+- Warning codes in `ack`: `team`, `liveGame`, `swap`, `kickoff`, `cutoffPast`, `money`, `pot`, `scoring`. A swap is
+  `set: { swap: true }` with the teams seen in `saw`. A team name change that is a spelling fix (case, spacing,
+  punctuation, or the same team in the team list) is free.
+- The negative rule refuses a save that makes the lowest quarter worse and below zero, so a board saved below zero
+  before this can still be put right. It applies to settings edits and `PUT`, not to guests' picks.
+- `game.changes` kinds: `price`, `payouts`, `pot` (the pot shown, before and after), `swap`, `teams` (Manual),
+  `game` (Live: teams, league, date, kickoff) and `numbers` (for R42). The first lock writes none.
+- Beyond section 4, `POST /api/game` (and a `PUT` that creates a board, in password and off modes) draws the numbers
+  too when a board is created already locked. The cutoff lock on read was already the server's; it now draws with
+  `crypto.randomInt` like the rest.
+- The Total Pot box and Lock board call the new route; the confirm shows the server's warning. The Edit game form
+  (picking only) still uses `PUT` until R41.
+

@@ -15,17 +15,18 @@
 
   // Fisher-Yates. Do NOT replace with arr.sort(() => Math.random() - 0.5) —
   // that is not a uniform shuffle and visibly clusters auto-picked squares.
-  function shuffle(arr) {
+  // `pick(n)` (optional) returns a whole number from 0 to n - 1; the server passes crypto.randomInt.
+  function shuffle(arr, pick) {
     const a = arr.slice();
     for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = pick ? pick(i + 1) : Math.floor(Math.random() * (i + 1));
       [a[i], a[j]] = [a[j], a[i]];
     }
     return a;
   }
 
-  function shuffledDigits() {
-    return shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  function shuffledDigits(pick) {
+    return shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], pick);
   }
 
   function emptyGrid() {
@@ -542,6 +543,7 @@
       || (!isUnset(game.simPlan) && invalidSimPlan(game.simPlan))
       || (!isUnset(game.paidOut) && invalidPaidOut(game.paidOut))
       || (!isUnset(game.guestPick) && invalidGuestPick(game.guestPick))
+      || (!isUnset(game.changes) && invalidChanges(game.changes))
       || null;
   }
 
@@ -564,12 +566,15 @@
   // "live game" begins — its whole trajectory is randomly generated right
   // here and replayed against the wall clock afterward (see simLiveState),
   // rather than re-rolled on every poll, so the score only ever moves forward.
-  function lockGame(game) {
-    game.axisX = shuffledDigits();
-    game.axisY = shuffledDigits();
+  // Only the server calls this (decision 026): the lock operation, a lock sent by an old page's PUT
+  // and the auto cutoff on read. `opts` = { pick, now } (both optional).
+  function lockGame(game, opts) {
+    const o = opts || {};
+    game.axisX = shuffledDigits(o.pick);
+    game.axisY = shuffledDigits(o.pick);
     game.status = 'started';
     if (game.simulation) {
-      game.simPlan = buildSimPlan();
+      game.simPlan = buildSimPlan(o.now);
       game.liveScore = null;
     }
     return game;
@@ -587,7 +592,7 @@
   // Random scoring plays for each team, timestamped (ms offset from kickoff)
   // across the whole simulated game. Sorted so downstream cumulative sums can
   // just filter by offset.
-  function buildSimPlan() {
+  function buildSimPlan(now) {
     const totalMs = SIM_QUARTER_MS * SIM_QUARTERS;
     const events = [];
     ['a', 'b'].forEach(team => {
@@ -601,7 +606,7 @@
       }
     });
     events.sort((x, y) => x.atMs - y.atMs);
-    return { startedAt: new Date().toISOString(), quarterMs: SIM_QUARTER_MS, events };
+    return { startedAt: new Date(typeof now === 'number' ? now : Date.now()).toISOString(), quarterMs: SIM_QUARTER_MS, events };
   }
 
   function simEventsThrough(plan, team, ms) {
@@ -1450,6 +1455,431 @@
     return { game: g, name, changed: true };
   }
 
+  // ---------- Settings after the lock (R40, decision 026) ----------
+  // Only the host edits a board's settings, and three lines close things off in order: the lock
+  // (numbers drawn), the game starting, and the first quarter ending. The server judges every
+  // save here, so a stale screen or an old cached page can't write past a line.
+
+  const EDIT_FIELDS = ['description', 'teamA', 'teamB', 'teamAColor', 'teamBColor', 'swap', 'league', 'gameDate', 'kickoffTime',
+    'autoCutoffEnabled', 'autoCutoffTime', 'squarePrice', 'payouts', 'potOverride', 'pickMode', 'guestPick', 'scoring'];
+  // What a whole-document PUT may not change once the board is locked: settings go through edit.
+  const LOCKED_FIELDS = EDIT_FIELDS.filter(k => k !== 'swap').concat('simulation');
+  const FIELD_LABEL = {
+    description: 'The description', teamA: 'Team A', teamB: 'Team B', teamAColor: 'Team A color', teamBColor: 'Team B color',
+    swap: 'Rows and columns', league: 'The league', gameDate: 'The date', kickoffTime: 'The kickoff', autoCutoffEnabled: 'Auto cutoff',
+    autoCutoffTime: 'The cutoff time', squarePrice: 'The square price', payouts: 'The payout split', potOverride: 'Total pot',
+    pickMode: 'Pick mode', guestPick: 'Player picks', scoring: 'The scoring', simulation: 'Simulation'
+  };
+  const QUARTER_WORDS = { q1: 'Q1', q2: 'Q2', q3: 'Q3', final: 'the Final' };
+  const CHANGE_KINDS = ['price', 'payouts', 'pot', 'swap', 'teams', 'game', 'numbers'];
+  const MAX_CHANGES = 5;
+
+  // game.changes (section 7): what the host changed after the first lock, for players to see. The last
+  // five, each { kind, from, to, at }, held to exact types like every field a guest's screen draws.
+  function invalidChanges(changes) {
+    const bad = 'The list of changes is not valid.';
+    if (!Array.isArray(changes) || changes.length > MAX_CHANGES) return bad;
+    const keysAre = (v, keys) => Object.keys(v).sort().join() === keys;
+    const pair = v => Array.isArray(v) && v.length === 2 && v.every(t => isText(t, MAX_TEXT));
+    const split = v => isRecord(v) && keysAre(v, 'final,q1,q2,q3') && QUARTERS.every(q => isAmount(v[q], 1000));
+    const linked = v => isRecord(v) && keysAre(v, 'gameDate,kickoffTime,league,teamA,teamB')
+      && isText(v.teamA, MAX_TEXT) && isText(v.teamB, MAX_TEXT) && LEAGUES.indexOf(v.league) !== -1
+      && typeof v.gameDate === 'string' && DATE_RE.test(v.gameDate)
+      && (v.kickoffTime === null || (typeof v.kickoffTime === 'string' && DATETIME_RE.test(v.kickoffTime)));
+    const axes = v => isRecord(v) && keysAre(v, 'axisX,axisY')
+      && (v.axisX === null || isDigitPermutation(v.axisX)) && (v.axisY === null || isDigitPermutation(v.axisY));
+    const types = { price: v => isAmount(v, 1e6), payouts: split, pot: v => isAmount(v, 1e9), swap: pair, teams: pair, game: linked, numbers: axes };
+    for (const c of changes) {
+      if (!isRecord(c) || !keysAre(c, 'at,from,kind,to') || CHANGE_KINDS.indexOf(c.kind) === -1) return bad;
+      if (typeof c.at !== 'string' || !DATETIME_RE.test(c.at) || !ZONED_RE.test(c.at) || isNaN(Date.parse(c.at))) return bad;
+      if (!types[c.kind](c.from) || !types[c.kind](c.to)) return bad;
+    }
+    return null;
+  }
+
+  // An instant the server can read (it has a zone), in ms, else null. A bare local time is only the
+  // host's browser's to read, as with the cutoff.
+  function zonedMs(v) {
+    if (typeof v !== 'string' || !DATETIME_RE.test(v) || !ZONED_RE.test(v)) return null;
+    const t = Date.parse(v);
+    return isNaN(t) ? null : t;
+  }
+
+  // Line 3: the first quarter has ended, known from the document alone (a recorded result or a
+  // paid-out record), once the caller has merged the slate.
+  function firstQuarterEnded(game) {
+    const results = isRecord(game.results) ? game.results : {};
+    if (QUARTERS.some(q => hasResult(results[q]))) return true;
+    const paid = isRecord(game.paidOut) ? game.paidOut : {};
+    return QUARTERS.some(q => isRecord(paid[q]));
+  }
+
+  const pastNil = (s) => isRecord(s) && ((Number(s.a) || 0) > 0 || (Number(s.b) || 0) > 0 || (Number(s.period) || 1) > 1);
+
+  // Line 2: has the real game started? Pure, worked out on each request, never stored (section 3).
+  // `feed` is the Live feed's latest reading of this game, { state, at (ms), available }, or null when the
+  // feed is down, stale or has not matched the game.
+  function gameUnderWay(game, now, feed) {
+    if (!game) return false;
+    if (firstQuarterEnded(game)) return true;
+    const mode = scoringMode(game);
+    if (mode === 'simulation') return game.status === 'started' || game.status === 'finished';
+    const t = typeof now === 'number' ? now : Date.now();
+    const kick = zonedMs(game.kickoffTime);
+    const kickoffPassed = kick !== null && t >= kick;
+    if (mode === 'live') {
+      const held = game.liveOverride === true || !!(game.liveScore && game.liveScore.manual);
+      if (held && pastNil(game.liveScore)) return true;
+      if (isRecord(feed) && feed.available !== false && typeof feed.state === 'string') {
+        if (feed.state === 'in' || feed.state === 'break' || feed.state === 'post') return true;
+        // "Not started" read after the kickoff time (a late start, a postponement) is believed.
+        if (feed.state === 'pre' && kick !== null && typeof feed.at === 'number' && feed.at >= kick) return false;
+      }
+      return kickoffPassed;
+    }
+    return pastNil(game.liveScore) || kickoffPassed;
+  }
+
+  // 'picking' (setup too), 'locked' (before kickoff), 'underWay' or 'over'.
+  function settingsStage(game, now, feed) {
+    if (game.status === 'finished') return 'over';
+    if (game.status !== 'started') return 'picking';
+    return gameUnderWay(game, now, feed) ? 'underWay' : 'locked';
+  }
+
+  // A setting as it reads, so an echoed '' or a missing key is the same as its default.
+  function settingOf(game, k) {
+    const v = game[k];
+    if (k === 'scoring') return scoringMode(game);
+    if (k === 'simulation' || k === 'autoCutoffEnabled') return v === true;
+    if (k === 'pickMode') return v || 'both';
+    if (k === 'guestPick') return Object.assign({ on: false, max: DEFAULT_GUEST_MAX, liftAt: null, lifted: false }, isRecord(v) ? v : null);
+    return v === undefined || v === '' ? null : v;
+  }
+  function canon(v) {
+    if (Array.isArray(v)) return '[' + v.map(canon).join(',') + ']';
+    if (isRecord(v)) return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + canon(v[k])).join(',') + '}';
+    return JSON.stringify(v === undefined ? null : v);
+  }
+  const sameValue = (a, b) => canon(a) === canon(b);
+
+  // A spelling fix (case, spaces, punctuation, or the same team by the server's team list) is not a
+  // different team. `teamKey(name, league)` is optional.
+  const teamNorm = (s) => String(s || '').toLowerCase().replace(uni('[^\\p{L}\\p{Nd}]'), '');
+  function sameTeam(a, leagueA, b, leagueB, teamKey) {
+    if (teamNorm(a) === teamNorm(b) && (teamNorm(a) || String(a || '').trim() === String(b || '').trim())) return true;
+    if (typeof teamKey !== 'function') return false;
+    const k = teamKey(a, leagueA);
+    return !!k && k === teamKey(b, leagueB);
+  }
+
+  function paidSquaresTotal(game) {
+    let n = 0;
+    new Set((game.squares || []).filter(Boolean).map(s => s.name)).forEach(name => { n += paidSquareCount(game, name); });
+    return n;
+  }
+
+  const dollars = (n) => (n < 0 ? '-' : '') + '$' + String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+  function lowestQuarter(game) {
+    const res = computeGame(game).results;
+    let low = null;
+    QUARTERS.forEach(q => { if (!low || res[q].baseAmount < low.amount) low = { quarter: q, amount: res[q].baseAmount }; });
+    return low;
+  }
+
+  // No save may make a quarter's amount negative. A board already below zero (saved before this
+  // rule) may still be put right, so only a save that makes it worse is refused. Returns the words, or null.
+  function negativeWords(before, after) {
+    const a = lowestQuarter(after);
+    if (a.amount >= 0 || a.amount >= lowestQuarter(before).amount) return null;
+    const res = computeGame(after).results;
+    const early = res.q1.baseAmount + res.q2.baseAmount + res.q3.baseAmount;
+    return `That would make ${QUARTER_WORDS[a.quarter]} pay ${dollars(a.amount)}. The pot has to cover Q1 to Q3 (${dollars(early)}).`;
+  }
+
+  function changeEntries(before, after, changed, teamsDiffer, at) {
+    const has = (k) => changed.indexOf(k) !== -1;
+    const out = [];
+    const four = (p) => ({ q1: p.q1, q2: p.q2, q3: p.q3, final: p.final });
+    const teams = (g) => [String(g.teamA || ''), String(g.teamB || '')];
+    if (has('squarePrice')) out.push({ kind: 'price', from: before.squarePrice, to: after.squarePrice, at });
+    if (has('payouts')) out.push({ kind: 'payouts', from: four(before.payouts), to: four(after.payouts), at });
+    if (has('potOverride')) out.push({ kind: 'pot', from: potOf(before), to: potOf(after), at });
+    if (has('swap')) out.push({ kind: 'swap', from: teams(before), to: teams(after), at });
+    if (scoringMode(before) === 'live') {
+      if (teamsDiffer || has('league') || has('gameDate') || has('kickoffTime')) {
+        const linked = (g) => ({ teamA: String(g.teamA || ''), teamB: String(g.teamB || ''), league: g.league, gameDate: g.gameDate, kickoffTime: g.kickoffTime || null });
+        out.push({ kind: 'game', from: linked(before), to: linked(after), at });
+      }
+    } else if (teamsDiffer) {
+      out.push({ kind: 'teams', from: teams(before), to: teams(after), at });
+    }
+    return out;
+  }
+
+  // One settings operation, as a pure function like applyScoreOp. Returns { game, warnings, changed }
+  // (a fresh copy; the input is never mutated) or { error, code } where code is
+  //   invalid   a malformed operation or value (HTTP 400)
+  //   illegal   not allowed at this stage, or a quarter would go negative; `field` names it (409)
+  //   conflict  a stored value differs from the one the host saw; `field` and its `value` now (409)
+  //   unacked   warnings the host has not confirmed; `warnings` lists them all (409)
+  //   marks     the price changes and someone is marked paid: keep or clear the marks; `paidSquares` (409)
+  // ctx = { now (ms), feed (see gameUnderWay), pick(n) (the server's draw), teamKey(name, league) }.
+  //   lock                                  the server draws the numbers (and plans a Simulation)
+  //   edit { set, saw, ack, marks }         only the changed fields, each with the value the host saw
+  function applySettingsOp(game, op, ctx) {
+    const c = ctx || {};
+    const now = typeof c.now === 'number' ? c.now : Date.now();
+    if (!isRecord(op)) return failure('invalid', 'Settings operation must be an object.');
+    if (op.op === 'lock') {
+      if (Object.keys(op).length !== 1) return failure('invalid', 'A lock carries nothing else: the server draws the numbers.');
+      if (!game || (game.status !== 'picking' && game.status !== 'setup')) return failure('illegal', 'This board is already locked.');
+      const g = JSON.parse(JSON.stringify(game));
+      lockGame(g, { pick: c.pick, now });
+      return { game: g, warnings: [], changed: true };
+    }
+    if (op.op !== 'edit') return failure('invalid', 'Unknown settings operation.');
+    return applyEdit(game, op, c, now);
+  }
+
+  function applyEdit(game, op, c, now) {
+    const set = op.set;
+    const saw = op.saw;
+    if (Object.keys(op).some(k => ['op', 'set', 'saw', 'ack', 'marks'].indexOf(k) === -1)) return failure('invalid', 'An edit carries set, saw, ack and marks only.');
+    if (!isRecord(set) || !Object.keys(set).length) return failure('invalid', 'Say what to change.');
+    if (!isRecord(saw)) return failure('invalid', 'Say what your screen showed.');
+    const unknown = Object.keys(set).find(k => EDIT_FIELDS.indexOf(k) === -1);
+    if (unknown) return failure('invalid', `${unknown} can't be changed here.`);
+    if (op.ack !== undefined && !(Array.isArray(op.ack) && op.ack.length <= 20 && op.ack.every(a => typeof a === 'string'))) return failure('invalid', 'ack is a list of warnings.');
+    if (op.marks !== undefined && op.marks !== 'keep' && op.marks !== 'clear') return failure('invalid', 'Paid marks are kept or cleared.');
+    const swap = set.swap !== undefined;
+    if (swap && set.swap !== true) return failure('invalid', 'Swap is true, or left out.');
+    if (swap && ['teamA', 'teamB', 'teamAColor', 'teamBColor'].some(k => k in set)) return failure('invalid', 'Swap the sides, or change the teams, not both at once.');
+    if (!game || !Array.isArray(game.squares)) return failure('illegal', 'That board is not ready.');
+
+    // Every value is held to the field's exact type before anything else is judged.
+    const draft = JSON.parse(JSON.stringify(game));
+    Object.keys(set).forEach(k => { if (k !== 'swap') draft[k] = set[k]; });
+    const invalid = validateGame(draft);
+    if (invalid) return failure('invalid', invalid);
+
+    const changed = Object.keys(set).filter(k => k === 'swap' || !sameValue(settingOf(set, k), settingOf(game, k)));
+    if (!changed.length) return { game: JSON.parse(JSON.stringify(game)), warnings: [], changed: false };
+
+    for (const k of changed) {
+      for (const seen of (k === 'swap' ? ['teamA', 'teamB'] : [k])) {
+        if (!(seen in saw)) return failure('invalid', `Say what your screen showed for ${seen}.`);
+        if (!sameValue(settingOf({ [seen]: saw[seen] }, seen), settingOf(game, seen))) {
+          return Object.assign(failure('conflict', `${FIELD_LABEL[seen]} was changed on another device.`), { field: seen, value: settingOf(game, seen) });
+        }
+      }
+    }
+
+    const stage = settingsStage(game, now, c.feed);
+    const picking = stage === 'picking';
+    const line3 = firstQuarterEnded(game);
+    const mode = scoringMode(game);
+    const paidBefore = paidSquaresTotal(game);
+    const has = (k) => changed.indexOf(k) !== -1;
+    const differs = (side) => has(side) && !sameTeam(game[side], game.league, set[side], has('league') ? set.league : game.league, c.teamKey);
+    const teamsDiffer = differs('teamA') || differs('teamB');
+    const warnings = [];
+    const warn = (code, field) => { if (!warnings.some(w => w.code === code)) warnings.push({ code, field }); return null; };
+    const STARTED = 'The game has started';
+
+    // Each changed field: null to save (perhaps with a warning), or the reason it is blocked.
+    const liveGame = (k) => (picking ? null : stage === 'locked' ? warn('liveGame', k)
+      : stage === 'over' ? 'The game is over, so the live game is fixed.' : `${STARTED}, so the live game can't change here.`);
+    const rule = (k) => {
+      switch (k) {
+        case 'description': case 'teamAColor': case 'teamBColor': return null;
+        case 'teamA': case 'teamB':
+          if (!differs(k)) return null;
+          return mode === 'live' ? liveGame(k) : picking ? null : warn('team', k);
+        case 'league': case 'gameDate':
+          return mode === 'live' ? liveGame(k) : null;
+        case 'kickoffTime':
+          if (mode === 'live') return liveGame(k);
+          if (mode !== 'manual' || stage !== 'underWay') return null;
+          return line3 || pastNil(game.liveScore) ? `${STARTED} and has a score, so the kickoff is fixed.` : warn('kickoff', k);
+        case 'swap':
+          return picking ? null : stage === 'locked' ? warn('swap', k) : "Rows and columns can't be swapped once the game starts.";
+        case 'autoCutoffEnabled': case 'autoCutoffTime':
+          if (!picking) return 'Auto cutoff is over once the board is locked.';
+          return cutoffPassed(Object.assign({}, game, { autoCutoffEnabled: draft.autoCutoffEnabled, autoCutoffTime: draft.autoCutoffTime }), now) ? warn('cutoffPast', k) : null;
+        case 'squarePrice': case 'payouts':
+          if (picking) return paidBefore > 0 ? warn('money', k) : null;
+          if (stage === 'over' || line3) return 'Price and payouts are fixed once a quarter has ended.';
+          return warn('money', k);
+        case 'potOverride':
+          return picking ? 'Total pot is set once the board is locked.' : warn('pot', k);
+        case 'pickMode': case 'guestPick':
+          return picking ? null : 'Picks are closed once the board is locked.';
+        case 'scoring': {
+          const to = settingOf(set, 'scoring');
+          if (picking) return null;
+          if (to === 'simulation' || mode === 'simulation') return "Simulation can't be turned on or off once the board is locked.";
+          if (stage === 'locked') return warn('scoring', k);
+          if (stage === 'over') return 'The game is over, so the scoring is fixed.';
+          if (mode === 'manual') return warn('scoring', k);
+          return `${STARTED}. Use "Enter the score myself" instead: it keeps the score.`;
+        }
+        default: return 'That field is not a setting.';
+      }
+    };
+    for (const k of changed) {
+      const blocked = rule(k);
+      if (blocked) return Object.assign(failure('illegal', blocked), { field: k });
+    }
+
+    const g = JSON.parse(JSON.stringify(game));
+    changed.forEach(k => { if (k !== 'swap') g[k] = JSON.parse(JSON.stringify(set[k])); });
+    if (swap) {
+      const put = (k, v) => { if (v === undefined) delete g[k]; else g[k] = v; };
+      put('teamA', game.teamB); put('teamB', game.teamA);
+      put('teamAColor', game.teamBColor); put('teamBColor', game.teamAColor);
+    }
+    if (has('scoring')) {
+      g.simulation = g.scoring === 'simulation';
+      g.liveScore = null;
+      delete g.liveOverride;
+    }
+
+    const negative = negativeWords(game, g);
+    if (negative) return Object.assign(failure('illegal', negative), { field: ['potOverride', 'squarePrice', 'payouts'].find(has) || null });
+
+    warnings.forEach(w => { w.text = warningText(w.code, game, g, paidBefore); });
+    const ack = op.ack || [];
+    if (warnings.some(w => ack.indexOf(w.code) === -1)) {
+      return Object.assign(failure('unacked', 'Check these changes and confirm them.'), { warnings });
+    }
+
+    if (has('squarePrice') && paidBefore > 0) {
+      if (!op.marks) {
+        return Object.assign(failure('marks', `${paidBefore} square${paidBefore === 1 ? ' is' : 's are'} marked paid at ${dollars(game.squarePrice)}. Keep the marks and settle the difference, or clear them.`), { paidSquares: paidBefore });
+      }
+      if (op.marks === 'clear') {
+        Object.keys(g.players || {}).forEach(n => {
+          if (!isRecord(g.players[n])) return;
+          g.players[n].paid = false;
+          delete g.players[n].paidSquares;
+        });
+      }
+    }
+
+    if (!picking) {
+      const entries = changeEntries(game, g, changed, teamsDiffer, new Date(now).toISOString());
+      if (entries.length) g.changes = (Array.isArray(game.changes) ? game.changes : []).concat(entries).slice(-MAX_CHANGES);
+    }
+    return { game: g, warnings, changed: true };
+  }
+
+  function warningText(code, before, after, paidBefore) {
+    switch (code) {
+      case 'team': return 'A different team: scores already entered stay with that side of the board.';
+      case 'liveGame': return 'This follows a different live game. Players see the change on the board.';
+      case 'swap': return 'Swapping rows and columns changes what every square means.';
+      case 'kickoff': return 'The game has started. Moving the kickoff can reopen settings that had closed.';
+      case 'cutoffPast': return 'That cutoff has passed: the board locks as soon as this saves.';
+      case 'money': {
+        const parts = [`The pot goes from ${dollars(potOf(before))} to ${dollars(potOf(after))}.`];
+        const a = computeGame(before).results;
+        const b = computeGame(after).results;
+        const moved = QUARTERS.filter(q => a[q].baseAmount !== b[q].baseAmount);
+        if (moved.length) parts.push(moved.map(q => `${QLABEL[q]} ${dollars(a[q].baseAmount)} → ${dollars(b[q].baseAmount)}`).join(', ') + '.');
+        if (paidBefore > 0) parts.push(`${paidBefore} square${paidBefore === 1 ? ' is' : 's are'} marked paid at ${dollars(before.squarePrice)}.`);
+        return parts.join(' ');
+      }
+      case 'pot': return `Total pot goes from ${dollars(potOf(before))} to ${dollars(potOf(after))}. Only the Final changes: it pays ${dollars(computeGame(after).results.final.baseAmount)}.`;
+      case 'scoring': return scoringMode(after) === 'live'
+        ? 'The score will come from the live feed. Quarters already entered stay.'
+        : 'You will enter the score yourself from now on.';
+      default: return 'Check this change.';
+    }
+  }
+
+  // The guards on PUT /api/game/:id (section 4), for screens that still save the whole board and pages
+  // cached from before. `stored` is the board as stored (its slate merged); the caller has already
+  // matched updatedAt. Returns { game } (the document to write) or { error, code, field }.
+  //   - game.changes is the server's.
+  //   - A save that locks a board keeps none of the client's numbers: the server draws them.
+  //   - On a locked board the numbers, the status going back to picking and every setting stay; an
+  //     empty square stays empty; moving and removing squares follow the table; a rename replaces a
+  //     name everywhere at once, and only the matching paid-out names may follow it.
+  function guardPut(stored, body, ctx) {
+    const c = ctx || {};
+    const now = typeof c.now === 'number' ? c.now : Date.now();
+    const refuse = (error, field) => Object.assign(failure('illegal', error), { field: field || null });
+    if (!isRecord(body)) return failure('invalid', 'Game must be an object.');
+    if (!Array.isArray(body.squares) || body.squares.length !== 100) return failure('invalid', 'Squares must be an array of exactly 100 entries.');
+    const g = JSON.parse(JSON.stringify(body));
+    const keep = (k) => { if (stored[k] === undefined) delete g[k]; else g[k] = JSON.parse(JSON.stringify(stored[k])); };
+    keep('changes');
+
+    const wasLocked = stored.status === 'started' || stored.status === 'finished';
+    if (!wasLocked) {
+      keep('simPlan');
+      if (g.status === 'started' || g.status === 'finished') lockGame(g, { pick: c.pick, now });
+      else { g.axisX = stored.axisX === undefined ? null : stored.axisX; g.axisY = stored.axisY === undefined ? null : stored.axisY; }
+      const negative = negativeWords(stored, g);
+      const field = ['potOverride', 'squarePrice', 'payouts'].find(k => !sameValue(settingOf(g, k), settingOf(stored, k))) || null;
+      return negative ? refuse(negative, field) : { game: g };
+    }
+
+    if (g.status !== 'started' && g.status !== 'finished') return refuse("This board is locked, so it can't go back to picking.", 'status');
+    for (const k of ['axisX', 'axisY', 'simPlan']) {
+      if (!sameValue(g[k], stored[k])) return refuse("The numbers can't change once they're drawn.", k);
+    }
+    for (const k of LOCKED_FIELDS) {
+      if (!sameValue(settingOf(g, k), settingOf(stored, k))) return refuse(`${FIELD_LABEL[k]} changes through Edit game once the board is locked.`, k);
+    }
+
+    // Squares: what became of each stored name.
+    const nameAt = (s) => (isRecord(s) && typeof s.name === 'string' ? s.name : null);
+    const count = (squares, name) => squares.filter(s => nameAt(s) === name).length;
+    const to = new Map(); // old name -> Map(new name -> squares)
+    let filled = false;
+    let removed = false;
+    stored.squares.forEach((s, i) => {
+      const a = nameAt(s);
+      const b = nameAt(g.squares[i]);
+      if (!a && g.squares[i]) filled = true;
+      else if (a && !g.squares[i]) removed = true;
+      else if (a && b && a !== b) {
+        if (!to.has(a)) to.set(a, new Map());
+        to.get(a).set(b, (to.get(a).get(b) || 0) + 1);
+      }
+    });
+    const renames = new Map();
+    const targets = new Map();
+    to.forEach(news => news.forEach((n, nw) => targets.set(nw, (targets.get(nw) || 0) + 1)));
+    let moved = false;
+    to.forEach((news, old) => {
+      const [nw, n] = news.size === 1 ? Array.from(news.entries())[0] : [null, 0];
+      const whole = nw !== null && n === count(stored.squares, old) && !count(g.squares, old)
+        && !count(stored.squares, nw) && targets.get(nw) === 1;
+      if (whole) renames.set(old, nw); else moved = true;
+    });
+    const stage = settingsStage(stored, now, c.feed);
+    if (filled) return refuse('An empty square stays empty once the board is locked.', 'squares');
+    if (moved && stage !== 'locked') return refuse("Squares can't move to someone else once the game starts.", 'squares');
+    if (removed && (stage === 'over' || firstQuarterEnded(stored))) return refuse("Nobody's squares can be removed once a quarter has ended.", 'squares');
+
+    // Paid-out records: the same records, a renamed person's name excepted.
+    const before = isRecord(stored.paidOut) ? stored.paidOut : {};
+    const after = isRecord(g.paidOut) ? g.paidOut : {};
+    if (!sameValue(Object.keys(before).sort(), Object.keys(after).sort())) return refuse('Payouts are marked through Paid out.', 'paidOut');
+    for (const q of Object.keys(before)) {
+      const r = before[q];
+      const renamed = isRecord(r) && renames.has(r.name) ? Object.assign({}, r, { name: renames.get(r.name) }) : r;
+      if (!sameValue(after[q], r) && !sameValue(after[q], renamed)) return refuse('Payouts are marked through Paid out.', 'paidOut');
+    }
+
+    const negative = negativeWords(stored, g);
+    return negative ? refuse(negative, null) : { game: g };
+  }
+
   return {
     PLAYER_COLORS, pickPlayerColor,
     applyGuestOp, applySquaresOp, guestCap, DEFAULT_GUEST_MAX, guestNameOf, paidSquareCount, unpaidSquares, cleanGuestName, nameKey,
@@ -1461,6 +1891,7 @@
     payoutStatus, applyPayoutOp, paidQuartersDisturbed, whoToPay,
     validateGame, isPlayerName, isColor, isDigitPermutation, syncStatus,
     cutoffPassed, lockGame,
+    EDIT_FIELDS, gameUnderWay, settingsStage, firstQuarterEnded, applySettingsOp, guardPut,
     SIM_QUARTER_MS, buildSimPlan, simLiveState, simCumulativeThroughQuarter
   };
 });

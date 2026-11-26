@@ -280,22 +280,36 @@
     // Blanking the field clears the override and falls back to the actual
     // collected total (squares sold × price); typing a number overrides it. The stat strip's box and
     // the pot box above the grid on a wide screen (R35) both come here.
+    // Saved as one settings edit (R40, decision 026): the server judges it, and the host confirms the
+    // warnings it sends back (only the Final changes) before it is saved.
     async function savePot(raw) {
       raw = raw.trim();
       const before = JSON.parse(JSON.stringify(game));
-      if (raw === '') {
-        game.potOverride = null;
-      } else {
+      let pot = null;
+      if (raw !== '') {
         const num = Math.round(parseFloat(raw));
-        game.potOverride = (Number.isFinite(num) && num >= 0) ? num : null;
+        pot = (Number.isFinite(num) && num >= 0) ? num : null;
       }
-      const disturbed = paidQuartersDisturbed(before, game);
+      const disturbed = paidQuartersDisturbed(before, Object.assign({}, before, { potOverride: pot }));
       if (disturbed.length && !(await showConfirm(disturbMessage(disturbed)))) {
         renderBoard(before);
         return;
       }
+      const seen = before.potOverride === undefined || before.potOverride === '' ? null : before.potOverride;
+      const op = { op: 'edit', set: { potOverride: pot }, saw: { potOverride: seen }, ack: [] };
       try {
-        const saved = await SBS.api.saveGame(game);
+        let saved;
+        try {
+          saved = await SBS.api.patchSettings(game.id, op);
+        } catch (err) {
+          if (err.code !== 'unacked' || !err.warnings) throw err;
+          if (!(await showConfirm(err.warnings.map(w => w.text).join(' ')))) {
+            renderBoard(before);
+            return;
+          }
+          op.ack = err.warnings.map(w => w.code);
+          saved = await SBS.api.patchSettings(game.id, op);
+        }
         renderBoard(saved);
       } catch (err) {
         if (await SBS.handleConflict(err, game.id)) return;
@@ -305,7 +319,7 @@
           return;
         }
         showAlert('Could not save the total pot: ' + err.message);
-        renderBoard(game);
+        renderBoard(err.game || before);
       }
     }
     strip.querySelector('#pot-input').addEventListener('change', (e) => savePot(e.target.value));

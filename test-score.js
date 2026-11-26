@@ -617,7 +617,8 @@ async function main() {
       const res = await call('POST', '/api/game', g);
       assert(res.statusCode === 201, 'create failed: ' + res.body);
       created.push(res.json.id);
-      return res.json;
+      // The server draws a locked board's numbers (decision 026); the test puts its own back in the store.
+      return (await store.updateGame(res.json.id, Object.assign(res.json, { axisX: g.axisX, axisY: g.axisY }), null)).game;
     };
 
     await check('PATCH add updates liveScore and returns the fresh game', async () => {

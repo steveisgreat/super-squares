@@ -69,13 +69,17 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `PATCH /api/game/:id/guest` | a device with that key; claim or release its own squares, one atomic write → `{ game, name }`; 400, 401 (never the host prompt), 409 with the current `game` |
 | `GET /<code>` (6 characters) | static; serves `index.html`, which resolves the code and opens Player View |
 | `PATCH /api/game/:id/payout` | host only; mark a quarter paid out, undo, or settle (decision 015); a record only, no money moves |
+| `PATCH /api/game/:id/settings` | host only, never a helper (R40, decision 026); `{ op: 'lock' }` (the server draws the numbers) or `{ op: 'edit', set, saw, ack, marks }` (`GameLogic.applySettingsOp`). 409 with `code`: `illegal` (blocked at this stage, or a quarter would go negative; names the `field`), `conflict` (a value moved since `saw`), `unacked` (the `warnings` to confirm), `marks` (keep or clear paid marks); 400 `invalid` |
 
 "Host only" means the board's owner in accounts mode: another account gets 403, and the
 list holds only the caller's boards. A foreign `Origin` on any write gets 403. A broken
 sign-in setup gets 503, as does a Vercel deploy with no sign-in set up at all.
 
-`PUT` sends the whole document with `updatedAt`; a stale `updatedAt` returns 409 with the
-current document. Game bodies over 40 KB and other bodies over 4 KB get 413.
+`PUT` sends the whole document with `updatedAt`; a stale or missing `updatedAt` on a board
+that exists returns 409 with the current document. `GameLogic.guardPut` then judges it against
+the stored board (decision 026): a lock gets the server's numbers, and a locked board keeps its
+numbers, status and settings, with squares moved or removed only as the stage allows.
+`game.changes` is written only by the settings route. Game bodies over 40 KB and other bodies over 4 KB get 413.
 `validateGame` (`compute.js`) holds every field that reaches markup to an exact type.
 
 ## Data

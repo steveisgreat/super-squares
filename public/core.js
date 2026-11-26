@@ -74,6 +74,10 @@
         // A guest's refused pick carries the board as it is now and which squares were taken.
         if (data.game && data.game.squares) err.game = data.game;
         if (data.taken) err.taken = data.taken;
+        // A refused settings operation (decision 026) says why: code, the field, and the warnings to confirm.
+        if (data.code) err.code = data.code;
+        if (data.field) err.field = data.field;
+        if (data.warnings) err.warnings = data.warnings;
       }
       throw err;
     }
@@ -194,6 +198,8 @@
     createGame: (game) => request('/api/game', json('POST', game)),
     saveGame: (game) => request(`/api/game/${game.id}`, json('PUT', game)),
     patchScore: (id, op, o) => request(`/api/game/${id}/score`, json('PATCH', op), o),
+    // Settings (R40): { op: 'lock' } (the server draws the numbers) or { op: 'edit', set, saw, ack, marks }.
+    patchSettings: (id, op) => request(`/api/game/${id}/settings`, json('PATCH', op)),
     // Squares manager (R38). Raw: a helper's phone must never be asked to sign in as the host.
     patchSquares: (id, op) => rawRequest(`/api/game/${id}/squares`, json('PATCH', op)),
     // Helpers (R37). The phone's calls are raw: it has no host session.

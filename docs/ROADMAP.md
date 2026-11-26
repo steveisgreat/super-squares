@@ -383,7 +383,8 @@ A host-only list of who did what on the board, the last 50. A failed log write n
 Editing a locked game (R40–R43): [decision 026](decisions/026-editing-a-locked-game.md), Steve approved the
 design 2026-11-25 ("Editing a locked game" canvas, claude.ai artifact `JJmzusrbdA7Cro7XCiWWHo`, private).
 
-**R40. Settings rules on the server** — `Opus` (money logic, test-first) — Depends on: none.
+**R40. Settings rules on the server** — `Opus` (money logic, test-first) — ✅ built 2026-11-25, not pushed
+(`test-settings.js`; Postgres run on `ci-tests`; lock and Total Pot checked at 1366 and 1920 px and on the TV). Depends on: none.
 `gameUnderWay`, `applySettingsOp` (`edit`, `lock`), `PATCH /api/game/:id/settings`, and the guards on `PUT`. The
 server draws the numbers at lock. No save makes a quarter's amount negative (a $100 pot on a $1,000 board
 pays a Final of -$500 today). Locking and Total Pot move to the new route.

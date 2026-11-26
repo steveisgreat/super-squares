@@ -5,7 +5,7 @@
   const SBS = window.SBS = window.SBS || {};
   const { el, textEl, escapeHtml, money, topbar, showConfirm, showAlert, applyTeamColors, teamBadge, fitTeamBadges, isPhone, overlayEl } = SBS.ui;
   const { openManagePlayersModal, resolveNameForPick, ensurePlayerColor, addSquares, replaceGame, formatAt, ensurePlayers, renameSquares, collectNameGroups } = SBS.players;
-  const { shuffle, lockGame, isPlayerName, unpaidGuestPicks, pruneEmptyPlayers, parsePlayerList } = window.GameLogic;
+  const { shuffle, isPlayerName, unpaidGuestPicks, pruneEmptyPlayers, parsePlayerList } = window.GameLogic;
 
   // Guards the one irreversible action in the app (drawing the axis numbers).
   // Module-level so a re-render can't reset it mid-save.
@@ -877,10 +877,17 @@
       if (lockInFlight) return;
       lockInFlight = true;
       try {
-        // Locks the newest board: a guest's pick that landed first stays in it.
-        const r = await SBS.saveWith(game, doc => { lockGame(doc); });
+        // The server locks the board as it is now (a guest's pick that landed first stays in it)
+        // and draws the numbers (decision 026). Already locked (the cutoff, another device): open it.
+        let locked;
+        try {
+          locked = await SBS.api.patchSettings(game.id, { op: 'lock' });
+        } catch (e) {
+          if (!(e.status === 409 && e.game && ['started', 'finished'].includes(e.game.status))) throw e;
+          locked = e.game;
+        }
         lockInFlight = false;
-        SBS.go({ screen: 'board', game: r.game });
+        SBS.go({ screen: 'board', game: locked });
       } catch (e) {
         lockInFlight = false;
         // Not signed in, or not this host's board. Retrying can't help, so stop

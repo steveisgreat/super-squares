@@ -559,6 +559,8 @@ async function run() {
     full.liveScore = { a: 34, b: 31, period: 4, clock: '0:00', state: 'post', completed: true, simulation: true, updatedAt: full.updatedAt };
     const size = Buffer.byteLength(JSON.stringify(full));
     assert(size * 2 <= 40 * 1024, `a full board is ${size} bytes`);
+    // Stored as it is, so the save is judged on its size alone (the PUT guards of decision 026 pass an echo).
+    db.games[GAME_A].doc = JSON.parse(JSON.stringify(full));
     eq((await call('PUT', `/api/game/${GAME_A}`, { as: A, body: full })).statusCode, 200, 'a full board saves');
 
     reset();

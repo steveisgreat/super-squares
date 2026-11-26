@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node test.js && node test-store.js && node test-auth.js && node test-accounts.js && node test-livescore.js && node test-score.js && node test-payout.js && node test-scores.js && node test-slates.js && node test-store-fs.js && node test-joincode.js && node test-tv.js && node test-helpers.js && node test-guest.js && node test-squares.js && node test-paste.js && node test-scorekeys.js && node test-store-pg.js",
+    "test": "node test.js && node test-store.js && node test-auth.js && node test-accounts.js && node test-livescore.js && node test-score.js && node test-payout.js && node test-scores.js && node test-slates.js && node test-store-fs.js && node test-joincode.js && node test-tv.js && node test-helpers.js && node test-guest.js && node test-squares.js && node test-paste.js && node test-scorekeys.js && node test-settings.js && node test-store-pg.js",
     "test:store": "node test-store.js",
     "test:auth": "node test-auth.js",
     "test:accounts": "node test-accounts.js",
@@ -22,7 +22,8 @@
     "test:paste": "node test-paste.js",
     "test:scorekeys": "node test-scorekeys.js",
     "test:store-pg": "node test-store-pg.js",
-    "test:slates": "node test-slates.js"
+    "test:slates": "node test-slates.js",
+    "test:settings": "node test-settings.js"
   },
   "license": "MIT",
   "engines": {
