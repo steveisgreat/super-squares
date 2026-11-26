@@ -1,17 +1,18 @@
-// The squares manager's Players tab in Player View (R38, decision 025): what is still to collect, add
-// squares for someone, player picks, who has paid, and removing squares nobody paid for. After the
-// lock only the paid marks work. Every tap is one operation the server checks against the board as it
-// is then, and nothing here needs the helper's own name or a square of theirs.
+// The Players tab in Player View (R44): everyone A to Z, this phone's name pinned on top, and each
+// player's squares with "This is me". A squares manager (R38, decision 025) also gets, in this same
+// tab: what is still to collect, add squares for someone, player picks, who has paid, and removing
+// squares nobody paid for. After the lock only the paid marks work. Every managing tap is one
+// operation the server checks against the board as it is then, and none needs the helper's own name
+// or a square of theirs.
 (function () {
   'use strict';
 
   const SBS = window.SBS;
   const { el, textEl, escapeHtml, money, showConfirm, openSheet } = SBS.ui;
   const { playerSummaries, openPaymentBox, payState, PAY_WORD } = SBS.players;
-  const { cutoffPassed, guestCap, nameKey } = window.GameLogic;
+  const { cutoffPassed, guestCap, nameKey, computeGame } = window.GameLogic;
+  const SEARCH_PAST = 8; // names
 
-  // Tabler "dots" (MIT, 24 px outline).
-  const DOTS_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M19 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/></svg>';
   const sq = (n) => `${n} square${n === 1 ? '' : 's'}`;
 
   function button(cls, html, onClick) {
@@ -22,17 +23,26 @@
   }
 
   // opts: { getGame(), setGame(g), patch(op) -> { game, name }, reload() -> newest board or null,
-  // onError(e) -> true when it dealt with it }.
+  // onError(e) -> true when it dealt with it, canManage(), me() -> the name this phone shows,
+  // elsewhere(name) -> another phone picked it, choose(name) }.
   function create(opts) {
-    const root = el('div', 'pm-tab');
+    const root = el('div', 'pm-tab player-pane');
     const status = el('div', 'pm-status');
     status.setAttribute('role', 'status');
     status.hidden = true;
     const body = el('div', 'pm-body');
-    root.append(body, status);
+    // The search box stays outside the parts that are rebuilt, so typing survives a poll.
+    const top = el('div', 'pm-body');
+    const search = el('label', 'ph-search', '<span>Find a player</span>');
+    const query = el('input', '');
+    query.type = 'search';
+    query.autocomplete = 'off';
+    query.addEventListener('input', () => draw());
+    search.appendChild(query);
+    root.append(top, search, body, status);
 
     let filter = 'all';
-    let openName = null; // whose More panel is open
+    let openName = null; // whose panel is open
     let saving = false;
     let sheet = null;    // the last sheet opened: { close, isShown, update }
     let sig = null;
@@ -89,7 +99,7 @@
       { op: 'paid', name: p.name, paidSquares: p.paidCount, have: p.count, was: n }
     ]);
     const payBox = (p) => openPaymentBox(p, price(), (n) => markPaid(p, n), () => focusKey(`more:${p.name}`));
-    const focusKey = (key) => { const n = Array.from(body.querySelectorAll('[data-k]')).find(x => x.dataset.k === key); if (n) n.focus(); };
+    const focusKey = (key) => { const n = Array.from(root.querySelectorAll('[data-k]')).find(x => x.dataset.k === key); if (n) n.focus(); };
 
     async function removeUnpaid(p) {
       if (!(await showConfirm(`Remove ${p.name}'s ${sq(p.unpaidCount)} not paid for? They open up for someone else. ${p.paidCount ? 'Paid squares stay.' : `${p.name} has no other squares.`}`))) return;
@@ -294,87 +304,122 @@
     // ----- the page -----
     function draw() {
       const g = opts.getGame();
+      const manage = opts.canManage();
       const open = isOpen();
+      const live = g.status === 'started' || g.status === 'finished';
       const all = playerSummaries(g);
       const owing = all.filter(p => p.unpaidCount > 0);
       const owed = all.reduce((t, p) => t + p.owed, 0);
       const taken = all.reduce((t, p) => t + p.count, 0);
       const pick = pickState();
+      const me = opts.me();
       if (openName && !all.some(p => p.name === openName)) openName = null;
-      const next = JSON.stringify([open, g.status, g.squarePrice, g.pickMode, filter, openName, pick, all]);
+      // The job was taken away: what only a manager may do closes with it.
+      if (!manage && (sheet || status.firstChild)) { filter = 'all'; closeSheet(); say(''); }
+      search.hidden = all.length <= SEARCH_PAST;
+      const q = search.hidden ? '' : query.value.trim().toLowerCase();
+      const computed = live ? computeGame(g) : null;
+      const rows = all.map(p => Object.assign({}, p, {
+        squares: SBS.playerHome.squaresOf(g, p.name),
+        won: computed ? SBS.playerHome.totalWon(computed, p.name) : 0,
+        away: opts.elsewhere(p.name)
+      }));
+      const next = JSON.stringify([manage, open, g.status, g.squarePrice, g.pickMode, g.axisX, g.axisY, filter, openName, pick, rows, me, q]);
       if (next === sig) return;
       sig = next;
-      const focused = body.contains(document.activeElement) ? document.activeElement.dataset.k : null;
+      const focused = root.contains(document.activeElement) ? document.activeElement.dataset.k : null;
       const key = (b, k) => { b.dataset.k = k; return b; };
-      const parts = [];
+      const head = [];
 
-      const boxes = el('div', 'money-boxes', `
-        <div class="money-box"><span class="lbl">Still to collect</span><span class="val${owed > 0 ? ' is-owed' : ' is-good'}">${escapeHtml(money(owed))}</span></div>
-        <div class="money-box"><span class="lbl">Squares taken</span><span class="val">${taken} of 100</span></div>`);
-      parts.push(boxes);
-
-      if (open) {
-        const add = key(button('pm-add', 'Add squares for someone', () => openAdd(null)), 'add');
-        add.disabled = taken >= 100;
-        parts.push(add);
-        const row = el('div', 'pm-picks');
-        const text = el('div', 'pm-picks-text');
-        text.append(textEl('strong', '', 'Players pick their own'), textEl('span', '', pick.text));
-        row.appendChild(text);
-        if (pick.on && pick.limited) {
-          const limit = key(button('secondary pm-limit', 'Limit', openLimit), 'limit');
-          limit.setAttribute('aria-label', `Limit per person, now ${pick.max}. Change`);
-          row.appendChild(limit);
+      if (manage) {
+        head.push(el('div', 'money-boxes', `
+          <div class="money-box"><span class="lbl">Still to collect</span><span class="val${owed > 0 ? ' is-owed' : ' is-good'}">${escapeHtml(money(owed))}</span></div>
+          <div class="money-box"><span class="lbl">Squares taken</span><span class="val">${taken} of 100</span></div>`));
+        if (open) {
+          const add = key(button('pm-add', 'Add squares for someone', () => openAdd(null)), 'add');
+          add.disabled = taken >= 100;
+          head.push(add);
+          const row = el('div', 'pm-picks');
+          const text = el('div', 'pm-picks-text');
+          text.append(textEl('strong', '', 'Players pick their own'), textEl('span', '', pick.text));
+          row.appendChild(text);
+          if (pick.on && pick.limited) {
+            const limit = key(button('secondary pm-limit', 'Limit', openLimit), 'limit');
+            limit.setAttribute('aria-label', `Limit per person, now ${pick.max}. Change`);
+            row.appendChild(limit);
+          }
+          const sw = key(button('helpers-switch', '<span aria-hidden="true"></span>', togglePicks), 'picks');
+          sw.setAttribute('role', 'switch');
+          sw.setAttribute('aria-checked', String(pick.on));
+          sw.setAttribute('aria-label', 'Players pick their own squares');
+          row.appendChild(sw);
+          head.push(row);
+        } else {
+          head.push(textEl('p', 'pm-note', g.status === 'setup' ? "Picking isn't open yet." : "The board is locked, so squares can't move. You can still mark people paid."));
         }
-        const sw = key(button('helpers-switch', '<span aria-hidden="true"></span>', togglePicks), 'picks');
-        sw.setAttribute('role', 'switch');
-        sw.setAttribute('aria-checked', String(pick.on));
-        sw.setAttribute('aria-label', 'Players pick their own squares');
-        row.appendChild(sw);
-        parts.push(row);
-      } else {
-        parts.push(textEl('p', 'pm-note', g.status === 'setup' ? "Picking isn't open yet." : "The board is locked, so squares can't move. You can still mark people paid."));
+        const tabs = el('div', 'pm-filter');
+        tabs.setAttribute('role', 'group');
+        tabs.setAttribute('aria-label', 'Show');
+        [['all', `Everyone (${all.length})`], ['owes', `Owes money (${owing.length})`]].forEach(([k, words]) => {
+          const b = key(button('pm-filter-btn', words, () => { filter = k; draw(); }), `show:${k}`);
+          b.setAttribute('aria-pressed', String(filter === k));
+          tabs.appendChild(b);
+        });
+        head.push(tabs);
       }
+      top.replaceChildren(...head);
+      top.hidden = !head.length;
 
-      const tabs = el('div', 'pm-filter');
-      tabs.setAttribute('role', 'group');
-      tabs.setAttribute('aria-label', 'Show');
-      [['all', `Everyone (${all.length})`], ['owes', `Owes money (${owing.length})`]].forEach(([k, words]) => {
-        const b = key(button('pm-filter-btn', words, () => { filter = k; draw(); }), `show:${k}`);
-        b.setAttribute('aria-pressed', String(filter === k));
-        tabs.appendChild(b);
-      });
-      parts.push(tabs);
-
-      const shown = filter === 'owes' ? owing : all;
+      // This phone's name is pinned on top; everyone else stays A to Z.
+      const shown = rows.filter(p => (filter !== 'owes' || p.unpaidCount > 0) && p.name.toLowerCase().includes(q))
+        .sort((a, b) => (b.name === me) - (a.name === me));
       const list = el('div', 'pm-list');
-      if (!shown.length) list.appendChild(textEl('p', 'player-muted', all.length ? 'Nobody owes money.' : 'No squares picked yet.'));
-      shown.forEach(p => list.appendChild(person(p, open, key)));
-      parts.push(list);
-      body.replaceChildren(...parts);
+      const none = !all.length ? 'No squares picked yet.' : q ? 'No name matches.' : 'Nobody owes money.';
+      if (!shown.length) list.appendChild(textEl('p', 'player-muted', none));
+      shown.forEach(p => list.appendChild(person(p, { manage, open, live, me }, key)));
+      body.replaceChildren(list);
       if (focused) focusKey(focused);
     }
 
-    function person(p, open, key) {
-      const st = payState(p);
-      const card = el('div', 'pm-person');
+    function person(p, at, key) {
+      const { manage, open } = at;
+      const isMe = p.name === at.me;
+      const card = el('div', 'pm-person' + (isMe ? ' is-me' : ''));
       const row = el('div', 'pm-row');
-      const info = el('div', 'pm-info');
-      info.append(textEl('strong', '', p.name), textEl('span', '', `${sq(p.count)}, ${p.unpaidCount ? `owes ${money(p.owed)}` : money(p.total)}`));
-      const pill = key(button(`paid-pill is-${st === 'none' ? 'unpaid' : st}`, PAY_WORD[st], () => {
-        if (st === 'part') payBox(p); else markPaid(p, st === 'paid' ? 0 : p.count);
-      }), `pill:${p.name}`);
-      pill.setAttribute('aria-label', st === 'part' ? `${p.name}: part paid, ${p.paidCount} of ${p.count}. Change`
-        : `${p.name}: ${st === 'paid' ? 'paid. Mark unpaid' : 'unpaid. Mark paid'}`);
       const isShown = openName === p.name;
-      const more = key(button('icon-btn pm-more', DOTS_ICON, () => { openName = isShown ? null : p.name; draw(); }), `more:${p.name}`);
-      more.setAttribute('aria-label', `More for ${p.name}`);
-      more.setAttribute('aria-expanded', String(isShown));
-      row.append(info, pill, more);
+      const line = [sq(p.count)];
+      if (at.live) line.push(`${money(p.won)} won`);
+      // Money owed and paid is the manager's business only.
+      if (manage) line.push(p.unpaidCount ? `owes ${money(p.owed)}` : `${money(p.total)} paid`);
+      const info = key(button('pm-info', '', () => { openName = isShown ? null : p.name; draw(); }), `more:${p.name}`);
+      const name = textEl('strong', '', p.name);
+      if (isMe) name.appendChild(textEl('em', 'pm-you', 'You'));
+      info.append(name, textEl('span', '', line.join(', ')));
+      if (p.away) info.appendChild(textEl('span', 'pm-away', 'Picked on another phone'));
+      info.setAttribute('aria-expanded', String(isShown));
+      row.appendChild(info);
+      if (manage) {
+        const st = payState(p);
+        const pill = key(button(`paid-pill is-${st === 'none' ? 'unpaid' : st}`, PAY_WORD[st], () => {
+          if (st === 'part') payBox(p); else markPaid(p, st === 'paid' ? 0 : p.count);
+        }), `pill:${p.name}`);
+        pill.setAttribute('aria-label', st === 'part' ? `${p.name}: part paid, ${p.paidCount} of ${p.count}. Change`
+          : `${p.name}: ${st === 'paid' ? 'paid. Mark unpaid' : 'unpaid. Mark paid'}`);
+        row.appendChild(pill);
+      }
       card.appendChild(row);
       if (!isShown) return card;
 
       const panel = el('div', 'pm-panel');
+      const squares = el('ul', 'pm-squares');
+      p.squares.forEach(i => squares.appendChild(el('li', '', SBS.playerHome.squareHtml(opts.getGame(), i))));
+      panel.appendChild(squares);
+      if (!isMe && !p.away) {
+        panel.appendChild(key(button('', 'This is me', () => { opts.choose(p.name); focusKey(`more:${p.name}`); }), `me:${p.name}`));
+      }
+      card.appendChild(panel);
+      if (!manage) return card;
+
       if (p.count > 1) panel.appendChild(key(button('secondary', 'Part payment', () => payBox(p)), `part:${p.name}`));
       if (open) {
         const add = key(button('secondary', `Add squares for ${escapeHtml(p.name)}`, () => openAdd(p.name)), `add:${p.name}`);
@@ -385,9 +430,8 @@
         panel.appendChild(key(button('danger', `Remove ${p.unpaidCount} unpaid`, () => removeUnpaid(p)), `remove:${p.name}`));
         panel.appendChild(textEl('p', 'player-muted', p.paidCount ? 'Paid squares stay.' : 'Their squares open up for someone else.'));
       } else {
-        panel.appendChild(textEl('p', 'player-muted', open ? 'Paid squares stay put. Ask the host to move them.' : 'Squares can\'t move after the board is locked.'));
+        panel.appendChild(textEl('p', 'player-muted', open ? 'Paid squares stay put. Ask the host to move them.' : "Squares can't move after the board is locked."));
       }
-      card.appendChild(panel);
       return card;
     }
 

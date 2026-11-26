@@ -104,11 +104,11 @@ always wins.
 `index.html` loads plain scripts in order: `compute.js` (payout math, validation,
 cutoff rules, shared with the server and unit-tested), `teams.js` (NFL/NBA names
 colors and ESPN logo URLs), `qrcode.js`, `core.js` (API client, routing, sign-in prompt by mode and 401 replay, 403 handling), `ui.js`,
-`players.js`, `board.js`, `score-panel.js` (the score pad: the only place a score is entered; one Undo, End and Fix dialogs, keyboard scoring on a laptop), `players-tab.js` (the squares manager's Players tab), `present.js` (Present on an HDMI TV:
+`players.js`, `board.js`, `score-panel.js` (the score pad: the only place a score is entered; one Undo, End and Fix dialogs, keyboard scoring on a laptop), `players-tab.js` (Player View's Players tab, with the squares manager's controls), `present.js` (Present on an HDMI TV:
 Party View in its own window, on the second screen when the browser can), then screens: `screen-home` (Home: top bar with New game and the account menu, Today / Coming up / Past games sections of cards with a primary button, Party View and a ⋯ menu, tiles for a TV browser; also setup and the version
 footer), `screen-picking` (two columns from 1024 px, one below, three tabs on a phone; `players.js` has the Players card and payment box it shares with Game Day), `screen-gameday` (from 1024 px, not a phone: a tabbed panel left, the grid right, the page fitted to the window by `#app.fit-screen`; below that, the stat strip, grid, score pad and quarters list in one column),
-`screen-player` (Player View: pick while picking is open, then My Squares; a helper's phone gets a bottom tab bar, My squares, then Score and Players for the jobs it holds), `screen-tvpair` (TV pairing and the Connect box),
-`screen-mirror` (Mirror mode for one phone, `#mirror-<id>`: TV-style board, score strip on tap),
+`player-home` and `screen-player` (Player View, a bottom tab bar: Home, Players, then Picks while players can pick or Live after the lock, plus Score for a scorekeeper; a squares manager edits in Players; who the phone is comes from its pick key, else a name chosen and kept on that phone), `screen-tvpair` (TV pairing and the Connect box),
+`screen-mirror` (Mirror mode for one phone, `#mirror-<id>`: TV-style board, score strip on tap; Player View opens the same screen read-only for guests, with no role check or strip),
 `screen-helpers` (the Helpers panel: a dialog from Connect and Home, a tab on wide Game Day; the `#helper-<token>` page; where an old `#score-<id>` link goes), and `app.js` (hash router: `#tv-<id>`,
 `#player-<id>`, `#helper-<token>`). Every polling screen refetches its game every 4 to 15 s through
 `SBS.api.pollGame` (the edge's copy, never older than what the tab has seen); other reads use

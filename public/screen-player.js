@@ -1,95 +1,48 @@
 // Player companion view: what a grid player sees after scanning the QR code
-// printed or displayed at the party. Read-only for everyone but a helper,
-// whose jobs are tabs at the bottom (decision 025): just "how am I doing right now" plus quarter winners so far. Polls
-// like the TV/phone screens so it stays live without a manual refresh.
+// printed or displayed at the party, as tabs at the bottom (R44): Home, Players, then Picks
+// before the lock or Live after it, plus what a helper's jobs add (decision 025). Home is in
+// player-home.js and Players in players-tab.js. Polls like the TV/phone screens so it stays
+// live without a manual refresh.
 (function () {
   'use strict';
 
   const SBS = window.SBS = window.SBS || {};
-  const { el, textEl, escapeHtml, money, showAlert, applyTeamColors, teamBadge, teamAbbr, teamStyle, fitTeamBadges, isPhone } = SBS.ui;
+  const { el, textEl, escapeHtml, money, applyTeamColors, teamBadge, fitTeamBadges, isPhone } = SBS.ui;
   const { playerSummaries } = SBS.players;
-  const { QUARTERS, QLABEL, computeGame, computeLiveHighlight, payoutAmount, drawnDigits } = window.GameLogic;
+  const { computeGame, nameKey } = window.GameLogic;
 
   function storageKey(id) { return `sbs-player-view-${id}`; }
-  // Set once this phone has tapped Pick squares on the board, so a reload opens picking again.
+  // Set once this phone has opened picking on the board, so a reload asks the server who it is.
   // Choosing a name just to look never does: looking must not set the pick cookie.
   function pickerKey(id) { return `sbs-guest-picker-${id}`; }
+  // The name the server last said this phone holds, and "Just watching".
+  function pickedKey(id) { return `sbs-guest-name-${id}`; }
+  function skipKey(id) { return `sbs-player-skip-${id}`; }
   function isPicker(id) { try { return window.localStorage.getItem(pickerKey(id)) === '1'; } catch (e) { return false; } }
 
-  function squareInfo(game, computed, liveHighlight, idx) {
-    const row = Math.floor(idx / 10), col = idx % 10;
-    const key = `${row}-${col}`;
-    const labels = computed.cellLabels[key] || [];
-    const won = labels.filter(l => !l.pushed).map(l => l.label);
-    const pushed = labels.filter(l => l.pushed).map(l => l.label);
-    const isLiveWinner = !!(liveHighlight && liveHighlight.winnerKey === key);
-    const isNear = !!(liveHighlight && liveHighlight.nearKeys.has(key));
-    let status = 'dormant';
-    if (won.length || isLiveWinner) status = 'winning';
-    else if (isNear) status = 'threat';
-    return {
-      idx, row, col, key, won, pushed, isLiveWinner, isNear, status,
-      xDigit: game.axisX ? game.axisX[col] : null,
-      yDigit: game.axisY ? game.axisY[row] : null
-    };
+  // The live score strip at the top of Home and Score, after the lock.
+  function tickerHtml(game) {
+    const live = game.liveScore;
+    const final = computeGame(game).results.final;
+    const hasFinal = final.a !== null && final.b !== null;
+    const auto = SBS.playerHome.isAutoScored(game);
+    // A manually-scored game has no live feed to fall back on, so there's nothing meaningful
+    // to show until the host enters the Final score: better nothing than a dash that looks
+    // like a score but never updates.
+    const score = (side) => (live && live[side] !== undefined && live[side] !== null ? live[side] : hasFinal ? final[side] : auto ? '–' : '');
+    const statusTxt = game.status === 'finished' ? 'FINAL'
+      : (live && live.state === 'in') ? [live.period ? (live.period > 4 ? (live.period > 5 ? `${live.period - 4}OT` : 'OT') : `Q${live.period}`) : '', live.clock].filter(Boolean).map(escapeHtml).join(' &middot; ')
+      : 'In Progress';
+    // Same glowing pill treatment the Home screen's game card uses for a "started" game.
+    const statusCls = 'pt-status' + (game.status === 'started' ? ' is-live' : '');
+    const team = (side, key) => `<div class="pt-team badge-fit">
+          ${teamBadge(game, side, { logoSize: 20, cls: 'team-badge-sm' })}
+          <div class="pt-pts">${escapeHtml(score(key))}</div>
+        </div>`;
+    return `<div class="player-ticker">${team('A', 'a')}<div class="pt-mid"><div class="${statusCls}">${statusTxt}</div></div>${team('B', 'b')}</div>`;
   }
 
-  // "TM1 # | # TM2" — the two digits (the actual score that matters) set off
-  // in the accent color so they read at a glance against the team abbreviations.
-  function coordHtml(game, info) {
-    const abbrA = teamAbbr(game.teamA, teamStyle(game, 'A').meta);
-    const abbrB = teamAbbr(game.teamB, teamStyle(game, 'B').meta);
-    const y = info.yDigit === null ? '–' : info.yDigit;
-    const x = info.xDigit === null ? '–' : info.xDigit;
-    return `<span class="coord-team">${escapeHtml(abbrA)}</span> `
-      + `<span class="coord-num">${escapeHtml(String(y))}</span>`
-      + `<span class="coord-sep">|</span>`
-      + `<span class="coord-num">${escapeHtml(String(x))}</span> `
-      + `<span class="coord-team">${escapeHtml(abbrB)}</span>`;
-  }
-
-  const STATUS_META = {
-    winning: { tag: 'Winning', cls: 'status-winning' },
-    threat: { tag: 'Hot Threat', cls: 'status-threat' },
-    dormant: { tag: 'Dormant', cls: 'status-dormant' }
-  };
-
-  function squareDesc(info) {
-    if (info.status === 'winning') {
-      return info.won.length ? `Already won ${info.won.join(', ')}` : 'Holding the current payout window';
-    }
-    if (info.status === 'threat') return 'One likely score away from flipping your way';
-    return 'Needs a bigger swing to get in play';
-  }
-
-  // True once the server has (or will) auto-update this game's score — a real
-  // ESPN feed found a match, or the host turned on Simulation Mode. When
-  // neither is true, the host is typing quarter scores in by hand: there's no
-  // live projection to show a "who's winning right now" readout for, and the
-  // running score is meaningless (just a stale placeholder) until the actual
-  // quarters get entered.
-  function isAutoScored(game) {
-    return !!(game.simulation || game.liveScore);
-  }
-
-  function hasFinalScore(computed) {
-    const f = computed.results.final;
-    return f.a !== null && f.a !== undefined && f.a !== '' && f.b !== null && f.b !== undefined && f.b !== '';
-  }
-
-  // Sum of every quarter this player has actually won so far. A pushed
-  // quarter has no winner of its own (its payout just rolls into whichever
-  // quarter is scored next — see compute.js), so it's excluded here same as
-  // everywhere else winnings are totaled (the TV screen's final summary).
-  function computeTotalWon(computed, playerName) {
-    if (!playerName) return 0;
-    return QUARTERS.reduce((sum, q) => {
-      const res = computed.results[q];
-      return (res.resolved && !res.pushed && res.winnerName === playerName) ? sum + res.amount : sum;
-    }, 0);
-  }
-
-  // ---------- Join code: link, share, mini grid (R22, decision 016) ----------
+  // ---------- Join code: link and share (R22, decision 016) ----------
 
   function joinUrl(game) {
     // A board from before join codes keeps its long link until its owner next reads it.
@@ -220,28 +173,6 @@
     SBS.onLeaveScreen(close);
   }
 
-  // A small 10x10 of the board: claimed squares shaded, the viewer's own
-  // highlighted. Never says who has or hasn't paid.
-  function miniGrid(game, mine) {
-    const wrap = el('div', 'mini-grid');
-    const claimed = game.squares.filter(Boolean).length;
-    const own = mine ? game.squares.filter(sq => sq && sq.name === mine).length : 0;
-    wrap.setAttribute('role', 'img');
-    wrap.setAttribute('aria-label', `Board: ${claimed} of 100 squares claimed` + (mine ? `, ${own} of them yours` : ''));
-    let html = '<div class="mg-corner"></div>';
-    for (let c = 0; c < 10; c++) html += `<div class="mg-axis">${game.axisX ? escapeHtml(String(game.axisX[c])) : ''}</div>`;
-    for (let r = 0; r < 10; r++) {
-      html += `<div class="mg-axis">${game.axisY ? escapeHtml(String(game.axisY[r])) : ''}</div>`;
-      for (let c = 0; c < 10; c++) {
-        const sq = game.squares[r * 10 + c];
-        const cls = 'mg-cell' + (sq ? ' is-filled' : '') + (sq && mine && sq.name === mine ? ' is-mine' : '');
-        html += `<div class="${cls}"></div>`;
-      }
-    }
-    wrap.innerHTML = html;
-    return wrap;
-  }
-
   // /<code>: resolve the code, then show the guest view. The address becomes the
   // ordinary deep link so a reload does not need the lookup again.
   function renderJoin(code) {
@@ -276,11 +207,11 @@
   const coordOf = (i) => `R${Math.floor(i / 10) + 1}C${i % 10 + 1}`;
   const localTime = (ms) => new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-  // ctx: { id, game() -> the board, setGame(g) stores and redraws, remember(name) saves the
-  // name the page already keeps, reload() fetches the board again }.
+  // ctx: { id, game() -> the board, setGame(g) stores and redraws, remember(name) takes the
+  // server's word on this phone's name, reload() fetches the board again, markPicker(),
+  // claimed(count) after a claim }.
   function createGuestPanel(ctx) {
     const root = el('div', 'guest-panel');
-    const miniHolder = el('div');
     const startRow = el('div', 'gp-start');
     const startBtn = el('button', 'gp-start-btn', 'Pick squares');
     startBtn.type = 'button';
@@ -289,15 +220,17 @@
 
     const live = el('div', 'gp-live');
     const nameWrap = el('div', 'gp-name');
-    nameWrap.innerHTML = '<label for="gp-name-input">Your name</label>';
+    nameWrap.innerHTML = '<label for="gp-name-input">First name and last initial</label>';
     const nameInput = el('input', '');
     nameInput.type = 'text';
     nameInput.id = 'gp-name-input';
     nameInput.maxLength = 10;
     nameInput.autocomplete = 'off';
     nameInput.setAttribute('autocapitalize', 'words');
-    nameInput.placeholder = 'Name (up to 10)';
-    nameWrap.appendChild(nameInput);
+    nameInput.placeholder = 'Up to 10 letters';
+    const warn = el('p', 'gp-warn');
+    warn.setAttribute('role', 'status');
+    nameWrap.append(nameInput, warn);
     const asLine = el('p', 'gp-as');
     const capLine = el('p', 'gp-cap');
     const boardWrap = el('div', 'gp-board');
@@ -328,9 +261,9 @@
     const status = el('p', 'gp-status');
     status.setAttribute('role', 'status');
     status.setAttribute('aria-live', 'polite');
-    const owed = el('p', 'gp-owed');
-    live.append(asLine, nameWrap, capLine, boardWrap, actionRow, autoWrap);
-    root.append(startRow, miniHolder, live, status, owed);
+    live.append(nameWrap, asLine, capLine, boardWrap, autoWrap);
+    // The claim bar stays above the tab bar while squares are selected.
+    root.append(startRow, live, status, actionRow);
 
     let started = false;
     let name = null;       // the name this phone holds on the board, from the server
@@ -374,19 +307,18 @@
       }
       rel = rel.filter(i => g.squares[i] && g.squares[i].name === name);
 
-      miniHolder.innerHTML = '';
-      startRow.hidden = started;
+      startRow.hidden = started || busy;
       startBtn.disabled = busy;
       live.hidden = !started;
       if (!started) {
-        owed.hidden = true;
-        miniHolder.appendChild(miniGrid(g, ctx.viewing()));
+        actionRow.hidden = true;
         return;
       }
 
       asLine.hidden = !name;
       asLine.textContent = name ? `Picking as ${name}` : '';
       nameWrap.hidden = !!name;
+      checkName();
 
       const c = cap();
       const gp = g.guestPick || {};
@@ -439,16 +371,15 @@
       clearBtn.disabled = busy;
       autoWrap.hidden = m === 'manual';
       autoBtn.disabled = busy;
-
-      const o = window.GameLogic.owedSummary(g)[name];
-      if (name && o) {
-        owed.hidden = false;
-        owed.textContent = (o.owed > 0 ? `${money(o.owed)} owed to the host for ${o.unpaidCount} square${o.unpaidCount === 1 ? '' : 's'}. ` : 'Nothing owed right now. ')
-          + 'Pay the host directly. The money goes to the host, not to us.';
-      } else {
-        owed.hidden = true;
-      }
     }
+
+    // Said while typing: the server refuses a taken name (decision 019 section 2).
+    function checkName() {
+      const key = nameKey(nameInput.value);
+      const taken = !name && !!key && game().squares.some(s => s && nameKey(s.name) === key);
+      warn.textContent = taken ? 'That name is taken. Not you? Add your last initial.' : '';
+    }
+    nameInput.addEventListener('input', checkName);
 
     function toggle(i) {
       if (busy) return;
@@ -501,6 +432,10 @@
         rel = [];
         ctx.setGame(res.game);
         say(summary());
+        if (op.op === 'claim') {
+          say('');
+          ctx.claimed(myIdx().length);
+        }
       } catch (e) {
         busy = false;
         if (e && e.status === 401) {
@@ -516,8 +451,6 @@
           render();
         }
         say((e && e.message) || 'That did not work. Try again.');
-        // The board moved on (closed or switched off): the page has changed under the message.
-        if (!guestPickingOn(game())) showAlert((e && e.message) || 'Picking is closed.');
       }
     }
 
@@ -540,7 +473,10 @@
 
     // Ask the server who this phone is on this board; it also hands out the key cookie.
     // `quiet`: a reload of a phone that picked before, so nothing is said if it cannot.
-    async function start(quiet) {
+    // `focusName`: Join was tapped, so the name box is ready to type in.
+    async function start(quiet, focusName) {
+      const focusBox = () => { if (focusName) (name ? boardWrap.querySelector('.gp-cell:not(:disabled)') || nameInput : nameInput).focus(); };
+      if (started) return focusBox();
       if (busy) return;
       busy = true;
       startBtn.disabled = true;
@@ -561,13 +497,12 @@
       started = true;
       name = res.name || null;
       if (!quiet) ctx.markPicker();
-      if (name) ctx.remember(name);
+      ctx.remember(name);
       say('');
       render();
-      const focusTarget = name ? boardWrap.querySelector('.gp-cell:not(:disabled)') : nameInput;
-      if (!quiet && focusTarget) focusTarget.focus();
+      focusBox();
     }
-    startBtn.addEventListener('click', () => start(false));
+    startBtn.addEventListener('click', () => start(false, true));
 
     // A host rename moves the name; a host removal ends it. When this phone's name has no
     // squares any more, ask again.
@@ -585,35 +520,123 @@
     return { root, render, start, followName };
   }
 
-  // Tabler "layout-grid", "scoreboard" and "users" (MIT, 24 px outline).
-  const tabSvg = (paths) => `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
-  const GRID_ICON = tabSvg('<path d="M4 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M14 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M4 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M14 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/>');
-  const SCORE_ICON = tabSvg('<path d="M3 5m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"/><path d="M12 5v2"/><path d="M12 10v1"/><path d="M12 14v1"/><path d="M12 18v1"/><path d="M7 3v2"/><path d="M17 3v2"/><path d="M15 10.5v3a1.5 1.5 0 0 0 3 0v-3a1.5 1.5 0 0 0 -3 0z"/><path d="M6 9h1.5a1.5 1.5 0 0 1 0 3h-.5h.5a1.5 1.5 0 0 1 0 3h-1.5"/>');
+  // ---------- The copy kept on the phone (Neon cold start) ----------
+  // The last board this phone fetched, so a reopened page paints before the database wakes.
+  // Only the few most recent boards are kept.
+  const COPY_PREFIX = 'sbs-player-board-';
+  const COPY_KEEP = 3;
+  function readCopy(id) {
+    try {
+      const c = JSON.parse(window.localStorage.getItem(COPY_PREFIX + id));
+      return c && c.game && Array.isArray(c.game.squares) ? c : null;
+    } catch (e) { return null; }
+  }
+  function writeCopy(id, game, at) {
+    try {
+      const store = window.localStorage;
+      store.setItem(COPY_PREFIX + id, JSON.stringify({ at, game }));
+      const keys = Array.from({ length: store.length }, (_, i) => store.key(i)).filter(k => k.indexOf(COPY_PREFIX) === 0);
+      if (keys.length <= COPY_KEEP) return;
+      const age = (k) => { try { return JSON.parse(store.getItem(k)).at || 0; } catch (e) { return 0; } };
+      keys.sort((a, b) => age(b) - age(a)).slice(COPY_KEEP).forEach(k => store.removeItem(k));
+    } catch (e) { /* storage full or off: the next visit waits for the server */ }
+  }
+  function dropCopy(id) {
+    try { window.localStorage.removeItem(COPY_PREFIX + id); } catch (e) { /* nothing kept */ }
+  }
 
+  // ---------- You won (R44) ----------
+  // Each win is announced once on a phone: its banner stays until dismissed, and it buzzes once.
+  // Returns { el, update(game, name, tab, fresh) }.
+  function createWinBanner(id, openHome) {
+    const root = el('div', 'win-banners');
+    root.setAttribute('role', 'status');
+    const key = `sbs-player-wins-${id}`;
+    let seen = { buzzed: [], gone: [] };
+    try { seen = Object.assign(seen, JSON.parse(window.localStorage.getItem(key))); } catch (e) { /* start over */ }
+    const save = () => { try { window.localStorage.setItem(key, JSON.stringify(seen)); } catch (e) { /* this visit only */ } };
+    let sig = '';
+    let last = null;
+
+    function update(game, name, tab, fresh) {
+      last = [game, name, tab, fresh];
+      const computed = computeGame(game);
+      const wins = !name ? [] : window.GameLogic.QUARTERS.map(q => {
+        const r = computed.results[q];
+        return r.resolved && !r.pushed && r.winnerName === name ? { id: `${q}|${name}`, q, amount: r.amount } : null;
+      }).filter(w => w && seen.gone.indexOf(w.id) === -1).reverse(); // newest first
+      // Only a board straight from the server, on a page someone can see, buzzes.
+      const unfelt = fresh && !document.hidden ? wins.filter(w => seen.buzzed.indexOf(w.id) === -1) : [];
+      if (unfelt.length) {
+        unfelt.forEach(w => seen.buzzed.push(w.id));
+        save();
+        try { if (navigator.vibrate) navigator.vibrate(200); } catch (e) { /* no buzz */ }
+      }
+      const home = tab === 'home';
+      const next = JSON.stringify([home, wins]);
+      if (next === sig) return;
+      sig = next;
+      const had = root.contains(document.activeElement);
+      // One banner for every win not yet dismissed: "You won Q1 and the half · $500".
+      const phrases = wins.slice().reverse().map(w => SBS.playerHome.WON_PHRASE[w.q]);
+      const named = phrases.length > 1 ? `${phrases.slice(0, -1).join(', ')} and ${phrases[phrases.length - 1]}` : phrases[0];
+      const words = `You won ${named} · ${money(wins.reduce((t, w) => t + w.amount, 0))}`;
+      const press = (cls, label, onClick) => {
+        const b = el('button', cls, label);
+        b.type = 'button';
+        b.addEventListener('click', onClick);
+        return b;
+      };
+      if (!wins.length) {
+        root.replaceChildren();
+      } else if (home) {
+        const card = el('div', 'win-banner');
+        const text = el('div', 'win-text');
+        text.append(textEl('strong', '', words), textEl('span', '', 'Collect from the host.'));
+        card.append(text, press('secondary win-dismiss', 'Dismiss', () => {
+          wins.forEach(w => seen.gone.push(w.id));
+          save();
+          update(...last);
+          const b = document.querySelector('.player-tab[aria-current]');
+          if (b) b.focus();
+        }));
+        root.replaceChildren(card);
+      } else {
+        root.replaceChildren(press('win-slim', escapeHtml(words), openHome));
+      }
+      if (had && !root.contains(document.activeElement)) { const b = root.querySelector('button'); if (b) b.focus(); }
+    }
+
+    return { el: root, update };
+  }
+
+  // Tabler "home", "activity", "layout-grid", "scoreboard" and "users" (MIT, 24 px outline).
+  const tabSvg = (paths) => `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+  const HOME_ICON = tabSvg('<path d="M5 12l-2 0l9 -9l9 9l-2 0"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7"/><path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6"/>');
+  const LIVE_ICON = tabSvg('<path d="M3 12h4l3 8l4 -16l3 8h4"/>');
+  const PICKS_ICON = tabSvg('<path d="M4 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M14 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M4 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M14 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/>');
+  const SCORE_ICON = tabSvg('<path d="M3 5m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"/><path d="M12 5v2"/><path d="M12 10v1"/><path d="M12 14v1"/><path d="M12 18v1"/><path d="M7 3v2"/><path d="M17 3v2"/><path d="M15 10.5v3a1.5 1.5 0 0 0 3 0v-3a1.5 1.5 0 0 0 -3 0z"/><path d="M6 9h1.5a1.5 1.5 0 0 1 0 3h-.5h.5a1.5 1.5 0 0 1 0 3h-1.5"/>');
   const PLAYERS_ICON = tabSvg('<path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0 -3 -3.85"/>');
 
-  // The helper's side of Player View (decision 025 section 2): a welcome once, then a tab per job.
-  // ctx: { id, route, wrap, header, game(), setGame(g), redraw(), saved(), selected(), choose(name) }.
-  // Opening a tab changes nothing on the server; the jobs come from GET …/role. The first tab is this
-  // page as any player sees it, and no job is needed to see it. The name chosen here is display only:
-  // a helper need not be playing, and nothing is authorized by a name.
-  function createHelperTabs(ctx) {
+  // The helper's side of Player View (decision 025 section 2): a welcome once, then what the jobs
+  // add. The scorekeeper gets a Score tab; the squares manager gets editing controls in the Players
+  // tab. Nothing changes on the server by looking; the jobs come from GET …/role. The name chosen in
+  // the welcome is display only: a helper need not be playing, and nothing is authorized by a name.
+  // ctx: { id, route, wrap, game(), setGame(g), redraw(), selected(), choose(name), welcomed(tab),
+  // lost() }.
+  function createHelpers(ctx) {
     const flag = SBS.helpers.phone;
     let role = null;          // the server's last answer, or null
-    let tab = 'mine';
-    let wanted = ctx.route.tab === 'score' ? 'score' : null; // an old score link
+    let wanted = ctx.route.tab === 'score'; // an old score link
     const maybe = () => ctx.route.helper === true || !!flag.get(ctx.id);
 
-    const pane = el('div', 'helper-pane');
-    pane.hidden = true;
-    const nav = el('nav', 'helper-tabs');
-    nav.setAttribute('aria-label', 'This board');
-    nav.hidden = true;
+    const welcomePane = el('div', 'helper-pane');
+    welcomePane.hidden = true;
+    const scorePane = el('div', 'helper-pane');
+    scorePane.hidden = true;
     const note = el('p', 'helper-note');
     note.setAttribute('role', 'status');
     note.hidden = true;
-    ctx.header.after(note, pane);
-    ctx.wrap.appendChild(nav);
 
     let pad = null; // made the first time it is shown: most phones here are guests'
     const makePad = () => SBS.scorePanel.create({
@@ -623,26 +646,17 @@
       // 403, not 401, when this phone happens to be signed in as some other host.
       onError: (e) => lost(e, 'canScore')
     });
-    let people = null; // the Players tab, likewise
-    const makePeople = () => SBS.playersTab.create({
-      getGame: ctx.game,
-      // Names and squares may have changed, so the whole page follows, not only the score.
-      setGame: (g) => { ctx.setGame(g); ctx.redraw(); ctx.saved(); },
-      patch: (op) => SBS.api.patchSquares(ctx.id, op),
-      reload: () => SBS.api.getGame(ctx.id).catch(() => null),
-      onError: (e) => lost(e, 'canSquares')
-    });
 
     const isOpen = () => ctx.game().status === 'started' || ctx.game().status === 'finished';
-    // Each job is a tab, in this order after the first one.
     const JOBS = [
-      { key: 'canScore', tab: 'score', label: 'Score', icon: SCORE_ICON, title: 'Scorekeeper', off: 'scorekeeping',
-        lost: 'keep score', duty: ['Keep score', 'Tap what happens. End each quarter.'] },
-      { key: 'canSquares', tab: 'players', label: 'Players', icon: PLAYERS_ICON, title: 'Squares manager', off: 'managing squares',
-        lost: 'manage squares', duty: ['Manage squares', 'Help people pick, and mark who has paid.'] }
+      { key: 'canScore', title: 'Scorekeeper', off: 'scorekeeping', lost: 'keep score',
+        duty: ['Keep score', 'Tap what happens. End each quarter.'] },
+      { key: 'canSquares', title: 'Squares manager', off: 'managing squares', lost: 'manage squares',
+        duty: ['Manage squares', 'In the Players tab: help people pick, and mark who has paid.'] }
     ];
     const held = () => JOBS.filter(j => role && role[j.key]);
     const jobNames = () => held().map(j => j.title).join(' and ');
+    const welcoming = () => held().length > 0 && flag.get(ctx.id) === 'new';
     let told = null; // the job the note says is gone
 
     function say(text) {
@@ -650,13 +664,12 @@
       note.hidden = !text;
     }
     // A save was refused: that job is over. 403 when this phone is also signed in as another host.
-    // Only its tab goes; the server says what is left.
+    // Only its controls go; the server says what is left.
     function lost(e, job) {
       if (e.status !== 401 && e.status !== 403) return false;
       if (role) role = Object.assign({}, role, { [job]: false });
       told = job;
       say(`You no longer ${JOBS.find(j => j.key === job).lost} on this board. If that is a mistake, ask the host for a new code.`);
-      draw();
       ctx.redraw();
       ask();
       return true;
@@ -683,72 +696,38 @@
       } else if (isHelper && !flag.get(ctx.id)) {
         flag.set(ctx.id, 'new');
       }
-      if (wanted && role && role.canScore) { tab = wanted; }
-      wanted = null;
+      const open = wanted && role && role.canScore;
+      wanted = false;
       const gone = before && role ? JOBS.filter(j => before[j.key] && !role[j.key]) : [];
       if (gone.length) {
         told = gone.length > 1 ? 'all' : gone[0].key;
         say(`The host switched off ${gone.map(j => j.off).join(' and ')} on this phone.`);
       }
-      if (JSON.stringify(before) !== JSON.stringify(role)) { draw(); ctx.redraw(); }
+      if (open) ctx.welcomed('score');
+      else if (JSON.stringify(before) !== JSON.stringify(role)) ctx.redraw();
     }
 
-    function draw() {
-      if (!ctx.game()) return;
-      const job = held().find(j => j.tab === tab);
-      if (!job) tab = 'mine';
-      if (people && tab !== 'players') people.close();
-      const welcome = held().length > 0 && flag.get(ctx.id) === 'new';
-      const hasTabs = held().length > 0 && !welcome;
-      ctx.wrap.classList.toggle('on-job', welcome || (hasTabs && tab !== 'mine'));
-      ctx.wrap.classList.toggle('has-tabs', hasTabs);
-      nav.hidden = !hasTabs;
-      pane.hidden = !(welcome || (hasTabs && tab !== 'mine'));
-      if (welcome) return drawWelcome();
-      if (hasTabs) drawNav();
-      if (pane.hidden) return pane.replaceChildren();
-      if (tab === 'players') {
-        if (!people) people = makePeople();
-        if (pane.firstChild !== people.el) pane.replaceChildren(people.el);
-        return people.update();
-      }
+    // The Score tab, while it is the one shown.
+    function drawScore() {
       if (!isOpen()) {
         const wait = el('div', 'card player-card helper-wait');
         wait.append(textEl('h2', '', "Scoring isn't open yet"), textEl('p', 'player-muted', 'It opens here by itself when the host locks the board and the numbers are drawn.'));
-        return pane.replaceChildren(wait);
+        return scorePane.replaceChildren(wait);
       }
       if (!pad) pad = makePad();
-      if (pane.firstChild !== pad.el) pane.replaceChildren(pad.el);
+      if (scorePane.firstChild !== pad.el) scorePane.replaceChildren(pad.el);
       pad.update();
-    }
-
-    function drawNav() {
-      const had = nav.contains(document.activeElement);
-      nav.replaceChildren(...[['mine', ctx.selected() ? 'My squares' : 'Board', GRID_ICON], ...held().map(j => [j.tab, j.label, j.icon])].map(([k, label, icon]) => {
-        const b = el('button', 'helper-tab', `${icon}<span>${label}</span>`);
-        b.type = 'button';
-        if (k === tab) b.setAttribute('aria-current', 'page');
-        b.addEventListener('click', () => {
-          if (tab === k) return;
-          tab = k;
-          draw();
-          window.scrollTo(0, 0);
-          ask();
-        });
-        return b;
-      }));
-      if (had) nav.querySelector('[aria-current]').focus();
     }
 
     // Once: what they may do, and whose squares are theirs.
     function drawWelcome() {
-      const shown = pane.querySelector('.helper-welcome');
+      const shown = welcomePane.querySelector('.helper-welcome');
       if (shown && shown.dataset.jobs === jobNames()) return; // a poll must not close an open list
       const card = el('div', 'card player-card helper-welcome');
       card.dataset.jobs = jobNames();
       card.appendChild(textEl('h2', '', 'You were asked to help run this board'));
       const duties = held().map(j => j.duty);
-      duties.push(['Your own squares stay here', 'Switch any time with the tabs at the bottom. Not playing? You still see the board.']);
+      duties.push(['Your own squares stay on Home', 'Switch any time with the tabs at the bottom. Not playing? You still see the board.']);
       duties.forEach(([name, text]) => {
         const d = el('div', 'helper-duty');
         d.append(textEl('strong', '', name), textEl('span', '', text));
@@ -772,23 +751,19 @@
       go.addEventListener('click', () => {
         flag.set(ctx.id, 'ok');
         ctx.choose(select.value || null);
-        tab = role && role.canScore && isOpen() ? 'score' : role && role.canSquares ? 'players' : 'mine';
-        pane.replaceChildren();
-        draw();
-        ctx.redraw();
-        window.scrollTo(0, 0);
+        welcomePane.replaceChildren();
+        ctx.welcomed(role && role.canScore && isOpen() ? 'score' : role && role.canSquares ? 'players' : 'home');
       });
       card.append(label, go, textEl('p', 'player-muted', 'This works on this phone, for this board, until the game is over.'));
-      pane.replaceChildren(card);
+      welcomePane.replaceChildren(card);
     }
 
     return {
-      ask, draw,
-      maybe,
-      onJob: () => tab !== 'mine' && !pane.hidden,
-      busy: () => (!!pad && pad.busy()) || (!!people && people.busy()),
+      ask, maybe, lost, welcoming, drawWelcome, drawScore, note, welcomePane, scorePane,
+      can: (key) => !!(role && role[key]),
+      busy: () => !!pad && pad.busy(),
       // Another device saved: what was done here may not undo cleanly.
-      saved: () => { if (pad) pad.clearUndo(); if (people) people.clearUndo(); },
+      saved: () => { if (pad) pad.clearUndo(); },
       line: () => (role && jobNames() ? [ctx.selected(), jobNames()].filter(Boolean).join(' · ') : '')
     };
   }
@@ -803,360 +778,292 @@
     app.appendChild(wrap);
 
     const header = el('div', 'player-header');
+    header.innerHTML = '<div class="player-muted">Opening the board…</div>';
     wrap.appendChild(header);
 
-    const selectRow = el('div', 'player-select-row');
-    wrap.appendChild(selectRow);
-
-    const inviteBtn = el('button', 'secondary player-invite-btn', 'Invite friends');
-    inviteBtn.type = 'button';
-    inviteBtn.hidden = true; // until the board loads
-    inviteBtn.addEventListener('click', () => showInvite(game));
-    wrap.appendChild(inviteBtn);
-
-    const body = el('div', 'player-body');
-    wrap.appendChild(body);
-    // R13: the guest-to-host link. Carries this board's join code so a sign-up is attributed to it.
-    const hostLink = el('a', 'player-host-link', 'Running your own pool? Host your own board');
-    hostLink.target = '_blank';
-    hostLink.rel = 'noopener';
-    hostLink.hidden = true; // until the board loads
-    wrap.appendChild(hostLink);
-    wrap.appendChild(SBS.ui.legalLinks());
-
     let game = null;
-    let selectedPlayer = null;
-    let panel = null; // the guest-pick panel, kept for the life of the screen
-    let helper = null; // the helper's tabs, made once the board has loaded
-    let panelCard = null; // the card it sits in, left in place while picking so typing and focus survive
+    let tab = 'home';     // everyone lands on Home
+    let panel = null;     // the guest-pick panel, kept for the life of the screen
+    let parts = null;     // the panes and the tab bar, made once the board has loaded
+    let closedNote = ''; // what Home is about to say because picking closed
+    let stale = false;   // what is on screen is the phone's copy, not yet the server's
+    let fetchedAt = 0;
+    let saved = '';      // the board already kept on the phone
+
+    // ----- who this phone is (decision 019) -----
+    // `chosen`: a name picked from a list, kept on this phone only; it changes only what this phone
+    // shows. `picked`: the server's answer to this phone's pick key, kept so it still reads "You"
+    // after the lock, when the server no longer says. Only that name is shown money owed.
+    const read = (key) => { try { return window.localStorage.getItem(key); } catch (e) { return null; } };
+    const write = (key, value) => {
+      try {
+        if (value) window.localStorage.setItem(key, value);
+        else window.localStorage.removeItem(key);
+      } catch (e) { /* private browsing etc — it just won't persist */ }
+    };
+    let chosen = read(storageKey(id));
+    let picked = read(pickedKey(id));
+    let skipped = read(skipKey(id)) === '1';
+
+    const hasSquares = (name) => !!name && game.squares.some(s => s && s.name === name);
+    const tagged = (name) => !!(game.players && Object.prototype.hasOwnProperty.call(game.players, name) && game.players[name] && game.players[name].g);
+    // A name with no squares left (removed by the host) shows as nobody.
+    const keyName = () => (hasSquares(picked) && tagged(picked) ? picked : null);
+    const me = () => shownName(game);
+    const elsewhere = (name) => tagged(name) && name !== keyName();
+    function choose(name) {
+      chosen = name || null;
+      write(storageKey(id), chosen);
+      if (chosen) skip(false);
+      drawAll();
+    }
+    function skip(on) {
+      skipped = !!on;
+      write(skipKey(id), on ? '1' : null);
+    }
+    // The server's word on which name this phone holds, or null for none.
+    function remember(name) {
+      const was = picked;
+      picked = name || null;
+      write(pickedKey(id), picked);
+      if (picked) { chosen = picked; skip(false); }
+      else if (was && chosen === was) chosen = null;
+      write(storageKey(id), chosen);
+    }
+
     const panelCtx = {
       id,
       game: () => game,
       setGame: (g) => { game = g; drawAll(); },
-      remember: (name) => { selectedPlayer = name; saveSelectedPlayer(name); if (helper) { drawHeader(); helper.draw(); } },
+      remember: (name) => { remember(name); drawAll(); },
       reload: () => load(false, true),
-      viewing: () => selectedPlayer,
-      markPicker: () => { try { window.localStorage.setItem(pickerKey(id), '1'); } catch (e) { /* asks again next time */ } }
+      markPicker: () => { write(pickerKey(id), '1'); },
+      // A claim goes back to Home and says what this phone holds now.
+      claimed: (n) => { show('home'); parts.home.say(`You have ${n} square${n === 1 ? '' : 's'}.`); parts.home.focusNote(); window.scrollTo(0, 0); }
     };
 
-    function loadSelectedPlayer() {
-      try { return window.localStorage.getItem(storageKey(id)); } catch (e) { return null; }
+    const pickingOn = () => guestPickingOn(game);
+    const locked = () => game.status === 'started' || game.status === 'finished';
+
+    // The tab bar: Home, Players, then Picks or Live, then a helper's Score.
+    function tabs() {
+      const list = [['home', 'Home', HOME_ICON], ['players', 'Players', PLAYERS_ICON]];
+      if (locked()) list.push(['live', 'Live', LIVE_ICON]);
+      else if (pickingOn()) list.push(['picks', 'Picks', PICKS_ICON]);
+      if (parts.helper.can('canScore')) list.push(['score', 'Score', SCORE_ICON]);
+      return list;
     }
-    function saveSelectedPlayer(name) {
-      try {
-        if (name) window.localStorage.setItem(storageKey(id), name);
-        else window.localStorage.removeItem(storageKey(id));
-      } catch (e) { /* private browsing etc — selection just won't persist */ }
+
+    function show(next) {
+      if (next !== tab) parts.home.say('');
+      if (next !== 'home') parts.home.reset();
+      tab = next;
+      drawAll();
+    }
+
+    function openPicks(focusName) {
+      show('picks');
+      window.scrollTo(0, 0);
+      if (panel) panel.start(false, focusName);
+    }
+
+    function build() {
+      const helper = createHelpers({
+        id, route: route || {}, wrap,
+        game: () => game,
+        setGame: (g) => { game = g; drawAll(); }, // a later poll finds nothing new to draw
+        redraw: () => drawAll(),
+        selected: () => me(),
+        choose,
+        welcomed: (next) => { show(next); window.scrollTo(0, 0); }
+      });
+      const home = SBS.playerHome.create({
+        game: () => game, me, keyName, elsewhere, choose, pickingOn,
+        names: () => playerSummaries(game).map(p => p.name),
+        skipped: () => skipped,
+        skip,
+        join: () => openPicks(true),
+        openPicks: () => openPicks(false),
+        invite: () => showInvite(game),
+        // The board full screen, read-only; Exit and Back come back here.
+        openBoard: () => SBS.go({
+          screen: 'mirror', id, from: 'player',
+          guest: { game, nameFor: shownName, back: { screen: 'player', id, helper: route && route.helper, focus: 'board' } }
+        })
+      });
+      const wins = createWinBanner(id, () => { show('home'); window.scrollTo(0, 0); parts.nav.querySelector('[aria-current]').focus(); });
+      const people = SBS.playersTab.create({
+        getGame: () => game,
+        // Names and squares may have changed, so the whole page follows.
+        setGame: (g) => { game = g; drawAll(); helper.saved(); if (panel) panel.followName(); },
+        patch: (op) => SBS.api.patchSquares(id, op),
+        reload: () => SBS.api.getGame(id).catch(() => null),
+        onError: (e) => helper.lost(e, 'canSquares'),
+        canManage: () => helper.can('canSquares'),
+        me, keyName, elsewhere, choose
+      });
+      const picksPane = el('div', 'player-pane');
+      const livePane = el('div', 'player-pane');
+      const nav = el('nav', 'player-tabs');
+      nav.setAttribute('aria-label', 'This board');
+      wrap.append(helper.note, wins.el, helper.welcomePane, home.el, picksPane, livePane, people.el, helper.scorePane, nav);
+      parts = { helper, home, people, picksPane, livePane, nav, wins };
     }
 
     function drawHeader() {
       applyTeamColors(game);
-      const live = game.liveScore;
-      let tickerHtml = '';
-      if (game.status === 'picking' || game.status === 'setup') {
-        const kickoff = SBS.ui.kickoffNotice(game);
-        tickerHtml = `<div class="player-ticker-pending">Squares are being claimed &mdash; the board locks in soon.${kickoff ? ' ' + kickoff : ''}</div>`;
-      } else {
-        const computed = computeGame(game);
-        const auto = isAutoScored(game);
-        const hasFinal = hasFinalScore(computed);
-        // A manually-scored game has no live feed to fall back on, so there's
-        // nothing meaningful to show but a stale "–" until the host actually
-        // enters the Final score — better to show nothing at all than a dash
-        // that looks like a score but never updates until the very end.
-        const scoreA = live && live.a !== undefined && live.a !== null ? live.a
-          : hasFinal ? computed.results.final.a
-          : auto ? '–' : '';
-        const scoreB = live && live.b !== undefined && live.b !== null ? live.b
-          : hasFinal ? computed.results.final.b
-          : auto ? '–' : '';
-        const statusTxt = game.status === 'finished' ? 'FINAL'
-          : (live && live.state === 'in') ? [live.period ? (live.period > 4 ? (live.period > 5 ? `${live.period - 4}OT` : 'OT') : `Q${live.period}`) : '', live.clock].filter(Boolean).map(escapeHtml).join(' &middot; ')
-          : 'In Progress';
-        // Same glowing pill treatment the Home screen's game card uses for a
-        // "started" game — a quiet visual cue that this one is live right now.
-        const statusCls = 'pt-status' + (game.status === 'started' ? ' is-live' : '');
-        tickerHtml = `
-          <div class="player-ticker">
-            <div class="pt-team badge-fit">
-              ${teamBadge(game, 'A', { logoSize: 20, cls: 'team-badge-sm' })}
-              <div class="pt-pts">${escapeHtml(scoreA)}</div>
-            </div>
-            <div class="pt-mid">
-              <div class="${statusCls}">${statusTxt}</div>
-            </div>
-            <div class="pt-team badge-fit">
-              ${teamBadge(game, 'B', { logoSize: 20, cls: 'team-badge-sm' })}
-              <div class="pt-pts">${escapeHtml(scoreB)}</div>
-            </div>
-          </div>
-        `;
-      }
-
+      const title = parts.helper.welcoming() ? 'Player View'
+        : { home: 'Player View', players: 'Players', picks: 'Pick your squares', live: 'Live', score: 'Score' }[tab];
+      const line = parts.helper.line();
       header.innerHTML = `
-        <div class="player-title-row badge-fit">
-          <div class="player-title">${guestPickingOn(game) ? 'Pick your squares' : 'Player View'}</div>
-        </div>
-        ${tickerHtml}
-        ${helper && helper.line() ? `<div class="helper-line">${escapeHtml(helper.line())}</div>` : ''}
+        <div class="player-title-row badge-fit"><div class="player-title">${title}</div></div>
+        ${locked() && (tab === 'home' || tab === 'score' || tab === 'live') ? tickerHtml(game) : ''}
+        ${line && (tab === 'home' || tab === 'score') ? `<div class="helper-line">${escapeHtml(line)}</div>` : ''}
       `;
       fitTeamBadges(header);
     }
 
-    function drawSelect() {
-      // Rebuilding the <select> while the host has it open (mid-poll refresh)
-      // collapses the dropdown out from under them — skip the rebuild while
-      // it's focused and let the next poll after they finish pick up any changes.
-      if (document.activeElement && selectRow.contains(document.activeElement)) return;
-
-      const summaries = playerSummaries(game);
-      selectRow.innerHTML = '';
-      if (!summaries.length) {
-        selectRow.appendChild(el('div', 'player-select-empty', 'No squares have been claimed for this game yet.'));
-        return;
-      }
-      const label = el('label', 'player-select-label', 'Viewing squares for');
-      const select = el('select', 'player-select');
-      // A helper's name can change later: one who bought squares, or tapped the wrong name.
-      select.appendChild(el('option', '', helper && helper.line() ? "I'm not playing" : 'Choose your name…')).value = '';
-      summaries.forEach(p => {
-        const opt = el('option', '', escapeHtml(p.name));
-        opt.value = p.name;
-        if (p.name === selectedPlayer) opt.selected = true;
-        select.appendChild(opt);
-      });
-      select.addEventListener('change', (e) => {
-        selectedPlayer = e.target.value || null;
-        saveSelectedPlayer(selectedPlayer);
-        if (helper) { drawHeader(); helper.draw(); }
-        drawBody();
-      });
-      selectRow.appendChild(label);
-      selectRow.appendChild(select);
-    }
-
-    function drawBody() {
-      // While a guest is picking, the panel stays where it is: taking it off the page, even
-      // for a moment, closes a phone's keyboard.
-      if (panelCard && panelCard.isConnected && guestPickingOn(game)) {
-        panelCard.querySelector('.player-card-sub').textContent = `${game.squares.filter(Boolean).length} of 100 claimed`;
-        panel.render();
-        return;
-      }
-      body.innerHTML = '';
-
-      if (game.status === 'setup' || game.status === 'picking') {
-        const claimed = game.squares.filter(Boolean).length;
-        const card = el('div', 'card player-card');
-        if (guestPickingOn(game)) {
-          if (!panel) panel = createGuestPanel(panelCtx);
-          card.innerHTML = `<div class="player-card-head"><span class="player-card-title">Board filling up</span><span class="player-card-sub">${claimed} of 100 claimed</span></div>
-            <p class="player-muted">The numbers are drawn when the host locks the board.</p>`;
-          card.appendChild(panel.root);
-          panelCard = card;
-          body.appendChild(card);
-          panel.render();
-          return;
-        }
-        card.innerHTML = `<div class="player-card-head"><span class="player-card-title">Board filling up</span><span class="player-card-sub">${claimed} of 100 claimed</span></div>
-          <p class="player-muted">The numbers are drawn when the host locks the board. Come back then to see how your squares are doing.</p>`;
-        card.appendChild(miniGrid(game, selectedPlayer));
-        body.appendChild(card);
-        return;
-      }
-
-      const computed = computeGame(game);
-      const liveHighlight = computeLiveHighlight(game);
-
-      const myIdx = game.squares
-        .map((sq, i) => (sq && sq.name === selectedPlayer) ? i : -1)
-        .filter(i => i >= 0);
-      const infos = myIdx.map(i => squareInfo(game, computed, liveHighlight, i));
-
-      // Squares that still have a realistic shot: already won a quarter, are
-      // the live winner right now, or are one likely score from becoming it.
-      // A square that needs an unlikely swing just clutters this list.
-      const inRunning = infos.filter(i => i.status !== 'dormant');
-
-      // "In the running" / "hot threat" are projections off a live score —
-      // meaningless for a game the host is scoring by hand, since there's no
-      // feed to project from between quarters actually being entered.
-      if (selectedPlayer && isAutoScored(game)) {
-        // ---- My Squares Status ----
-        const statusCard = el('div', 'card player-card');
-        statusCard.innerHTML = `<div class="player-card-head"><span class="player-card-title">My Squares Status</span><span class="player-card-sub">${inRunning.length} in the running</span></div>`;
-        if (!infos.length) {
-          statusCard.appendChild(el('p', 'player-muted', `No squares found for "${escapeHtml(selectedPlayer)}".`));
-        } else if (!inRunning.length) {
-          statusCard.appendChild(el('p', 'player-muted', `None of your ${infos.length} square${infos.length === 1 ? '' : 's'} are in the running right now — hang tight for the next score.`));
-        } else {
-          const list = el('div', 'player-square-list');
-          inRunning.slice().sort((a, b) => (a.status === b.status ? 0 : a.status === 'winning' ? -1 : 1))
-            .forEach(info => {
-              const meta = STATUS_META[info.status];
-              const row = el('div', 'player-square-item');
-              row.innerHTML = `
-                <div>
-                  <div class="psi-coord">${coordHtml(game, info)}</div>
-                  <div class="psi-desc">${escapeHtml(squareDesc(info))}</div>
-                </div>
-                <span class="psi-tag ${meta.cls}">${meta.tag}</span>
-              `;
-              list.appendChild(row);
-            });
-          statusCard.appendChild(list);
-        }
-        body.appendChild(statusCard);
-      }
-
-      if (selectedPlayer && infos.length) {
-        // ---- Portfolio pills ----
-        const pillCard = el('div', 'card player-card');
-        pillCard.innerHTML = `<div class="player-card-head"><span class="player-card-title">My Grid Portfolio</span></div>`;
-        const pillsWrap = el('div', 'player-pills');
-        infos.forEach(info => {
-          const winCount = info.won.length;
-          // Absolutely positioned so it overlays the corner rather than
-          // sitting inline — the badge must never push the pill wider/taller
-          // or the two-column grid's alignment would drift row to row.
-          const badge = winCount > 0 ? `<span class="pill-win-badge" title="Won ${winCount} quarter${winCount === 1 ? '' : 's'}">${winCount}</span>` : '';
-          const pillCls = info.status === 'winning' ? ' is-live' : info.status === 'threat' ? ' is-threat' : '';
-          const pill = el('span', 'player-pill' + pillCls, coordHtml(game, info) + badge);
-          pillsWrap.appendChild(pill);
+    function drawNav() {
+      const { nav } = parts;
+      const list = tabs();
+      const sig = JSON.stringify([tab, list.map(t => t[0])]);
+      if (nav.dataset.sig === sig) return;
+      nav.dataset.sig = sig;
+      const had = nav.contains(document.activeElement);
+      nav.replaceChildren(...list.map(([k, label, icon]) => {
+        const b = el('button', 'player-tab', `${icon}<span>${label}</span>`);
+        b.type = 'button';
+        if (k === tab) b.setAttribute('aria-current', 'page');
+        b.addEventListener('click', () => {
+          if (tab === k) return;
+          if (k === 'picks') openPicks(false);
+          else { show(k); window.scrollTo(0, 0); }
+          if (!stale) parts.helper.ask();
         });
-        pillCard.appendChild(pillsWrap);
-        body.appendChild(pillCard);
-      }
-
-      // ---- The board, with my squares highlighted ----
-      const gridCard = el('div', 'card player-card');
-      gridCard.innerHTML = `<div class="player-card-head"><span class="player-card-title">The Board</span></div>`;
-      gridCard.appendChild(miniGrid(game, selectedPlayer));
-      body.appendChild(gridCard);
-
-      // ---- Game Winners ----
-      const archiveCard = el('div', 'card player-card');
-      const scoredByHost = window.GameLogic.scoringMode(game) === 'manual'
-        ? '<span class="player-card-sub player-scored-by">scored by host</span>' : '';
-      archiveCard.innerHTML = `<div class="player-card-head"><span class="player-card-title">Game Winners</span>${scoredByHost}</div>`;
-      const rows = el('div', 'player-history');
-      QUARTERS.forEach(q => {
-        const res = computed.results[q];
-        const label = q === 'final' ? 'FINAL' : QLABEL[q];
-        let scoreTxt = '– : –';
-        if (res.a !== null && res.b !== null) scoreTxt = `${res.a} - ${res.b}`;
-        let winnerTxt, winnerCls = '';
-        if (res.a === null || res.b === null) {
-          winnerTxt = 'Not yet'; winnerCls = 'ph-pending';
-        } else if (res.resolved && res.pushed) {
-          winnerTxt = 'Push (rolled over)'; winnerCls = 'ph-pending';
-        } else if (res.resolved && res.winnerName) {
-          const mine = res.winnerName === selectedPlayer;
-          winnerTxt = `${escapeHtml(res.winnerName)} &middot; ${money(res.amount)}`;
-          if (res.autoResolved) {
-            const digits = drawnDigits(game, res);
-            if (digits) winnerTxt += ` <span class="ph-drawn">(Drawn ${escapeHtml(digits.y)}-${escapeHtml(digits.x)})</span>`;
-          }
-          winnerCls = mine ? 'ph-mine' : 'ph-live';
-        } else if (q === 'final' && res.needsDraw) {
-          winnerTxt = 'Awaiting draw'; winnerCls = 'ph-pending';
-        } else {
-          winnerTxt = 'In progress'; winnerCls = 'ph-pending';
-        }
-        const row = el('div', 'player-history-row');
-        row.innerHTML = `
-          <div class="ph-q">${label}</div>
-          <div class="ph-score">${scoreTxt}</div>
-          <div class="ph-winner ${winnerCls}">${winnerTxt}</div>
-        `;
-        rows.appendChild(row);
-      });
-      archiveCard.appendChild(rows);
-      body.appendChild(archiveCard);
-
-      if (selectedPlayer) {
-        // ---- Total Won ---- (updates live as quarters resolve, via the poll)
-        const totalWon = computeTotalWon(computed, selectedPlayer);
-        const totalCard = el('div', 'card player-card player-total-card');
-        totalCard.innerHTML = `
-          <div class="player-total-label">Total Won</div>
-          <div class="player-total-value${totalWon > 0 ? ' has-winnings' : ''}">${money(totalWon)}</div>
-        `;
-        body.appendChild(totalCard);
-      }
-
-      fitTeamBadges(body);
+        return b;
+      }));
+      if (had) nav.querySelector('[aria-current]').focus();
     }
 
     function drawAll() {
-      if (!game) return;
+      if (!game || !parts) return;
+      const { helper, home, people, picksPane, livePane } = parts;
+      if (pickingOn() && !panel) {
+        panel = createGuestPanel(panelCtx);
+        picksPane.appendChild(el('div', 'card player-card')).appendChild(panel.root);
+      }
+      // The tab on screen may be gone: picking closed or locked, or a job was taken away.
+      if (!tabs().some(t => t[0] === tab)) {
+        if (tab === 'picks') {
+          const mine = SBS.playerHome.squaresOf(game, me());
+          closedNote = `Picking just closed. ${mine.length ? `You have ${mine.length} square${mine.length === 1 ? '' : 's'}.` : 'You have no squares.'}`;
+        }
+        tab = 'home';
+      }
+
+      const welcome = helper.welcoming();
+      const on = (k) => !welcome && tab === k;
+      helper.welcomePane.hidden = !welcome;
+      home.el.hidden = !on('home');
+      picksPane.hidden = !on('picks');
+      livePane.hidden = !on('live');
+      people.el.hidden = !on('players');
+      helper.scorePane.hidden = !on('score');
+      parts.nav.hidden = welcome;
       drawHeader();
-      drawSelect();
-      inviteBtn.hidden = false;
-      if (game.joinCode) { hostLink.href = SBS.referral.url(game.joinCode); hostLink.hidden = false; }
-      drawBody();
-      if (helper) helper.draw(); // the first tab's label follows the name
+      if (welcome) helper.drawWelcome(); else drawNav();
+      home.update();
+      if (panel && pickingOn()) panel.render();
+      livePane.replaceChildren(...(locked() ? SBS.playerHome.liveCards(game, me()) : []));
+      parts.wins.el.hidden = welcome;
+      if (!welcome) parts.wins.update(game, me(), tab, !stale);
+      keepCopy();
+      if (on('players')) people.update(); else people.close();
+      if (on('score')) helper.drawScore();
+      // Said once Home is on screen, so keyboard focus can follow it there.
+      if (closedNote) { home.say(closedNote); home.focusNote(); closedNote = ''; window.scrollTo(0, 0); }
+    }
+
+    // The name this phone shows on a given copy of the board (the full-screen board asks too).
+    function shownName(g) {
+      const on = (name) => !!name && g.squares.some(s => s && s.name === name);
+      if (on(chosen)) return chosen;
+      return on(picked) && g.players && g.players[picked] && g.players[picked].g ? picked : null;
+    }
+
+    // The copy's age is what "Updated N ago" shows next time, so it is refreshed each minute
+    // even when nothing changed.
+    function keepCopy() {
+      if (stale || !game) return;
+      const next = `${Math.floor(fetchedAt / 60000)} ${SBS.boardKey(game)}`;
+      if (next === saved) return;
+      saved = next;
+      writeCopy(id, game, fetchedAt || Date.now());
+    }
+
+    const busy = () => !!parts && (parts.helper.busy() || parts.people.busy());
+
+    // The first board from the server, whether or not the phone's copy drew first.
+    function arrived(fresh) {
+      game = fresh;
+      stale = false;
+      if (!parts) build();
+      parts.home.fetched();
+      drawAll();
+      if (route && route.focus === 'board') { delete route.focus; parts.home.focusBoard(); }
+      parts.helper.ask();
+      // A phone that picked before asks who it is. Its name may have changed since (a host
+      // rename), so the server is asked, not the remembered name trusted.
+      if (isPicker(id) && panel && pickingOn()) panel.start(true);
     }
 
     async function load(initial, now) {
       // A score on its way must not be overwritten by an answer from before it.
-      if (helper && helper.busy()) return;
+      if (busy()) return;
       try {
         // A phone that picks must see its own squares after a reload, not a copy from before them.
-        const fresh = now || (initial && isPicker(id)) ? await SBS.api.getGame(id) : await SBS.api.pollGame(id, { must: initial });
-        if (!fresh || (helper && helper.busy())) return;
-        if (initial) {
-          game = fresh;
-          selectedPlayer = loadSelectedPlayer();
-          // A remembered name that no longer has squares (removed by the
-          // host) shouldn't silently pin the view to an empty state forever.
-          if (selectedPlayer && !Object.keys(playerSummaries(fresh).reduce((m, p) => (m[p.name] = 1, m), {})).includes(selectedPlayer)) {
-            selectedPlayer = null;
-          }
-          drawAll();
-          helper = createHelperTabs({
-            id, route: route || {}, wrap, header,
-            game: () => game,
-            setGame: (g) => { game = g; drawHeader(); drawBody(); }, // a later poll finds nothing new to draw
-            redraw: () => drawAll(),
-            saved: () => { if (panel) panel.followName(); },
-            selected: () => selectedPlayer,
-            choose: (name) => { selectedPlayer = name; saveSelectedPlayer(name); }
-          });
-          helper.ask();
-          // A phone that picked before opens straight into picking. Its name may have changed
-          // since (a host rename), so the server is asked, not the remembered name trusted.
-          if (isPicker(id) && panel && guestPickingOn(game)) panel.start(true);
-        } else if (!game || SBS.boardKey(fresh) !== SBS.boardKey(game)) {
+        const first = !parts || stale;
+        const fresh = now || (first && isPicker(id)) ? await SBS.api.getGame(id) : await SBS.api.pollGame(id, { must: first });
+        if (busy()) return;
+        if (!fresh) { if (parts && !stale) parts.home.fetched(); return; }
+        fetchedAt = Date.now();
+        if (first) return arrived(fresh);
+        parts.home.fetched();
+        keepCopy();
+        if (!game || SBS.boardKey(fresh) !== SBS.boardKey(game)) {
           const saved = !game || fresh.updatedAt !== game.updatedAt;
           game = fresh;
+          drawAll();
           if (saved) {
-            drawAll();
             if (panel) panel.followName();
-          } else {
-            // Only the live score moved: leave the name list alone, it may be open.
-            drawHeader();
-            drawBody();
-          }
-          if (helper) {
-            if (saved) helper.saved();
-            helper.draw();
+            parts.helper.saved();
+            parts.people.clearUndo();
           }
         }
       } catch (e) {
         if (e && e.status === 404) {
-          header.innerHTML = `<div class="error-msg">This game no longer exists.</div>`;
-          selectRow.innerHTML = '';
-          inviteBtn.hidden = true;
-          body.innerHTML = '';
-          wrap.classList.remove('on-job');
-          wrap.querySelectorAll('.helper-pane, .helper-tabs, .helper-note').forEach(n => n.remove());
+          dropCopy(id);
+          header.innerHTML = '<div class="error-msg">This game no longer exists.</div>';
+          while (header.nextSibling) header.nextSibling.remove();
+          parts = null;
+          game = null;
           return;
         }
-        if (initial) header.innerHTML = `<div class="error-msg">Could not load this game: ${escapeHtml(e.message)}</div>`;
+        // With a copy on screen, its age says it is old and the poll keeps trying.
+        if (initial && !parts) header.innerHTML = `<div class="error-msg">Could not load this game: ${escapeHtml(e.message)}</div>`;
       }
     }
 
+    // Paint the phone's copy at once, then ask the server.
+    const copy = readCopy(id);
+    if (copy) {
+      game = copy.game;
+      stale = true;
+      build();
+      parts.home.fetched(copy.at);
+      drawAll();
+      if (route && route.focus === 'board') { delete route.focus; parts.home.focusBoard(); }
+    }
     load(true);
     // 15s, not the 6s the host-facing screens use. This view is the one that
     // scales with the size of the party: every guest who scans the QR code
@@ -1168,8 +1075,17 @@
     SBS.setManagedInterval(() => load(false), 15000);
     // A helper at work stays in step with the host's screens. Whether the job still stands is
     // asked on load, when the phone is shown again, on a tab tap and after a refusal: never on a timer.
-    SBS.setManagedInterval(() => { if (helper && helper.onJob() && !document.hidden) load(false); }, 5000);
-    const onShow = () => { if (!document.hidden && helper && helper.maybe()) helper.ask(); };
+    SBS.setManagedInterval(() => {
+      if (!parts || document.hidden || parts.helper.welcoming()) return;
+      if ((tab === 'score' && parts.helper.can('canScore')) || (tab === 'players' && parts.helper.can('canSquares'))) load(false);
+    }, 5000);
+    // The countdown and "Updated N s ago", from what is already here: no request.
+    SBS.setManagedInterval(() => { if (parts && tab === 'home' && !document.hidden) parts.home.tick(); }, 1000);
+    const onShow = () => {
+      if (document.hidden || !parts || stale) return;
+      drawAll(); // a win that arrived while the phone was away buzzes now
+      if (parts.helper.maybe()) parts.helper.ask();
+    };
     document.addEventListener('visibilitychange', onShow);
     SBS.onLeaveScreen(() => document.removeEventListener('visibilitychange', onShow));
   }

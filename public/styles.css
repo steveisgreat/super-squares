@@ -2055,9 +2055,11 @@ body.player-mode { background: var(--bg); }
 body.player-mode #app { padding: 0; }
 
 .player-screen {
+  width: 100%;
+  box-sizing: border-box;
   max-width: 560px;
   margin: 0 auto;
-  padding: 16px 16px calc(28px + env(safe-area-inset-bottom));
+  padding: 16px 16px calc(100px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -2122,13 +2124,6 @@ body.player-mode #app { padding: 0; }
   text-align: center;
 }
 
-.player-select-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.player-select-label { margin: 0; color: var(--muted); font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
 .player-select {
   flex: 1;
   min-width: 160px;
@@ -2141,7 +2136,6 @@ body.player-mode #app { padding: 0; }
   font-size: 1.25rem;
   font-weight: 600;
 }
-.player-select-empty { color: var(--muted); font-size: 1.1rem; }
 
 .player-card { padding: 18px; }
 .player-card-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; gap: 10px; flex-wrap: wrap; }
@@ -2186,7 +2180,6 @@ body.player-mode #app { padding: 0; }
   border-radius: var(--radius);
 }
 .psi-coord { font-weight: 800; font-size: 1.4rem; color: var(--text); }
-.psi-desc { font-size: 1.05rem; color: var(--muted); margin-top: 4px; }
 .psi-tag { font-size: 0.92rem; font-weight: 700; padding: 6px 12px; border-radius: 6px; text-transform: uppercase; white-space: nowrap; }
 .status-winning { background: var(--good-soft); color: var(--good); }
 .status-threat { background: var(--warn-soft); color: var(--warn); }
@@ -2198,47 +2191,6 @@ body.player-mode #app { padding: 0; }
 .coord-team { color: inherit; }
 .coord-num { color: var(--accent); }
 .coord-sep { color: var(--muted); font-weight: 400; margin: 0 4px; }
-
-.player-pills { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
-.player-pill {
-  position: relative;
-  background: var(--panel2);
-  border: 1px solid var(--border);
-  padding: 9px 13px;
-  border-radius: 8px;
-  font-size: 1.1rem;
-  font-weight: 700;
-}
-/* First column reads left-to-right as normal; the second column is right
-   justified so the two columns form a tidy inner edge down the middle. */
-.player-pills .player-pill:nth-child(odd) { text-align: left; }
-.player-pills .player-pill:nth-child(even) { text-align: right; }
-.player-pill.is-live { border-color: var(--good); background: var(--good-soft); color: var(--good); }
-.player-pill.is-threat { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
-
-/* Absolutely positioned so it overlays the pill's corner instead of sitting
-   inline — it must never add width/height to the pill itself, or the grid's
-   row heights and column alignment would drift depending on who has a badge. */
-.pill-win-badge {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--good);
-  color: var(--on-accent);
-  border: 2px solid var(--panel);
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 800;
-  line-height: 1;
-}
-.player-pill.is-live .coord-num { color: var(--good); }
-.player-pill.is-threat .coord-num { color: var(--warn); }
 
 .player-history { display: flex; flex-direction: column; }
 .player-history-row {
@@ -2388,16 +2340,11 @@ button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color:
 .gd-phone .cell .badges { top: 0; right: 1px; }
 .gd-phone .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
-/* ---- Join code card, share button, guest mini grid (R22) ---- */
+/* ---- Join code card, share button (R22) ---- */
 .join-code { font-size: clamp(2rem, 11vw, 3rem); font-weight: 800; letter-spacing: 0.18em; padding-left: 0.18em; color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1.1; }
 .join-url { font-size: 0.85rem; color: var(--muted); overflow-wrap: anywhere; }
 .join-note { min-height: 1.2em; font-size: 0.9rem; color: var(--good); overflow-wrap: anywhere; }
 
-.mini-grid { display: grid; grid-template-columns: 1.4em repeat(10, minmax(0, 1fr)); gap: 2px; max-width: 360px; margin: 10px auto 0; }
-.mg-axis { font-size: 0.7rem; text-align: center; color: var(--accent); line-height: 1.6; min-height: 1.4em; }
-.mg-cell { aspect-ratio: 1; border-radius: 3px; background: transparent; border: 1px solid var(--border); box-sizing: border-box; }
-.mg-cell.is-filled { background: var(--panel3); border-color: var(--border-strong); }
-.mg-cell.is-mine { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft, rgba(var(--accent-rgb), 0.35)); }
 .player-scored-by { font-size: 0.85rem; font-weight: 500; color: var(--muted); }
 
 /* TV, before the lock: the join QR panel beside the filling board, and the code in the pill. */
@@ -2512,10 +2459,7 @@ button.helpers-choice[aria-checked="true"] { border-color: var(--accent); }
 @media (max-height: 820px) { .helpers-tab .helpers-qr svg { width: 180px; } }
 
 /* Helpers (R37): the phone, in Player View */
-.player-screen.has-tabs { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
-.player-screen.on-job > :not(.player-header):not(.helper-note):not(.helper-pane):not(.helper-tabs) { display: none; }
-.player-screen.on-job .player-title-row { display: none; }
-.helper-pane[hidden], .helper-tabs[hidden], .helper-note[hidden] { display: none; }
+.helper-pane[hidden], .helper-note[hidden] { display: none; }
 .helper-pane { min-width: 0; }
 .helper-line { margin-top: 6px; text-align: center; color: var(--muted); font-size: .95rem; overflow-wrap: anywhere; }
 .helper-note { margin: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; line-height: 1.4; }
@@ -2526,9 +2470,38 @@ button.helpers-choice[aria-checked="true"] { border-color: var(--accent); }
 .helper-duty { display: flex; flex-direction: column; line-height: 1.35; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; }
 .helper-duty span { color: var(--muted); }
 .helper-mine { display: flex; flex-direction: column; gap: 6px; font-weight: 700; }
-.helper-tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; gap: 6px; max-width: 560px; margin: 0 auto; padding: 6px 8px calc(8px + env(safe-area-inset-bottom)); box-sizing: border-box; background: var(--bg); border-top: 1px solid var(--border); }
-button.helper-tab { flex: 1; min-width: 0; min-height: 56px; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; background: transparent; border: 0; box-shadow: none; border-radius: 12px; color: var(--muted); font-size: .9rem; font-weight: 700; }
-button.helper-tab[aria-current="page"] { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* Player View tabs (R44) */
+.player-tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; gap: 6px; max-width: 560px; margin: 0 auto; padding: 6px 8px calc(8px + env(safe-area-inset-bottom)); box-sizing: border-box; background: var(--bg); border-top: 1px solid var(--border); }
+.player-tabs[hidden], .player-pane[hidden] { display: none; }
+button.player-tab { flex: 1; min-width: 0; min-height: 56px; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; background: transparent; border: 0; box-shadow: none; border-radius: 12px; color: var(--muted); font-size: .9rem; font-weight: 700; }
+button.player-tab[aria-current="page"] { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.player-pane { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.player-pane button, .player-pane input { scroll-margin-bottom: 150px; }
+.ph-slot { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.ph-slot:empty, .ph-note:empty, .ph-updated:empty { display: none; }
+.ph-note { margin: 0; padding: 12px 14px; border: 1px solid var(--accent); border-radius: 12px; font-weight: 700; overflow-wrap: anywhere; }
+.ph-countdown { display: flex; flex-direction: column; gap: 4px; }
+.ph-countdown strong { color: var(--text); font-size: 1.35rem; }
+.ph-who { display: flex; flex-direction: column; gap: 10px; }
+.ph-who h2 { margin: 0; font-size: 1.3rem; overflow-wrap: anywhere; }
+.ph-who button, button.ph-link, button.ph-more { min-height: 48px; }
+button.ph-skip { background: transparent; border: 0; box-shadow: none; color: var(--muted); text-decoration: underline; }
+.ph-who-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 1.15rem; }
+.ph-who-line span { min-width: 0; overflow-wrap: anywhere; }
+.ph-who-line button { flex: none; }
+.ph-search { display: flex; flex-direction: column; gap: 6px; margin: 0; font-weight: 700; }
+.ph-search[hidden] { display: none; }
+.ph-search input { width: 100%; min-height: 48px; box-sizing: border-box; padding: 10px 12px; background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; color-scheme: dark; font-family: inherit; font-size: 1.05rem; }
+.ph-names { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; padding: 2px; }
+button.ph-name { display: flex; flex: none; flex-direction: column; align-items: flex-start; justify-content: center; text-align: left; line-height: 1.3; }
+.ph-name span { color: var(--muted); font-size: .85rem; font-weight: 400; }
+.ph-won, .ph-owed { margin: 12px 0 0; font-size: 1.05rem; line-height: 1.4; }
+.ph-won { display: flex; justify-content: space-between; gap: 10px; }
+.ph-won strong { font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.ph-won strong.has-winnings { color: var(--good); }
+button.ph-more { width: 100%; margin-top: 12px; }
+.ph-updated { margin: 0; text-align: center; color: var(--muted); font-size: .9rem; }
 
 /* Squares manager (R38): the Players tab */
 .pm-tab, .pm-body, .pm-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -2536,6 +2509,7 @@ button.helper-tab[aria-current="page"] { color: var(--accent); background: color
 button.pm-add { width: 100%; min-height: 50px; }
 .pm-picks, .pm-person { border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
 .pm-picks { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; }
+.pm-body[hidden] { display: none; }
 .pm-picks-text, .pm-info { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; overflow-wrap: anywhere; }
 .pm-picks-text span, .pm-info span { color: var(--muted); font-size: 0.92rem; }
 button.pm-limit { min-height: 44px; padding: 0 14px; flex: none; }
@@ -2544,7 +2518,12 @@ button.pm-limit { min-height: 44px; padding: 0 14px; flex: none; }
 button.pm-filter-btn { min-height: 44px; padding: 4px 6px; background: transparent; border: 0; box-shadow: none; border-radius: 9px; color: var(--muted); font-weight: 700; font-size: 0.95rem; }
 button.pm-filter-btn[aria-pressed="true"] { background: var(--panel3); color: var(--text); }
 .pm-row { display: flex; align-items: center; gap: 8px; padding: 8px 6px 8px 14px; min-height: 48px; }
-button.pm-more { width: 44px; min-height: 44px; flex: none; }
+button.pm-info { min-height: 48px; padding: 2px 0; align-items: flex-start; justify-content: center; text-align: left; background: transparent; border: 0; box-shadow: none; color: var(--text); font-weight: 400; }
+.pm-info strong { font-weight: 700; }
+.pm-you { margin-left: 8px; color: var(--accent); font-size: .85rem; font-style: normal; text-transform: uppercase; }
+.pm-person.is-me { border-color: var(--accent); }
+.pm-squares { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.pm-squares li { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; font-weight: 700; }
 .pm-panel { display: flex; flex-direction: column; gap: 8px; padding: 0 14px 12px; }
 .pm-panel button { min-height: 46px; }
 .pm-panel p { margin: 0; }
@@ -2560,16 +2539,17 @@ button.pm-undo { min-height: 44px; flex: none; }
 .pm-actions button { min-height: 48px; }
 
 /* Guest picks (R28): the guest's panel on the player page and the host's controls. */
-.guest-panel { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.guest-panel { display: flex; flex-direction: column; gap: 12px; }
 .guest-panel [hidden] { display: none; }
 .gp-start { display: flex; flex-direction: column; gap: 10px; }
 .gp-start-btn, .gp-action { width: 100%; min-height: 48px; }
 .gp-live { display: flex; flex-direction: column; gap: 10px; }
 .gp-name label, .gp-auto label { display: block; margin: 0 0 6px; color: var(--muted); font-weight: 600; }
 .gp-name input, .gp-auto input { width: 100%; box-sizing: border-box; min-height: 44px; font-size: 1rem; }
-.gp-as, .gp-cap, .gp-owed, .gp-status { margin: 0; overflow-wrap: anywhere; }
+.gp-as, .gp-cap, .gp-warn, .gp-status { margin: 0; overflow-wrap: anywhere; }
+.gp-warn { margin-top: 6px; color: var(--warn); font-weight: 600; }
+.gp-warn:empty { display: none; }
 .gp-cap { font-weight: 700; color: var(--accent); }
-.gp-owed { color: var(--muted); font-size: 0.95rem; }
 .gp-status { min-height: 1.3em; color: var(--accent-hi); }
 .gp-board { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 2px; width: 100%; max-width: 380px; margin: 4px auto 0; }
 .gp-cell {
@@ -2585,7 +2565,7 @@ button.pm-undo { min-height: 44px; flex: none; }
 .gp-cell.is-rel { background: var(--danger-soft); border-color: var(--danger); color: var(--text); }
 .gp-cell:disabled { cursor: default; }
 .gp-cell.is-open:disabled { opacity: 0.5; }
-.gp-actions { display: flex; flex-direction: column; gap: 8px; }
+.gp-actions { display: flex; flex-direction: column; gap: 8px; position: sticky; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 5; padding: 8px; border: 1px solid var(--accent); border-radius: 12px; background: var(--panel2); box-shadow: var(--shadow-pop); }
 .gp-actions[hidden] { display: none; }
 .gp-auto-row { display: flex; gap: 8px; }
 .gp-auto-row input { flex: 1; min-width: 0; }
@@ -3467,18 +3447,18 @@ button.gd-pay.is-paid { background: var(--good-soft); color: var(--good); border
 
 /* ==========================================================================
    Phone grids: thin light lines
-   Host picking (.is-tabbed), Game Day on a phone (.gd-phone), and the guest's pick board and mini
+   Host picking (.is-tabbed), Game Day on a phone (.gd-phone), and the guest's pick board
    grid share one look: a flat sheet, one 1 px light line between squares, no rounded corners. The
    line is the table's own background showing through a 1 px gap, so every square's fill is opaque.
    ========================================================================== */
-.is-tabbed, .gd-phone, .gp-board, .mini-grid {
+.is-tabbed, .gd-phone, .gp-board {
   --g-line: #75808b;
   --g-taken: var(--panel3);
   --g-mine: var(--panel3);
   --g-hover: var(--panel3);
 }
 @supports (color: color-mix(in srgb, red 50%, blue)) {
-  .is-tabbed, .gd-phone, .gp-board, .mini-grid {
+  .is-tabbed, .gd-phone, .gp-board {
     --g-line: color-mix(in srgb, var(--muted) 62%, var(--panel));
     --g-taken: color-mix(in srgb, var(--muted) 24%, var(--panel));
     --g-mine: color-mix(in srgb, var(--accent) 34%, var(--panel));
@@ -3531,8 +3511,30 @@ button.gd-pay.is-paid { background: var(--good-soft); color: var(--good); border
 .gp-cell.is-open:disabled { background: var(--panel); }
 .gp-cell:focus-visible { outline: 3px solid var(--accent-hi); outline-offset: -3px; }
 
-/* The mini grid's axis numbers sit in the same grid, so each square draws its own line. */
-.mini-grid { gap: 1px; }
-.mg-cell { border: 0; border-radius: 0; background: var(--panel2); box-shadow: 0 0 0 1px var(--g-line); }
-.mg-cell.is-filled { background: var(--g-taken); }
-.mg-cell.is-mine { background: var(--accent); box-shadow: 0 0 0 1px var(--g-line); }
+
+/* ---- A guest's read-only board (R44, screen-mirror.js) ---- */
+.mirror-screen.is-guest .cell[data-i] { cursor: pointer; }
+.mirror-screen.is-guest .cell.is-yours { outline: 3px solid var(--text); outline-offset: -3px; z-index: 1; }
+.mirror-screen.is-guest .cell[data-i]:focus-visible { outline: 3px dashed var(--accent); outline-offset: -1px; z-index: 2; }
+.mirror-label { position: fixed; left: 0; top: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; max-width: calc(100vw - 8px); padding: 6px 12px; box-sizing: border-box; background: var(--panel); color: var(--text); border: 1px solid var(--accent); border-radius: 8px; box-shadow: var(--shadow-pop); pointer-events: none; visibility: hidden; white-space: nowrap; }
+.mirror-label.is-on { visibility: visible; }
+.mirror-label span { color: var(--muted); font-size: .8rem; }
+
+/* ---- Player View: Live tab, rules sheet and the You won banner (R44) ---- */
+.pl-row.is-mine { border: 1px solid var(--good); }
+.pl-who { min-width: 0; overflow-wrap: anywhere; }
+.pl-you { color: var(--good); font-weight: 800; font-size: .85rem; }
+.pl-pays { margin: 12px 0 0; line-height: 1.4; }
+.ph-rules { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; }
+.ph-rules p { margin: 0 0 10px; line-height: 1.45; }
+.ph-split { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; margin: 0 0 12px; }
+.ph-split dt { color: var(--muted); }
+.ph-split dd { margin: 0; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ph-host-pays { font-weight: 700; }
+.win-banners { display: flex; flex-direction: column; gap: 8px; }
+.win-banners:empty, .win-banners[hidden] { display: none; }
+.win-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border: 2px solid var(--good); border-radius: 12px; background: var(--panel); }
+.win-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.win-text strong { color: var(--good); font-size: 1.15rem; }
+button.win-dismiss { flex: none; min-height: 44px; }
+button.win-slim { width: 100%; min-height: 44px; background: var(--panel); color: var(--good); border: 1px solid var(--good); font-weight: 700; }

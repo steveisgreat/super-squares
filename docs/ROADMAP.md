@@ -403,7 +403,9 @@ game once R42 ships).
 `game.changes` (written by R40's and R42's operations), the list on Player View, and the ten-minute line on the TV.
 *Done:* browser check on Player View and the TV; a board with no changes looks as it does today.
 
-**R44. Player View tabs: Home, Players, Live, Picks** — `Sonnet` build, `Opus` review — Depends on: R28 ✅,
+**R44. Player View tabs: Home, Players, Live, Picks** — `Sonnet` build, `Opus` review — ✅ built 2026-11-25
+(`player-home.js`; guest read-only mode in `screen-mirror.js`; overtime counts toward the Final, checked in
+`lib/scores` and the score pad; wins share one banner; not tried on a real phone). Depends on: R28 ✅,
 R37, R38. Steve approved the design 2026-11-25 (design session, inline phone mockups). Front end only: decision 019's
 rules, the pick cookie and the API stay as they are. Today a guest lands on "Pick your squares" while picking is
 open; now everyone lands on **Home**, and picking is a tab.
