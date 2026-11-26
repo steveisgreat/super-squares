@@ -559,6 +559,19 @@ office-pool groups.
 
 ## Later (after 2027-02-14)
 
+- **Idea: zoom the grid on an iPhone** — `Sonnet` — not scheduled, not built. Players can't read names on the
+  phone grid. *Findings (2026-11-26, from the code):* pinch zoom is off app-wide (`index.html` viewport has
+  `user-scalable=no`, `maximum-scale=1`), and phone Game Day and the phone picking board force the 10×10 grid to the
+  screen width (`.gd-phone` and `.is-tabbed` rules in `styles.css`), so a square is about 28 px at 390 px wide and
+  long names get an ellipsis (`fitNames` in `board.js`). *Options:* (1) a "Zoom in on grid" button that sets squares to
+  about 62 px and scrolls the grid sideways inside its card with the row numbers pinned (sticky), remembered per phone
+  in `localStorage`; (2) turn pinch zoom back on for the grid only (a custom touch handler, since the viewport
+  meta applies to the whole page and the nudge script in `viewport-nudge.js` depends on it); (3) tap a square for its
+  full name (Game Day cells already have a `title`, which iPhone doesn't show). *Leaning:* option 1; a quick trial
+  on an iPhone profile worked (cells 28.5 → 62 px, no page overflow) but that code was not kept. Shared by one helper
+  in `board.js`, used by Game Day and the picking board. Party View, TV and wide screens stay as they are. Check on a
+  real iPhone, 360 px, landscape, and the TV view when built.
+
 - **R5. Payments** — `Opus` — Depends on: R2, R16. Live before the 2027–28 postseason.
   Stripe Checkout for the Postseason Pass ([decision 022](decisions/022-postseason-pass.md)),
   a signed webhook that grants the entitlement, the postseason free limit (10 players)
