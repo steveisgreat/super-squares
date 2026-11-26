@@ -201,7 +201,7 @@ check('edit: a value the board already holds is no change, and needs nothing see
 
 check('edit: malformed operations are refused', () => {
   const g = board('locked');
-  [null, [], 'edit', {}, { op: 'unlock' }, { op: 'edit' }, { op: 'edit', set: {}, saw: {} },
+  [null, [], 'edit', {}, { op: 'redraw' }, { op: 'edit' }, { op: 'edit', set: {}, saw: {} },
     { op: 'edit', set: { status: 'picking' }, saw: { status: 'started' } },
     { op: 'edit', set: { axisX: IDENTITY }, saw: { axisX: IDENTITY } },
     { op: 'edit', set: { squares: [] }, saw: { squares: [] } },
@@ -389,6 +389,105 @@ check('lock: a Simulation board gets its plan from the server clock', () => {
 check('lock: only a board that is picking', () => {
   for (const s of ['locked', 'underWay', 'over']) no(run(board(s), { op: 'lock' }), 'illegal');
   no(run(board('picking'), { op: 'lock', axisX: IDENTITY }), 'invalid');
+});
+
+// ---------- applySettingsOp: unlock (R42, section 5) ----------
+
+const UNLOCK = { op: 'unlock', ack: ['unlock'] };
+
+check('unlock: before kickoff it throws the numbers away and opens picking; squares, marks and picks stay', () => {
+  const g = board('locked', { autoCutoffEnabled: true, autoCutoffTime: PAST, guestPick: { on: true, max: 5, liftAt: null, lifted: false } });
+  g.players.Ann.paid = true;
+  const asked = no(run(g, { op: 'unlock' }), 'unacked');
+  eq(asked.warnings.map(w => w.code), ['unlock'], 'asks first');
+  assert(/cutoff/i.test(asked.warnings[0].text), `says the cutoff goes off: ${asked.warnings[0].text}`);
+  const r = ok(run(g, UNLOCK));
+  eq([r.game.status, r.game.axisX, r.game.axisY, r.game.autoCutoffEnabled], ['picking', null, null, false], 'unlocked');
+  eq([r.game.squares, r.game.players, r.game.guestPick], [g.squares, g.players, g.guestPick], 'kept');
+  eq(r.game.changes.map(c => [c.kind, c.from, c.to, c.at]), [['numbers', { axisX: IDENTITY, axisY: IDENTITY }, { axisX: null, axisY: null }, iso(NOW)]], 'shown to players');
+  eq(GL.cutoffPassed(r.game, NOW), false, 'the next read does not lock it again');
+  const plain = ok(run(board('locked'), UNLOCK));
+  assert(!/cutoff/i.test(no(run(board('locked'), { op: 'unlock' }), 'unacked').warnings[0].text), 'no cutoff words when it was off');
+  eq(plain.game.autoCutoffEnabled, false, 'stays off');
+});
+
+check('unlock: refused once the game starts, and on a board that is not locked', () => {
+  for (const s of ['underWay', 'line3', 'over']) no(run(board(s), UNLOCK), 'illegal');
+  no(run(live('locked'), UNLOCK, { feed: { state: 'in', at: NOW } }), 'illegal');
+  no(run(board('locked', { paidOut: { q1: { name: 'Ann', amount: 250 } } }), UNLOCK), 'illegal');
+  no(run(board('locked', { scoring: 'simulation', simulation: true }), UNLOCK), 'illegal');
+  no(run(board('picking'), UNLOCK), 'illegal');
+  ok(run(live('locked', { kickoffTime: PAST }), UNLOCK, { feed: { state: 'pre', at: NOW - MIN } }));
+});
+
+check('unlock: malformed operations are refused', () => {
+  for (const bad of [{ op: 'unlock', ack: 'unlock' }, { op: 'unlock', ack: ['unlock'], axisX: IDENTITY }, { op: 'unlock', ack: [1] }]) {
+    no(run(board('locked'), bad), 'invalid');
+  }
+});
+
+check('unlock then lock: new numbers from the server, shown as drawn again; a first lock writes none', () => {
+  const open = ok(run(board('locked'), UNLOCK)).game;
+  const r = ok(run(open, { op: 'lock' }, { pick: () => 0, now: NOW + MIN }));
+  const drawn = (() => { const a = IDENTITY.slice(); for (let i = 9; i > 0; i--) [a[i], a[0]] = [a[0], a[i]]; return a; })();
+  eq(r.game.changes.map(c => [c.kind, c.from, c.to]), [
+    ['numbers', { axisX: IDENTITY, axisY: IDENTITY }, { axisX: null, axisY: null }],
+    ['numbers', { axisX: null, axisY: null }, { axisX: drawn, axisY: drawn }]
+  ], 'both shown');
+  eq(r.game.changes[1].at, iso(NOW + MIN), 'when');
+  eq(ok(run(board('picking'), { op: 'lock' })).game.changes, undefined, 'first lock');
+  // Every other lock path shows the redraw too: the cutoff on read and the stores call lockGame.
+  const byCutoff = GL.lockGame(clone(open), { pick: () => 0, now: NOW });
+  eq(byCutoff.changes.map(c => c.kind), ['numbers', 'numbers'], 'cutoff lock');
+  const byPut = GL.guardPut(open, Object.assign(clone(open), { status: 'started', axisX: IDENTITY, axisY: IDENTITY }), CTX);
+  eq([byPut.error, byPut.game.changes.length, byPut.game.changes[1].to.axisX === null], [undefined, 2, false], 'old page PUT lock');
+  const priced = board('picking', { changes: [{ kind: 'price', from: 10, to: 12, at: iso(NOW) }] });
+  eq(ok(run(priced, { op: 'lock' })).game.changes.length, 1, 'a lock after other changes adds nothing');
+});
+
+// ---------- applySettingsOp: relink, the wrong game (R42, section 5) ----------
+
+const OTHER = { teamA: 'Bills', teamB: 'Ravens', league: 'nfl', gameDate: '2027-02-14', kickoffTime: SOON };
+const relink = (g, game, ack, ctx) => run(g, Object.assign({ op: 'relink', game }, ack ? { ack } : {}), ctx);
+
+check('relink: sets the game and clears the results, the score, a held score and a drawn winner', () => {
+  const g = live('line3', {
+    results: { q1: { a: 7, b: 3 }, q2: { a: 10, b: 3, autoResolve: { key: '0-3', row: 3, col: 0, drawnAt: NOW - MIN } } },
+    liveScore: { a: 13, b: 3, period: 3, manual: true }, liveOverride: true
+  });
+  const asked = no(relink(g, OTHER), 'unacked');
+  eq(asked.warnings.map(w => w.code), ['wrongGame'], 'asks first');
+  assert(/Bills/.test(asked.warnings[0].text) && /Q1/.test(asked.warnings[0].text), `names the game and what clears: ${asked.warnings[0].text}`);
+  const r = ok(relink(g, OTHER, ['wrongGame']));
+  eq(['teamA', 'teamB', 'league', 'gameDate', 'kickoffTime'].map(k => r.game[k]), ['Bills', 'Ravens', 'nfl', '2027-02-14', SOON], 'the new game');
+  eq([r.game.results, r.game.liveScore, r.game.liveOverride, r.game.status], [{}, null, undefined, 'started'], 'cleared');
+  eq([r.game.axisX, r.game.squares, r.game.players], [g.axisX, g.squares, g.players], 'numbers and squares stay');
+  eq(r.game.changes.map(c => [c.kind, c.from.teamA, c.to.teamA, c.to.kickoffTime]), [['game', 'Chiefs', 'Bills', SOON]], 'shown to players');
+  eq(GL.settingsStage(r.game, NOW, null), 'locked', 'before kickoff again');
+  eq(r.game.description, 'Office pool', 'a description of its own stays');
+  const auto = ok(relink(live('underWay', { description: 'Chiefs @ Eagles', teamAColor: '#ff0000', teamBColor: '#00ff00' }), OTHER, ['wrongGame'])).game;
+  eq([auto.description, auto.teamAColor, auto.teamBColor], ['Bills @ Ravens', null, null], 'a description that named the game follows it; colors reset');
+  eq(GL.settingsStage(ok(relink(g, Object.assign({}, OTHER, { kickoffTime: PAST }), ['wrongGame'])).game, NOW, null), 'underWay', 'a game already on');
+});
+
+check('relink: refused with a quarter paid out, once final, off a Live board, and while picking', () => {
+  no(relink(live('line3', { paidOut: { q1: { name: 'Ann', amount: 250 } } }), OTHER, ['wrongGame']), 'illegal');
+  no(relink(live('over'), OTHER, ['wrongGame']), 'illegal');
+  no(relink(board('underWay'), OTHER, ['wrongGame']), 'illegal');
+  no(relink(live('picking'), OTHER, ['wrongGame']), 'illegal');
+  ok(relink(live('locked'), OTHER, ['wrongGame']));
+  ok(relink(live('underWay'), OTHER, ['wrongGame']));
+});
+
+check('relink: the same game is no change; malformed games are refused', () => {
+  const g = live('underWay');
+  const same = ok(relink(g, { teamA: g.teamA, teamB: g.teamB, league: g.league, gameDate: g.gameDate, kickoffTime: g.kickoffTime }));
+  eq(same.changed, false, 'same game');
+  for (const bad of [undefined, 'Bills', Object.assign({}, OTHER, { extra: 1 }), { teamA: 'Bills' },
+    Object.assign({}, OTHER, { league: 'xfl' }), Object.assign({}, OTHER, { gameDate: '14/02/2027' }), Object.assign({}, OTHER, { teamA: '' })]) {
+    no(relink(g, bad, ['wrongGame']), 'invalid');
+  }
+  no(run(g, { op: 'relink', game: OTHER, ack: ['wrongGame'], results: {} }), 'invalid');
 });
 
 // ---------- guardPut ----------
@@ -584,11 +683,38 @@ async function routes() {
     eq([negative.statusCode, negative.json.code], [409, 'illegal'], negative.body);
     const blocked = await call('PATCH', p, { body: { op: 'edit', set: { pickMode: 'auto' }, saw: { pickMode: 'both' } } });
     eq([blocked.statusCode, blocked.json.field], [409, 'pickMode'], blocked.body);
-    for (const bad of [{ op: 'unlock' }, { op: 'edit', set: { status: 'picking' }, saw: {} }, 'not json']) {
+    for (const bad of [{ op: 'unlock', ack: 'unlock' }, { op: 'edit', set: { status: 'picking' }, saw: {} }, 'not json']) {
       eq((await call('PATCH', p, { body: bad })).statusCode, 400, JSON.stringify(bad));
     }
     eq((await call('PATCH', `/api/game/${crypto.randomUUID()}/settings`, { body: LOCK })).statusCode, 404, 'unknown board');
     eq((await call('GET', p)).statusCode, 404, 'GET');
+  });
+
+  await check('route: unlock asks, opens picking with the cutoff off, and the next lock draws new numbers', async () => {
+    const g = await makeBoard('locked', { autoCutoffEnabled: true, autoCutoffTime: iso(Date.now() - HOUR) });
+    const p = `/api/game/${g.id}/settings`;
+    const asked = await call('PATCH', p, { body: { op: 'unlock' } });
+    eq([asked.statusCode, asked.json.code, asked.json.warnings.map(w => w.code)], [409, 'unacked', ['unlock']], asked.body);
+    const r = await call('PATCH', p, { body: UNLOCK });
+    eq([r.statusCode, r.json.status, r.json.axisX, r.json.autoCutoffEnabled], [200, 'picking', null, false], r.body);
+    const read = await call('GET', `/api/game/${g.id}?fresh=1`);
+    eq(read.json.status, 'picking', 'the read does not lock it again');
+    const locked = await call('PATCH', p, { body: LOCK });
+    eq([locked.statusCode, locked.json.status, locked.json.changes.map(c => c.kind)], [200, 'started', ['numbers', 'numbers']], locked.body);
+    const under = await makeBoard('underWay');
+    eq((await call('PATCH', `/api/game/${under.id}/settings`, { body: UNLOCK })).json.code, 'illegal', 'game started');
+  });
+
+  await check('route: wrong game clears the results on a Live board, and is refused with a quarter paid out', async () => {
+    const g = await makeBoard('line3', { scoring: 'live' });
+    const p = `/api/game/${g.id}/settings`;
+    const r = await call('PATCH', p, { body: { op: 'relink', game: Object.assign({}, OTHER, { kickoffTime: iso(Date.now() + HOUR) }), ack: ['wrongGame'] } });
+    eq([r.statusCode, r.json.teamA, r.json.results], [200, 'Bills', {}], r.body);
+    eq((await store.getGame(g.id)).results, {}, 'stored');
+    const paid = await makeBoard('line3', { scoring: 'live', paidOut: { q1: { name: 'Ann', amount: 250 } } });
+    const refused = await call('PATCH', `/api/game/${paid.id}/settings`, { body: { op: 'relink', game: OTHER, ack: ['wrongGame'] } });
+    eq([refused.statusCode, refused.json.code], [409, 'illegal'], refused.body);
+    eq((await store.getGame(paid.id)).teamA, 'Chiefs', 'untouched');
   });
 
   await check('route: a line crossed between the read and the write is judged again', async () => {

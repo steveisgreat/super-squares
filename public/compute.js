@@ -573,6 +573,15 @@
     game.axisX = shuffledDigits(o.pick);
     game.axisY = shuffledDigits(o.pick);
     game.status = 'started';
+    // Numbers drawn again after an unlock are shown to players, whichever path locks (the settings op,
+    // the cutoff on read, an old page's PUT); a first lock writes nothing. Picking writes no changes,
+    // so an unlock's entry is still the last one at the next lock (decision 026, section 5).
+    const list = Array.isArray(game.changes) ? game.changes : [];
+    const last = list[list.length - 1];
+    if (last && last.kind === 'numbers' && last.to && last.to.axisX === null) {
+      const at = new Date(typeof o.now === 'number' ? o.now : Date.now()).toISOString();
+      game.changes = list.concat({ kind: 'numbers', from: { axisX: null, axisY: null }, to: { axisX: game.axisX, axisY: game.axisY }, at }).slice(-5);
+    }
     if (game.simulation) {
       game.simPlan = buildSimPlan(o.now);
       game.liveScore = null;
@@ -1628,6 +1637,8 @@
   // ctx = { now (ms), feed (see gameUnderWay), pick(n) (the server's draw), teamKey(name, league) }.
   //   lock                                  the server draws the numbers (and plans a Simulation)
   //   edit { set, saw, ack, marks }         only the changed fields, each with the value the host saw
+  //   unlock { ack }                        before the game starts: numbers thrown away, picking again (section 5)
+  //   relink { game, ack }                  Live, the wrong game: the five linked fields, results cleared (section 5)
   function applySettingsOp(game, op, ctx) {
     const c = ctx || {};
     const now = typeof c.now === 'number' ? c.now : Date.now();
@@ -1639,8 +1650,78 @@
       lockGame(g, { pick: c.pick, now });
       return { game: g, warnings: [], changed: true };
     }
+    if (op.op === 'unlock' || op.op === 'relink') {
+      const keys = op.op === 'unlock' ? ['op', 'ack'] : ['op', 'game', 'ack'];
+      if (Object.keys(op).some(k => keys.indexOf(k) === -1)) return failure('invalid', `${op.op === 'unlock' ? 'An unlock' : 'A wrong-game fix'} carries ${keys.slice(1).join(' and ')} only.`);
+      if (op.ack !== undefined && !(Array.isArray(op.ack) && op.ack.length <= 20 && op.ack.every(a => typeof a === 'string'))) return failure('invalid', 'ack is a list of warnings.');
+      return op.op === 'unlock' ? applyUnlock(game, op, c, now) : applyRelink(game, op, c, now);
+    }
     if (op.op !== 'edit') return failure('invalid', 'Unknown settings operation.');
     return applyEdit(game, op, c, now);
+  }
+
+  const asked = (warnings, ack) => (warnings.some(w => (ack || []).indexOf(w.code) === -1)
+    ? Object.assign(failure('unacked', 'Check these changes and confirm them.'), { warnings }) : null);
+
+  // Unlock (section 5): only before the game starts. Squares, paid marks and picks stay; auto cutoff
+  // goes off, or the next read would lock the board again. New numbers come at the next lock.
+  function applyUnlock(game, op, c, now) {
+    if (!game || game.status !== 'started') return failure('illegal', game && game.status === 'finished' ? 'The game is over, so the numbers stay.' : 'This board is not locked.');
+    if (settingsStage(game, now, c.feed) !== 'locked') return failure('illegal', "The game has started, so the numbers can't be drawn again.");
+    const words = ['The numbers will be reset and the board reopens for square selection. Squares already picked and paid marks stay. New numbers are drawn when you lock it again.'];
+    if (game.autoCutoffEnabled === true) words.push('Auto cutoff is turned off: lock the board yourself when it is ready.');
+    const stop = asked([{ code: 'unlock', field: null, text: words.join(' ') }], op.ack);
+    if (stop) return stop;
+    const g = JSON.parse(JSON.stringify(game));
+    g.status = 'picking';
+    g.axisX = null;
+    g.axisY = null;
+    g.autoCutoffEnabled = false;
+    g.changes = (Array.isArray(game.changes) ? game.changes : [])
+      .concat({ kind: 'numbers', from: { axisX: game.axisX, axisY: game.axisY }, to: { axisX: null, axisY: null }, at: new Date(now).toISOString() })
+      .slice(-MAX_CHANGES);
+    return { game: g, warnings: [], changed: true };
+  }
+
+  // Wrong game (section 5, Live): teams, league, date and kickoff together; the results, the score, a
+  // host-held score and any drawn winner are cleared. Not with a quarter paid out, nor once final.
+  const LINKED = ['teamA', 'teamB', 'league', 'gameDate', 'kickoffTime'];
+  function applyRelink(game, op, c, now) {
+    const to = op.game;
+    if (!isRecord(to) || Object.keys(to).sort().join() !== LINKED.slice().sort().join()) return failure('invalid', `Say the game: ${LINKED.join(', ')}.`);
+    if (!isText(to.teamA, MAX_TEXT) || !isText(to.teamB, MAX_TEXT) || !to.teamA.trim() || !to.teamB.trim()) return failure('invalid', 'Both teams need a name.');
+    if (!game || !Array.isArray(game.squares)) return failure('illegal', 'That board is not ready.');
+    const draft = Object.assign(JSON.parse(JSON.stringify(game)), to);
+    const invalid = validateGame(draft);
+    if (invalid) return failure('invalid', invalid);
+    if (scoringMode(game) !== 'live') return failure('illegal', 'Wrong game is for a board that follows a live game.');
+    if (game.status === 'finished') return failure('illegal', 'The game is over, so the live game is fixed.');
+    if (game.status !== 'started') return failure('illegal', 'The board is still filling: change the game in Edit game.');
+    const paid = isRecord(game.paidOut) ? game.paidOut : {};
+    if (QUARTERS.some(q => isRecord(paid[q]))) return failure('illegal', 'A quarter is marked paid out, so the live game is fixed. Undo the payout first.');
+    if (LINKED.every(k => sameValue(settingOf(to, k), settingOf(game, k)))) return { game: JSON.parse(JSON.stringify(game)), warnings: [], changed: false };
+
+    const results = isRecord(game.results) ? game.results : {};
+    const entered = QUARTERS.filter(q => hasResult(results[q])).map(q => QLABEL[q]);
+    const words = [`The board follows ${to.teamA} @ ${to.teamB} instead.`];
+    words.push(entered.length ? `Scores already in (${entered.join(', ')}) are cleared; the new game's score comes from the feed.` : "The new game's score comes from the feed.");
+    const stop = asked([{ code: 'wrongGame', field: null, text: words.join(' ') }], op.ack);
+    if (stop) return stop;
+
+    const g = JSON.parse(JSON.stringify(game));
+    LINKED.forEach(k => { g[k] = to[k]; });
+    // As the form's game picker does: listed teams wear their own colors, and a description that
+    // only named the old game follows the new one.
+    g.teamAColor = null;
+    g.teamBColor = null;
+    if (game.description === `${game.teamA} @ ${game.teamB}`) g.description = `${to.teamA} @ ${to.teamB}`;
+    g.results = {};
+    g.liveScore = null;
+    delete g.liveOverride;
+    const linked = (x) => ({ teamA: String(x.teamA || ''), teamB: String(x.teamB || ''), league: x.league, gameDate: x.gameDate, kickoffTime: x.kickoffTime || null });
+    g.changes = (Array.isArray(game.changes) ? game.changes : [])
+      .concat({ kind: 'game', from: linked(game), to: linked(g), at: new Date(now).toISOString() }).slice(-MAX_CHANGES);
+    return { game: g, warnings: [], changed: true };
   }
 
   function applyEdit(game, op, c, now) {

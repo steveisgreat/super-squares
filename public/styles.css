@@ -3609,6 +3609,7 @@ button.eg-pill[aria-pressed="true"], button.eg-choice[aria-pressed="true"] { bac
 .eg-message { color: var(--good); }
 button.eg-primary { flex: none; min-height: 54px; font-size: var(--fs-lg); font-weight: 800; }
 button.eg-secondary { flex: none; min-height: 50px; }
+button.eg-unlock { width: 100%; margin-top: 4px; }
 .eg-sheet { display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px); overflow-y: auto; }
 .eg-sheet h3, .eg-sheet p { margin: 0; line-height: 1.4; }
 .eg-change { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md); overflow-wrap: anywhere; }

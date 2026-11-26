@@ -436,6 +436,55 @@
       }
     }
 
+    // Unlock and Wrong game (R42, section 5) are operations of their own, not edits: each asks once,
+    // in the server's words, and saves alone. Unsaved edits in the form are dropped first, on a yes.
+    const probeOp = (op) => GL.applySettingsOp(base(), op, context(base()));
+    async function special(op, title, yes) {
+      if (busy) return;
+      if (changedKeys().length && !(await showConfirm('Your other changes here are not saved yet. Drop them and go on?'))) return;
+      const asked = probeOp(op);
+      if (asked.code === 'illegal' || asked.code === 'invalid') { state.error = asked.error; return draw(); }
+      if (asked.code !== 'unacked') return sendSpecial(op);
+      confirmSpecial(op, title, yes, asked.warnings);
+    }
+    function confirmSpecial(op, title, yes, warnings) {
+      openSheet(title, (box, shut) => {
+        box.classList.add('eg-sheet');
+        warnings.forEach(w => box.appendChild(textEl('p', 'eg-warn', w.text)));
+        const go = textEl('button', 'eg-primary', yes);
+        go.type = 'button';
+        go.dataset.eg = 'special-yes';
+        go.addEventListener('click', () => { shut(); sendSpecial(Object.assign({}, op, { ack: warnings.map(w => w.code) }), title, yes); });
+        const keep = textEl('button', 'secondary eg-secondary', 'Cancel');
+        keep.type = 'button';
+        keep.addEventListener('click', shut);
+        box.append(go, keep);
+      });
+    }
+    async function sendSpecial(op, title, yes) {
+      busy = true;
+      state.error = '';
+      state.message = '';
+      drawFoot();
+      let saved;
+      try {
+        saved = await SBS.api.patchSettings(base().id, op);
+      } catch (e) {
+        busy = false;
+        if (!root.isConnected) return;
+        if (e.forbidden) { await SBS.handleForbidden(e, base().id); return opts.onClose(); }
+        if (e.status === 404) return SBS.go({ screen: 'home' });
+        state.message = e.game ? takeBase(e.game) : '';
+        state.error = e.code === 'unacked' ? '' : 'Could not save: ' + e.message;
+        draw();
+        if (e.code === 'unacked' && e.warnings) confirmSpecial(Object.assign({}, op, { ack: undefined }), title, yes, e.warnings);
+        return;
+      }
+      busy = false;
+      Object.keys(draft).forEach(k => delete draft[k]);
+      if (root.isConnected) opts.onSaved(saved);
+    }
+
     async function close() {
       if (changedKeys().length && !(await showConfirm('Leave without saving your changes?'))) return;
       opts.onClose();
@@ -537,8 +586,16 @@
       const fixed = blocked('teamA');
       if (mode === 'live') {
         const row = summary(sec, 'Live game', [`${cur('teamA') || '?'} @ ${cur('teamB') || '?'}`, `${LEAGUE[cur('league')] || ''} · ${whenText(cur('kickoffTime'), cur('gameDate'))}`]);
-        if (fixed) reason(sec, fixed);
-        else rowButton(row, 'pick-game', 'Change', pickGame).setAttribute('aria-haspopup', 'dialog');
+        if (fixed) {
+          // Under way, the wrong game can still be fixed (section 5): a new game, the scores cleared.
+          const r = s === 'underWay'
+            ? probeOp({ op: 'relink', game: { teamA: 'Probe A', teamB: 'Probe B', league: b.league, gameDate: b.gameDate, kickoffTime: null } })
+            : null;
+          if (r && r.code !== 'illegal') {
+            sec.appendChild(textEl('p', 'eg-hint', 'Following the wrong game? Switch it with Wrong game. Scores already in are cleared.'));
+            rowButton(row, 'wrong-game', 'Wrong game?', () => pickGame(true)).setAttribute('aria-haspopup', 'dialog');
+          } else reason(sec, r ? r.error : fixed);
+        } else rowButton(row, 'pick-game', 'Change', () => pickGame(false)).setAttribute('aria-haspopup', 'dialog');
       } else if (fixed) {
         summary(sec, 'Game', [`${b.teamA} @ ${b.teamB}`, `${LEAGUE[b.league] || ''} · ${dayText(b.gameDate)}`]);
         reason(sec, fixed);
@@ -712,13 +769,23 @@
       const sold = base().squares.filter(Boolean).length;
       sec.appendChild(textEl('p', 'eg-text', `${sold} of 100 squares sold. The numbers are drawn.`));
       sec.appendChild(textEl('p', 'eg-hint', stage() === 'locked'
-        ? 'Squares can’t be added, and pick settings are closed. Move or remove squares in Players.'
+        ? 'Squares can’t be added, and pick settings are closed. Move or remove squares in Players, or unlock to sell more.'
         : 'Pick settings are closed, and the numbers stay as they are.'));
+      // Before the game starts the board can go back to picking (section 5).
+      if (stage() === 'locked' && probeOp({ op: 'unlock' }).code === 'unacked') {
+        const btn = textEl('button', 'secondary eg-secondary eg-unlock', 'Unlock and reopen picking');
+        btn.type = 'button';
+        btn.dataset.eg = 'unlock';
+        btn.setAttribute('aria-haspopup', 'dialog');
+        btn.addEventListener('click', () => special({ op: 'unlock' }, 'Unlock the board?', 'Unlock the board'));
+        sec.appendChild(btn);
+      }
     }
 
-    // The games on a date: picking one sets the teams, league, date and kickoff together.
-    function pickGame() {
-      openSheet('Which game?', (box, shut) => {
+    // The games on a date: picking one sets the teams, league, date and kickoff together. With
+    // `wrong`, the game has started and picking one is the Wrong game fix, saved on its own.
+    function pickGame(wrong) {
+      openSheet(wrong ? 'Which game is it?' : 'Which game?', (box, shut) => {
         box.classList.add('eg-sheet');
         let league = cur('league') === 'nba' ? 'nba' : 'nfl';
         let games = [];
@@ -752,7 +819,8 @@
         });
         date.addEventListener('change', load);
         box.append(leagues, dateWrap, msg, list,
-          textEl('p', 'eg-warn', 'Squares stay as they are. The score will come from the game you pick.'), use, cancel);
+          textEl('p', 'eg-warn', wrong ? 'Squares and numbers stay. Scores already in are cleared, and the score will come from the game you pick.'
+            : 'Squares stay as they are. The score will come from the game you pick.'), use, cancel);
 
         async function load() {
           const mine = ++seq;
@@ -792,6 +860,11 @@
         use.addEventListener('click', () => {
           const g = games[picked];
           if (!g) return;
+          if (wrong) {
+            shut();
+            const game = { teamA: g.teamA, teamB: g.teamB, league, gameDate: date.value, kickoffTime: g.date || null };
+            return special({ op: 'relink', game }, 'Follow this game instead?', 'Follow this game');
+          }
           const oldAuto = `${cur('teamA')} @ ${cur('teamB')}`;
           const followed = cur('description') === oldAuto;
           setSwap(false);

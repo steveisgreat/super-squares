@@ -398,12 +398,12 @@ choice, a Kickoff field, and "Keep theirs or use mine". A date change no longer 
 a locked board.
 *Done:* browser check at 360, 390, 1366 and 1920 px in all four stages; a stale form never reverts another device's change.
 
-**R42. Unlock and wrong game** — `Opus` (test-first) — Depends on: R40, R41.
+**R42. Unlock and wrong game** — `Opus` (test-first) — Depends on: R40, R41. — ✅ built 2026-11-26, not pushed (decision 026, "As built (R42)"; `/code-review high` done with its fixes).
 `unlock` and `relink` with their confirm sheets.
 *Done:* decision 026 tests, including a past cutoff and a paid-out quarter; `/code-review high` clean.
 
-**R43. Changed by the host** — `Sonnet` build, `Opus` review — Depends on: R40 (shows redraws and a changed
-game once R42 ships).
+**R43. Changed by the host** — `Sonnet` build, `Opus` review — Depends on: R40, R42 ✅ (shows redraws: an unlock's
+`numbers` change then the new numbers, and a changed game).
 `game.changes` (written by R40's and R42's operations), the list on Player View, and the ten-minute line on the TV.
 *Done:* browser check on Player View and the TV; a board with no changes looks as it does today.
 

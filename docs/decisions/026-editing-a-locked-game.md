@@ -1,7 +1,7 @@
 # 026 — Editing a locked game: three lines, judged on the server
 
 **Date:** 2026-11-25 · **Status:** accepted (Steve approved the design 2026-11-25); server rules built
-2026-11-25 (R40); the form built 2026-11-26 (R41); unlock and wrong game (R42) and the players' list (R43) not built ·
+2026-11-25 (R40); the form built 2026-11-26 (R41); unlock and wrong game built 2026-11-26 (R42); the players' list (R43) not built ·
 **Roadmap:** R40–R43 · **Related:** 004, 007, 008, 011, 012, 015, 019, 020, 023, 025 (its host column in
 section 1 is narrowed after lock, see section 2)
 
@@ -149,5 +149,18 @@ including a missing `updatedAt` and a lock from an old page; both stores.
   says why and keeps the rest.
 - A Live board's league, date, teams and kickoff change only together, by picking a game ("Change"), and a conflict
   over any of them is settled for all of them. Changing a date can no longer drop the kickoff or turn Live off.
-- Not shown yet: Unlock and "Wrong game?" (R42), and the mockup's line that players see the changes (R43).
+- Not shown yet: the mockup's line that players see the changes (R43). Unlock and "Wrong game?" came with R42.
 
+## As built (R42, 2026-11-26)
+- `applySettingsOp` takes `unlock { ack }` (warning code `unlock`) and `relink { game, ack }` (warning code
+  `wrongGame`, `game` = exactly `teamA`, `teamB`, `league`, `gameDate`, `kickoffTime`); tests in `test-settings.js`.
+- Unlock: only at the `locked` stage (so never on Simulation, which is under way from the lock). It sets status to
+  picking, clears the numbers, turns auto cutoff off and adds a `numbers` change (old numbers to null). The next
+  lock, by any path (`lockGame`: the settings op, the cutoff on read, an old page's `PUT`), adds a second `numbers`
+  change (null to the new numbers) when the last change is an unlock's.
+- Wrong game: Live boards, locked or under way, never with a quarter paid out or once final; picking boards use
+  Edit game. It clears the results (drawn winners with them), the score and a host-held score, resets the team
+  colors, follows a description that only named the old game, and adds a `game` change. The same game is no change.
+- Edit game: "Unlock and reopen picking" in Squares and numbers while locked; "Wrong game?" beside the live game
+  under way, which opens the game picker. Each asks once in the server's words and saves on its own; unsaved edits
+  in the form are dropped first, on a yes. The host log reads "Unlocked the board" and "Changed the live game".
