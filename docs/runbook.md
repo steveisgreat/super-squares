@@ -71,6 +71,13 @@ Once, after R16 (sending domain). R10's firewall rule is already live (below).
    `AUTH_MODE=accounts`, and redeploy.
 5. Run step 3 again, for boards made in between. Sign in and check the list.
 
+*Progress (2026-11-26):* step 1 done. Step 2 done on production: 002, 008, 009 and 013 applied in one
+transaction (18 games rows). Step 3 done: 18 boards assigned to Steve's account. Step 4 partly done:
+`SESSION_SECRET` and `APP_ORIGIN` (`https://play-super-squares.vercel.app`, change it when R16's domain lands)
+are set on Production; password mode now signs its cookie with `SESSION_SECRET`, so the host signs in once
+more after the next deploy. Left: R16 (domain, Resend verified), `RESEND_API_KEY`, `EMAIL_FROM`, the reviewed
+`TERMS_VERSION` (R6), then `AUTH_MODE=accounts`, redeploy and step 5.
+
 To go back, unset `AUTH_MODE` and redeploy. Boards keep their owner.
 
 ## Sign-in rate limit (R10)

@@ -65,7 +65,8 @@ checks on the server, mailer, tests; see the decision's build notes). Part 2 don
 Content-Security-Policy, 28 KB game limit, `scripts/assign-owner.js`, CI workflow, privacy
 draft). Not live: `AUTH_MODE` stays unset. `TEST_DATABASE_URL` set 2026-11-24 (Neon
 branch `ci-tests`; the Postgres suites passed there). Left: the first CI run after a push,
-then going live (runbook, "Turn on host accounts") once R16 is done.
+then going live (runbook, "Turn on host accounts") once R16 is done. Production prepared 2026-11-26: migrations 002, 008, 009, 013 applied, boards assigned,
+`SESSION_SECRET` and `APP_ORIGIN` set; `AUTH_MODE` still unset (needs R16, Resend and the reviewed Terms).
 
 **R3. Manual current score** — `Sonnet` — ✅ shipped 2026-11-23 ([decision 011](decisions/011-manual-scoring.md)); R2 later swaps its
 host check for an owner check.
