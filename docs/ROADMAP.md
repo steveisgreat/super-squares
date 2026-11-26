@@ -447,12 +447,13 @@ name, with picks on, off and closed, locked, live, hand-scored and final; a help
 unchanged; `/code-review medium`.
 
 **R46. Animated number draw** — `Sonnet` build, `Opus` review (the draw stays the server's) — Depends on: R42.
-Requested by Steve 2026-11-26; not scheduled yet. When the board locks (and after an unlock and a new lock), a fun
-animated reveal pulls the numbers one at a time onto the board's axes, on Game Day, Player View and the TV/Party
-View. Reuse the drawn-winner reveal for a final score where it fits. The animation only **reveals** the numbers the
+Requested by Steve 2026-11-26; not scheduled yet. A board setting, **Number draw: Quick pick or Animated** (set at
+setup and in Edit game until the lock; Quick pick, today's instant draw, is the default). With Animated, when the
+board locks (and after an unlock and a new lock), a fun reveal pulls the numbers one at a time onto the board's axes,
+on Game Day, Player View and the TV/Party View. Reuse the drawn-winner reveal for a final score where it fits. The animation only **reveals** the numbers the
 server already drew with `crypto.randomInt` (decision 026); the browser never picks them, so every screen shows
 the same digits. Each screen plays it once per draw, and a screen that opens later shows the finished axes.
-*Done:* no change to the drawn numbers or the lock route; every screen plays the same order; reduced-motion users
+*Done:* the setting saves and is closed after the lock like pick mode (decision 026 table); Quick pick boards look as they do today; no change to the drawn numbers or the lock route; every screen plays the same order; reduced-motion users
 get no animation; skip by tap; TV view checked at 1366 and 1920 px; `/code-review medium`.
 
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
