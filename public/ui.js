@@ -1024,8 +1024,98 @@
     return close;
   }
 
+  // "Where did you hear about us?" (R45c): one optional sheet for a signed-in host the server says
+  // to ask (`askHeard` on /api/session). Send and Skip both answer once; Escape sends "skip", and a
+  // tap outside closes it without an answer. A failed send closes quietly, so it may ask again next visit.
+  const HEARD_CHOICES = [
+    ['friend', 'A friend'], ['search', 'Search'], ['video', 'TikTok, Reels or Shorts'],
+    ['group', 'A Facebook or Reddit group'], ['ad', 'An ad'], ['other', 'Something else']
+  ];
+  // Once per page load: Home redraws (and asks the session again) while the answer is still saving.
+  let heardShown = false;
+  function showHeardSheet() {
+    if (heardShown) return;
+    heardShown = true;
+    const back = document.activeElement;
+    const overlay = overlayEl('0.72');
+    overlay.classList.add('sp-overlay');
+    const box = el('div', 'card sp-sheet heard-sheet');
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-labelledby', 'heard-title');
+    box.tabIndex = -1;
+    const title = textEl('h3', '', 'Where did you hear about us?');
+    title.id = 'heard-title';
+    const hint = textEl('p', 'sp-sheet-small', 'Optional. It only helps us count where hosts come from.');
+    const group = el('div', 'heard-choices');
+    group.setAttribute('role', 'radiogroup');
+    group.setAttribute('aria-labelledby', 'heard-title');
+    let picked = '';
+    const otherInput = el('input', 'heard-other');
+    otherInput.type = 'text';
+    otherInput.maxLength = 80;
+    otherInput.hidden = true;
+    otherInput.setAttribute('aria-label', 'Tell us where (optional)');
+    otherInput.placeholder = 'Tell us where (optional)';
+    const send = textEl('button', '', 'Send');
+    send.type = 'button';
+    send.disabled = true;
+    const skip = textEl('button', 'secondary', 'Skip');
+    skip.type = 'button';
+    HEARD_CHOICES.forEach(([key, label]) => {
+      const row = el('label', 'checkbox-label heard-choice');
+      const radio = el('input', '');
+      radio.type = 'radio';
+      radio.name = 'heard';
+      radio.value = key;
+      radio.addEventListener('change', () => {
+        picked = key;
+        send.disabled = false;
+        otherInput.hidden = key !== 'other';
+        if (key === 'other') otherInput.focus();
+      });
+      row.append(radio, textEl('span', '', label));
+      group.appendChild(row);
+    });
+    const actions = el('div', 'actions heard-actions');
+    actions.append(send, skip);
+    box.append(title, hint, group, otherInput, actions);
+    overlay.appendChild(box);
+
+    let done = false;
+    function finish(answer, other) {
+      if (done) return;
+      done = true;
+      overlay.remove();
+      if (back && document.body.contains(back) && back.focus) back.focus();
+      if (answer) SBS.api.sendHeard(answer, other).catch(() => { /* quiet: it may ask again next visit */ });
+    }
+    send.addEventListener('click', () => {
+      if (!picked) return;
+      finish(picked, picked === 'other' ? otherInput.value.trim().slice(0, 80) : '');
+    });
+    skip.addEventListener('click', () => finish('skip'));
+    // A tap outside only closes it (easy by accident on a phone): nothing is sent, so it may ask again.
+    overlay.addEventListener('click', (e) => { e.stopPropagation(); if (e.target === overlay) finish(null); });
+    overlay.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); finish('skip'); return; }
+      if (e.key === 'Enter' && e.target === otherInput && picked) { e.preventDefault(); send.click(); return; }
+      if (e.key !== 'Tab') return;
+      const all = Array.from(box.querySelectorAll('button, input')).filter(n => !n.disabled && n.offsetParent !== null);
+      // The radios are one Tab stop: the checked one, or the first when none is.
+      const first = box.querySelector('input[type=radio]:checked') || all[0];
+      const last = all[all.length - 1];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === box)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+    // No leave-screen hook: Home redraws itself when the games list changes, and that must not
+    // skip the question for a host who is still reading it.
+    document.body.appendChild(overlay);
+    box.focus();
+  }
+
   SBS.ui = {
-    openSheet, el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake, keepPartyAwake, partyHistory,
+    showHeardSheet, openSheet, el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake, keepPartyAwake, partyHistory,
     showModal, showConfirm, showAlert, disturbMessage, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin, signInConsent,
     shownDescription, topbar, HOME_ICON, BACK_ICON, formatGameDate, statusLabel, isTvBrowser, isPhone,
     formatKickoffTime, kickoffNotice,

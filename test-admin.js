@@ -218,6 +218,60 @@ async function run() {
 
   // ---------- counting ----------
 
+  await check('build: where hosts heard about us (R45c): answers, skips, friend boards, tags, latest text', async () => {
+    const t = Date.parse('2026-11-20T15:00:00Z');
+    const h = (id, o) => Object.assign({ id, email: `${id}@x.com`, createdAt: '2026-11-19T12:00:00.000Z', lastLoginAt: null,
+      referredBy: null, src: null, heardFrom: null, heardOther: null, heardAt: null, boards: 0, locked: 0, finished: 0 }, o);
+    const facts = { boards: [], liveNow: 0, tvsPaired: 0, tvBoards: [], helperBoards: [], hosts: [
+      h('a', { heardFrom: 'search' }), h('b', { heardFrom: 'search', src: 'tt1' }), h('c', { heardFrom: 'skip', src: 'tt1' }),
+      h('d', { referredBy: 'ABCDEF', src: 'yt' }), h('e', {}),
+      h('f', { heardFrom: 'other', heardOther: 'old', heardAt: '2026-11-19T13:00:00.000Z' }),
+      h('g', { heardFrom: 'other', heardOther: 'my coach', heardAt: '2026-11-19T14:00:00.000Z' }),
+      h('z', { heardFrom: 'ad', createdAt: '2026-01-01T00:00:00.000Z' })
+    ] };
+    const out = AdminStats.build(facts, [], { range: '7d', now: t, since: AdminStats.rangeStart('7d', t), refreshMs: 15000 });
+    eq(out.heard.answers.map(a => [a.answer, a.hosts]), [['friend', 0], ['search', 2], ['video', 0], ['group', 0], ['ad', 0], ['other', 2]], 'answers in range');
+    eq([out.heard.skipped, out.heard.fromBoard, out.heard.notAsked], [1, 1, 1], 'skips, friend boards, not asked');
+    eq(out.heard.tagged, [{ src: 'tt1', hosts: 2 }, { src: 'yt', hosts: 1 }], 'tags');
+    eq(out.heard.latestOther, { text: 'my coach', at: '2026-11-19T14:00:00.000Z' }, 'latest other');
+    const from = Object.fromEntries(out.recentHosts.map(r => [r.id, r.from]));
+    eq([from.a, from.b, from.c, from.d, from.e], ['search', 'link:tt1', 'link:tt1', 'board', null], 'recent hosts came from');
+  });
+
+  await check('Database and Hosting cards: no key is null; only named fields leave; a failure is ok:false', async () => {
+    const Services = require('./lib/admin-services.js');
+    eq(await Services.read({}, async () => null), { neon: null, vercel: null, tables: null }, 'no keys');
+    eq(await Services.neon({ NEON_API_KEY: 'k', NEON_PROJECT_ID: '../x' }), null, 'bad project id');
+    const realFetch = global.fetch;
+    const seen = [];
+    try {
+      global.fetch = async (url, opts) => {
+        seen.push([url, opts.method, opts.headers.Authorization]);
+        if (url.endsWith('/branches')) return { ok: true, json: async () => ({ branches: [{ default: false, logical_size: 1 }, { default: true, logical_size: 42 }] }) };
+        if (url.includes('neon')) return { ok: true, json: async () => ({ project: { compute_time_seconds: 7200, active_time_seconds: 3600, data_transfer_bytes: 5, written_data_bytes: 6,
+          consumption_period_start: '2026-11-01T00:00:00Z', consumption_period_end: '2026-12-01T00:00:00Z', compute_last_active_at: '2026-11-26T16:00:00Z', owner: { email: 'secret@x.com' } } }) };
+        return { ok: true, json: async () => ({ deployments: [{ state: 'READY', created: 0, meta: { githubCommitSha: 'abcdef123456', githubCommitMessage: 'Ship it\nmore', githubCommitAuthorLogin: 'someone' } }] }) };
+      };
+      const out = await Services.read({ NEON_API_KEY: 'nk', NEON_PROJECT_ID: 'misty-lake-1', VERCEL_API_TOKEN: 'vt', VERCEL_PROJECT_ID: 'prj_1', VERCEL_TEAM_ID: 'team_1' },
+        async () => [{ table: 'games', rows: 3 }]);
+      eq(out.neon, { ok: true, computeHours: 2, activeHours: 1, transferBytes: 5, writtenBytes: 6, storageBytes: 42,
+        periodStart: '2026-11-01T00:00:00Z', periodEnd: '2026-12-01T00:00:00Z', lastActive: '2026-11-26T16:00:00Z' }, 'neon');
+      eq(out.vercel, { ok: true, deploy: { state: 'READY', createdAt: '1970-01-01T00:00:00.000Z', commit: 'abcdef1', message: 'Ship it' } }, 'vercel');
+      eq(out.tables, [{ table: 'games', rows: 3 }], 'tables');
+      assert(!JSON.stringify(out).includes('secret@x.com') && !JSON.stringify(out).includes('someone'), 'nothing else leaves');
+      assert(seen.every(r => r[1] === 'GET'), 'GET only');
+      assert(seen.some(r => r[0].includes('teamId=team_1') && r[2] === 'Bearer vt'), 'vercel team and token');
+      global.fetch = async () => ({ ok: false, status: 500, json: async () => ({}) });
+      const errLog = console.error; console.error = () => {};
+      try {
+        const bad = await Services.read({ NEON_API_KEY: 'nk', NEON_PROJECT_ID: 'p', VERCEL_API_TOKEN: 'vt', VERCEL_PROJECT_ID: 'prj' }, async () => { throw new Error('x'); });
+        eq(bad, { neon: { ok: false }, vercel: { ok: false }, tables: null }, 'failures');
+      } finally { console.error = errLog; }
+    } finally {
+      global.fetch = realFetch;
+    }
+  });
+
   await check('a slate refresh counts each provider tried, a failover, and a feed fully down', async () => {
     const bumps = [];
     let saved = null;

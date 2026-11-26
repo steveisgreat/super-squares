@@ -133,6 +133,11 @@ Object.assign(store, {
     l.tries++;
     return l.codeHash === codeHash ? signedIn(l) : null;
   },
+  async getHeardAsk(hostId) { const h = db.hosts[hostId]; return !!h && !h.heardAt && !h.referredBy; },
+  async setHeard(hostId, answer, other) {
+    const h = db.hosts[hostId];
+    if (h && !h.heardAt) Object.assign(h, { heardFrom: answer, heardOther: other, heardAt: Date.now() });
+  },
   async revokeSessions(hostId, version) {
     const h = db.hosts[hostId];
     if (!h || h.sessionVersion !== version) return false;
@@ -146,7 +151,7 @@ function signedIn(login) {
   let id = Object.keys(db.hosts).find(k => db.hosts[k].email === login.email);
   if (!id) {
     id = crypto.randomUUID();
-    db.hosts[id] = { email: login.email, sessionVersion: 1 };
+    db.hosts[id] = { email: login.email, sessionVersion: 1, referredBy: login.ref || null, src: login.src || null };
   }
   return { id, email: login.email, sessionVersion: db.hosts[id].sessionVersion };
 }
@@ -443,6 +448,48 @@ async function run() {
       const out = (await call('GET', '/api/session', opts)).json;
       eq([out.host, out.authRequired, 'email' in out], [false, true, false], 'signed out');
     }
+  });
+
+  // ---------- where did you hear about us (R45c, decision 027 section 5) ----------
+
+  await check('sign-in keeps a valid ?src= tag and drops a bad one', async () => {
+    for (const [src, want] of [[' TikTok-Jan_1 ', 'tiktok-jan_1'], ['has space', null], ['x'.repeat(33), null], [7, null], ['-lead', null]]) {
+      const before = db.logins.length;
+      await call('POST', '/api/login', { body: { email: 'src@example.com', src } });
+      eq(db.logins.length, before + 1, `stored for ${JSON.stringify(src)}`);
+      eq(db.logins[db.logins.length - 1].src, want, `src for ${JSON.stringify(src)}`);
+    }
+    db.logins = db.logins.filter(l => l.email !== 'src@example.com');
+  });
+
+  await check('the session asks once; PUT /api/heard keeps the first answer', async () => {
+    const h = db.hosts[A];
+    delete h.heardAt; delete h.heardFrom; delete h.heardOther;
+    eq((await call('GET', '/api/session', { as: A })).json.askHeard, true, 'asked');
+    eq((await call('PUT', '/api/heard', { as: A, body: { answer: 'nope' } })).statusCode, 400, 'bad answer');
+    eq((await call('PUT', '/api/heard', { as: A, body: { answer: 'other', other: `  a\u0007${'z'.repeat(100)} ` } })).statusCode, 200, 'answered');
+    eq([h.heardFrom, h.heardOther], ['other', `a ${'z'.repeat(78)}`], 'cleaned and cut to 80');
+    delete h.heardAt;
+    await call('PUT', '/api/heard', { as: A, body: { answer: 'other', other: `${'y'.repeat(79)}\u{1F600}x` } });
+    eq(Array.from(h.heardOther).length === 80 && h.heardOther.endsWith('\u{1F600}'), true, 'an emoji at the limit stays whole');
+    await call('PUT', '/api/heard', { as: A, body: { answer: 'ad' } });
+    eq(h.heardFrom, 'other', 'first answer stands');
+    eq('askHeard' in (await call('GET', '/api/session', { as: A })).json, false, 'not asked again');
+  });
+
+  await check('PUT /api/heard needs a signed-in host and a PUT', async () => {
+    eq((await call('PUT', '/api/heard', { body: { answer: 'skip' } })).statusCode, 401, 'signed out');
+    eq((await call('PUT', '/api/heard', { cookie: cookie(A, 9), body: { answer: 'skip' } })).statusCode, 401, 'old session');
+    eq((await call('POST', '/api/heard', { as: A, body: { answer: 'skip' } })).statusCode, 405, 'method');
+  });
+
+  await check('a host from a friend board is never asked', async () => {
+    const id = Object.keys(db.hosts).find(k => k !== A) || A;
+    const h = db.hosts[id];
+    const saved = { ...h };
+    delete h.heardAt; h.referredBy = 'ABCDEF';
+    eq('askHeard' in (await call('GET', '/api/session', { as: id })).json, false, 'not asked');
+    Object.keys(h).forEach(k => delete h[k]); Object.assign(h, saved);
   });
 
   await check('password sign-in does not exist in accounts mode', async () => {

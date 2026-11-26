@@ -32,6 +32,11 @@
       + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   }
 
+  function day(iso) {
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  }
+
   function add(parent, ...children) {
     children.forEach(c => parent.appendChild(c));
     return parent;
@@ -170,9 +175,29 @@
         ? table('Top referring boards', ['Board code', 'Hosts'], g.topReferrers.map(r => ({ cells: [r.code, num(r.hosts)] })))
         : empty('No referrals in this range yet.'));
     }],
-    ['heard', 'Where hosts heard about us', 'full', (body) => {
-      body.appendChild(empty('Coming with R45c.'));
-    }, 'fixed'],
+    ['heard', 'Where hosts heard about us', 'full', (body, d) => {
+      const h = d.heard;
+      if (!h) { body.appendChild(empty('No answers yet.')); return; }
+      const answered = h.answers.reduce((t, a) => t + (a.hosts || 0), 0);
+      const total = answered + (h.skipped || 0) + (h.fromBoard || 0) + (h.notAsked || 0);
+      body.appendChild(note('Asked once, after a host signs in. The answer is optional.'));
+      body.appendChild(bars(h.answers.map(a => [HEARD_LABELS[a.answer] || a.answer, a.hosts, total, num(a.hosts)])));
+      body.appendChild(facts([
+        ['Skipped', num(h.skipped)],
+        ["From a friend's board", num(h.fromBoard)],
+        ['Not asked yet', num(h.notAsked)]
+      ]));
+      body.appendChild(textEl('h3', '', 'Tagged links'));
+      const tags = (h.tagged || []).slice(0, 10);
+      body.appendChild(tags.length
+        ? table('Tagged links', ['Tag', 'Hosts'], tags.map(t => ({ cells: [t.src, num(t.hosts)] })))
+        : empty('No hosts came in by a tagged link yet.'));
+      body.appendChild(textEl('h3', '', 'Latest "something else"'));
+      const o = h.latestOther;
+      body.appendChild(o && o.text
+        ? add(el('p', 'adm-other'), textEl('span', '', '“' + o.text + '”'), textEl('span', 'adm-note', ' ' + when(o.at, '—')))
+        : empty('None yet.'));
+    }],
     ['games', 'Hosts by game', 'full', (body, d) => {
       if (!d.byGame.length) { body.appendChild(empty('No boards in this range yet.')); return; }
       const head = el('div', 'adm-game-head');
@@ -264,8 +289,42 @@
       ]));
       body.appendChild(add(el('div', 'adm-services'), feeds, mail));
     }],
-    ['database', 'Database', 'half', (body) => dashboard(body, 'Neon', 'https://console.neon.tech/'), 'fixed'],
-    ['hosting', 'Hosting', 'half', (body) => dashboard(body, 'Vercel', 'https://vercel.com/dashboard'), 'fixed'],
+    ['database', 'Database', 'half', (body, d) => {
+      const db = d.database || {};
+      const n = db.neon;
+      if (n && n.ok) {
+        body.appendChild(facts([
+          ['Compute hours', hours(n.computeHours)],
+          ['Active hours', hours(n.activeHours)],
+          ['Data transferred', bytes(n.transferBytes)],
+          ['Data written', bytes(n.writtenBytes)],
+          ['Storage', bytes(n.storageBytes)],
+          ['Period', n.periodStart && n.periodEnd ? `${day(n.periodStart)} to ${day(n.periodEnd)}` : '—'],
+          ['Last active', when(n.lastActive, '—')]
+        ]));
+      }
+      const t = db.tables;
+      if (t && t.length) {
+        body.appendChild(textEl('h3', '', 'Rows'));
+        body.appendChild(table('Rows per table', ['Table', 'Rows'], t.map(r => ({ cells: [r.table, num(r.rows)] }))));
+      }
+      dashboard(body, 'Neon', 'https://console.neon.tech/', n);
+    }],
+    ['hosting', 'Hosting', 'half', (body, d) => {
+      const v = (d.hosting || {}).vercel;
+      if (v && v.ok) {
+        const dep = v.deploy;
+        body.appendChild(dep
+          ? facts([
+            ['Latest deploy', dep.state || '—'],
+            ['Deployed', when(dep.createdAt, '—')],
+            ['Commit', dep.commit ? String(dep.commit).slice(0, 7) : '—'],
+            ['Message', dep.message || '—']
+          ])
+          : empty('No deploy found.'));
+      }
+      dashboard(body, 'Vercel', 'https://vercel.com/dashboard', v);
+    }],
     ['recent', 'Recent hosts', 'full', (body, d, ctx) => {
       if (!d.recentHosts.length) { body.appendChild(empty('No hosts yet.')); return; }
       const list = el('ul', 'adm-hosts');
@@ -275,7 +334,7 @@
           ['Boards', num(h.boards)],
           ['Stage', HOST_STAGES[h.stage] || h.stage],
           ['Last sign-in', when(h.lastSignIn, 'Never')],
-          ['From', h.from === 'board' ? 'a board' : '—']
+          ['From', from(h.from)]
         ]);
         info.classList.add('adm-recent-facts');
         list.appendChild(add(el('li', 'adm-recent'), ctx.email(h), info));
@@ -284,8 +343,26 @@
     }]
   ];
 
-  function dashboard(body, name, href) {
-    body.appendChild(note(`${name} numbers are not shown here yet.`));
+  const HEARD_LABELS = {
+    friend: 'A friend', search: 'Search', video: 'TikTok, Reels or Shorts',
+    group: 'A Facebook or Reddit group', ad: 'An ad', other: 'Something else', skip: 'Skipped'
+  };
+  const hours = (n) => (n == null ? '—' : Number(n).toFixed(1));
+  function bytes(n) {
+    if (n == null) return '—';
+    const gb = Number(n) / 1e9;
+    return gb >= 1 ? gb.toFixed(2) + ' GB' : (Number(n) / 1e6).toFixed(1) + ' MB';
+  }
+  function from(f) {
+    if (f === 'board') return 'a board';
+    if (typeof f === 'string' && f.startsWith('link:')) return 'link ' + f.slice(5);
+    return HEARD_LABELS[f] || '—';
+  }
+
+  // `state`: null = no key set here, {ok:false} = could not reach it, {ok:true} = numbers drawn above.
+  function dashboard(body, name, href, state) {
+    if (!state) body.appendChild(note(`${name} numbers are not shown here yet.`));
+    else if (!state.ok) body.appendChild(note(`Couldn't reach ${name}.`));
     const a = textEl('a', 'adm-link', 'Open dashboard');
     a.href = href;
     a.target = '_blank';

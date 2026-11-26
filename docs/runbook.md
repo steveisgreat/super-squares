@@ -123,6 +123,12 @@ needs a change there. On previews it blocks the Vercel toolbar, which is expecte
 - **R45a:** `migrations/012_usage_counters.sql` was applied to production on 2026-11-26, before the push (and to `ci-tests`;
   decision 027). `ADMIN_EMAILS` is set on Vercel Production. `#admin` opens only in accounts mode, so it refuses everyone until R2. Without it nothing fails: no service counts are kept and the admin page shows none. It only adds a
   table. Set `ADMIN_EMAILS` on Vercel (Production) to Steve's sign-in email; unset means nobody can open `#admin`.
+- **R45c:** `migrations/013_heard_about_us.sql` must be applied to production **before** the push that
+  ships R45c (applied to `ci-tests` 2026-11-26). Sign-in writes `login_requests.src` and `hosts.src`, and
+  `#admin` reads the new `hosts` columns, so both fail without it once accounts mode is on. It only adds
+  columns. Optional env (Production only) for the Database and Hosting cards: `NEON_API_KEY` +
+  `NEON_PROJECT_ID` (`misty-lake-58761091`), `VERCEL_API_TOKEN` + `VERCEL_PROJECT_ID` + `VERCEL_TEAM_ID`
+  (from `.vercel/project.json`). Neither provider offers a read-only key (see decision 027 section 5).
 - **R33:** `migrations/007_host_themes.sql` was applied to production on 2026-11-24
   (decision 021). Without it every board shows the default theme and choosing one answers 503.
 - **R13:** `migrations/008_referrals.sql` alters the tables of 002, which production doesn't have

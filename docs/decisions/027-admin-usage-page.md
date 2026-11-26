@@ -55,9 +55,31 @@ says there is no analytics, and that must stay true.
 
 ### 4. Split
 - **R45a** (this entry): access, counters, the route. **R45b**: the `#admin` screen. **R45c**: the
-  "where did you hear about us" question with `?src=` links (a `hosts` column, privacy text), and the
-  Neon and Vercel cards with their two read-only keys (`NEON_API_KEY`, `VERCEL_API_TOKEN`); until then
-  those cards show "Open dashboard".
+  "where did you hear about us" question with `?src=` links (`hosts` columns, privacy text), and the
+  Neon and Vercel cards with their keys (`NEON_API_KEY`, `VERCEL_API_TOKEN`); see section 5.
+
+### 5. Where hosts heard about us, and the outside cards (R45c, 2026-11-26)
+- `?src=<tag>` (1–32 of `a-z 0-9 - _`, lowercased; anything else dropped) is kept in the browser and sent
+  with the sign-in request like `ref`; `login_requests.src` is copied to `hosts.src` on the first sign-in
+  only (migration 013).
+- `GET /api/session` answers `askHeard: true` for a signed-in host with no answer yet and no referral
+  (a friend's board already says where they came from). The page asks once; `PUT /api/heard` takes one
+  of `friend`, `search`, `video`, `group`, `ad`, `other` (with up to 80 characters of text) or `skip`, and
+  the first answer stands. Accounts mode only. Hosts from before migration 013 are asked once too: only
+  test accounts exist before R2.
+- The stats add `heard` (answers, skips, from a friend's board, not asked yet, top 10 tags, the latest
+  "something else" text), and Recent hosts' `from` becomes board, link tag or answer.
+- **Outside cards.** `lib/admin-services.js` reads Neon (this period's compute and active hours, data
+  moved and written, the default branch's size, last active) and Vercel (the production deployment's
+  state, time and commit) with GET requests only, 4 s each, and passes on only those fields (Neon's
+  answer includes the owner's email, which is dropped). No key: `null` and the card links to the
+  dashboard; a failure: `{ ok: false }`, never a failed page. Row counts per table come from
+  `pg_stat_user_tables` (no scan). **Neither provider offers a read-only key**, so the protection is
+  scope: a Neon API key for this project only, a Vercel token for this team with an expiry, both on
+  Production only and read only by the admin route.
+- Not built: Vercel function metrics (Active CPU, calls, errors, cache share, p95, firewall blocks) need
+  the observability query API, and Neon cold starts and the slowest query need `pg_stat_statements`;
+  the cards link to the dashboards for those.
 
 | Option | Why not |
 |---|---|

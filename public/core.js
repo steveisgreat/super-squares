@@ -171,7 +171,9 @@
     setTheme: (theme) => request('/api/theme', json('PUT', { theme })),
     getGameTheme: (id) => rawRequest(`/api/game/${id}/theme`),
     // Account sign-in. Raw on purpose: a 401 here must never open the prompt.
-    requestLoginCode: (email) => rawRequest('/api/login', json('POST', { email, ref: SBS.referral.get() })),
+    requestLoginCode: (email) => rawRequest('/api/login', json('POST', { email, ref: SBS.referral.get(), src: SBS.linkTag.get() })),
+    // "Where did you hear about us?" (R45c). Raw on purpose: never opens the sign-in prompt.
+    sendHeard: (answer, other) => rawRequest('/api/heard', json('PUT', other ? { answer, other } : { answer })),
     verifyLogin: (body) => rawRequest('/api/login/verify', json('POST', body)),
     // News about next season (R34): the signed-in host's own choice. Raw on purpose: a prompt here
     // could sign in someone else and replay the choice on their account.
@@ -376,8 +378,31 @@
     url(code) { return `${window.location.origin}/?ref=${encodeURIComponent(code)}`; }
   };
 
+  // Link tags (R45c): /?src=tiktok1 marks where a link was shared. Kept like `ref` and sent with
+  // the next sign-in request; the server ignores it unless the account is new.
+  const SRC_KEY = 'sbs-src';
+  const SRC_RE = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+  SBS.linkTag = {
+    get() {
+      try { return window.localStorage.getItem(SRC_KEY) || undefined; } catch (e) { return undefined; }
+    },
+    capture() {
+      let src;
+      try { src = new URLSearchParams(window.location.search).get('src'); } catch (e) { return; }
+      if (src === null) return;
+      src = src.trim().toLowerCase();
+      if (SRC_RE.test(src)) { try { window.localStorage.setItem(SRC_KEY, src); } catch (e) { /* optional */ } }
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.delete('src');
+        window.history.replaceState(window.history.state, '', u.pathname + u.search + u.hash);
+      } catch (e) { /* the parameter just stays in the address bar */ }
+    }
+  };
+
   SBS.parseInitialRoute = function () {
     SBS.referral.capture();
+    SBS.linkTag.capture();
     const hash = window.location.hash || '';
     // /<join code>: the guest link (R22). The server serves this same page for
     // it; the code is resolved to a board id, then the player view opens.

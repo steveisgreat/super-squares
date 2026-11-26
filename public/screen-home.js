@@ -750,6 +750,8 @@
       if (!s.host) return;
       syncHostTheme();
       if (!tv) nav.appendChild(buildAccountButton(s));
+      // R45c: the server says when to ask (accounts mode, a host who signed up here, never asked).
+      if (!tv && s.askHeard === true && SBS.ui.showHeardSheet) SBS.ui.showHeardSheet();
     }).catch(() => { /* never block Home on the session probe */ });
 
     // Games are created/edited/deleted from other devices in the room (a

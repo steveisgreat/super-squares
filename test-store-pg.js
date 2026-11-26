@@ -441,6 +441,28 @@ async function main() {
       eq(await store.revokeSessions(host.id, 1), false, 'old session');
       eq((await signIn('revoke')).sessionVersion, 2, 'the next sign-in carries the new version');
     });
+
+    // R45c (migration 013): the ?src= tag is kept on the first sign-in only, and the heard question
+    // is asked once, never of a host from a friend's board.
+    await check('heard about us: src on the first sign-in, one answer, admin facts carry it', async () => {
+      const r = await ask('heard', { src: 'tt1', ref: null });
+      const host = await store.useLoginToken(r.tokenHash);
+      const again = await ask('heard', { src: 'other' });
+      await store.useLoginToken(again.tokenHash);
+      eq((await sql`select src from hosts where id = ${host.id}`)[0].src, 'tt1', 'src kept from the first sign-in');
+      eq(await store.getHeardAsk(host.id), true, 'asked');
+      await Promise.all([store.setHeard(host.id, 'other', 'my coach'), store.setHeard(host.id, 'ad', null)]);
+      eq(await store.getHeardAsk(host.id), false, 'not asked again');
+      const row = (await sql`select heard_from, heard_other from hosts where id = ${host.id}`)[0];
+      assert(row.heard_from === 'ad' ? row.heard_other === null : row.heard_other === 'my coach', 'one answer, whole');
+      const facts = await store.adminFacts({ since: new Date().toISOString(), now: Date.now(), etToday: '2099-01-01' });
+      const h = facts.hosts.find(x => x.id === host.id);
+      eq([h.src, h.heardFrom, typeof h.heardAt], ['tt1', row.heard_from, 'string'], 'admin facts');
+      const friend = await ask('friendref', { ref: 'ABCDEF' });
+      eq(await store.getHeardAsk((await store.useLoginToken(friend.tokenHash)).id), false, 'friend board not asked');
+      const rows = await store.tableRows();
+      assert(rows.some(t => t.table === 'hosts' && typeof t.rows === 'number'), 'table rows');
+    });
   } finally {
     const mine = `%-${tag}@test.invalid`;
     await sql`delete from games where owner_id in (select id from hosts where email like ${mine})`;
