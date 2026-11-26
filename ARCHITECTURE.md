@@ -27,6 +27,7 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `lib/mailer.js` | The sign-in email, one `fetch` to Resend |
 | `lib/store.js` | Storage contract and backend switch (decision 008) |
 | `lib/changes.js` | The wording of the host's "Recent changes" entries (R39) |
+| `lib/admin-stats.js` | The admin usage page's sums from the store's facts and daily counters (R45a, decision 027) |
 | `lib/store-fs.js`, `lib/store-pg.js` | The two backends; both apply auto-cutoff on read (Postgres: only if the row is unchanged since it was read) |
 | `lib/version.js` | App version from `package.json`; adds `+<short hash>` on Vercel non-production |
 | `lib/scores/` | Score providers (decision 001): `espn.js` and `balldontlie.js` adapters, `index.js` (config, failover, no-backward merge, quarter completion), `slate.js` (the shared slate: one claimed refresh per league and date every 15 s, merge into a board, `listGames` for the picker) |
@@ -54,6 +55,7 @@ framework-free (`handleApi(req, res, pathname, query)`).
 | `PATCH`, `DELETE /api/game/:id/helpers/:helper` | host only; switch the jobs, remove that helper → `{ helpers }` |
 | `POST /api/game/:id/helpers/:helper/code` | host only; a new one-time code for that helper, cancels the waiting one |
 | `GET /api/game/:id/changes` | host only (R39, decision 025); the board's last 50 score, squares and helper changes → `{ changes: [{ id, at, helperId, label, text }] }`, newest first; `helperId` null is the host |
+| `GET /api/admin/stats` | admins only: accounts mode, `ADMIN_EMAILS` (R45a, decision 027); `?range=7d\|30d\|season` → counts with masked emails; `?reveal=<host id>` → `{ email }`; 403 for everyone else |
 | `POST /api/helper` | anonymous; `{ token }` spends the code once, sets `sbs_helper` (180 d, `Path=/api/game/<id>`) → `{ gameId }`; 401 otherwise |
 | `GET /api/game/:id/role` | public; `{ role: 'host' \| 'helper' \| 'none' }` for this device, plus `label`, `canScore`, `canSquares` on a helper's phone |
 | `POST /api/tv` | anonymous; a TV asks to pair → `{ code, token }` (decision 017) |

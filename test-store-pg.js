@@ -478,6 +478,37 @@ async function main() {
     await sql`delete from live_slates where league = ${slateLeague}`;
   }
 
+  // ---------- usage counters (R45a, decision 027) ----------
+
+  const usageDay = '2099-12-30';
+  try {
+    await check('usage: one upsert per call keeps calls, failures, the busiest minute and the latest call', async () => {
+      const t = Date.parse(`${usageDay}T10:00:05Z`);
+      await Promise.all([0, 1, 2].map(i => store.bumpUsage('test:feed', { now: t + i * 1000 })));
+      await store.bumpUsage('test:feed', { failed: true, now: t + 60000 });
+      await store.bumpUsage('test:feed', { now: t + 120000 });
+      const rows = (await store.listUsage(usageDay)).filter(r => r.key === 'test:feed');
+      eq(rows.map(r => [r.day, r.calls, r.failed, r.peakMinute, r.lastAt]),
+        [[usageDay, 5, 1, 3, new Date(t + 120000).toISOString()]], 'row');
+    });
+
+    await check('admin facts: a board made in the range comes back as facts, never its document', async () => {
+      const game = makeGame();
+      game.squares[0] = { name: 'Ann' };
+      game.squares[1] = { name: ' ann ' };
+      game.squares[2] = { name: 'Bob' };
+      const made = await store.createGame(game);
+      cleanupIds.push(made.id);
+      const facts = await store.adminFacts({ since: made.createdAt, now: Date.now(), etToday: '2099-01-01' });
+      const b = facts.boards.find(x => x.id === made.id);
+      assert(b, 'board listed');
+      eq([b.sold, b.names.slice().sort(), b.doc], [3, ['ann', 'bob'], undefined], 'facts');
+      assert(Array.isArray(facts.hosts) && typeof facts.liveNow === 'number' && typeof facts.tvsPaired === 'number', 'shape');
+    });
+  } finally {
+    await sql`delete from usage_counters where day = ${usageDay}::date`;
+  }
+
   // ---------- report ----------
 
   for (const id of cleanupIds) {

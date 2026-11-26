@@ -16,6 +16,8 @@ delete process.env.VERCEL;
 
 const crypto = require('crypto');
 const store = require('./lib/store-fs.js');
+// The admin counters (decision 027) are tested in test-admin.js; here they would only leave a file in data/.
+store.bumpUsage = async () => {};
 const Slate = require('./lib/scores/slate.js');
 const G = require('./public/compute.js');
 const { handleApi } = require('./lib/api.js');

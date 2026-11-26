@@ -116,6 +116,7 @@ Object.assign(store, {
     return { exists: !!g, ownerId: g ? g.ownerId : null, sessionVersion: h ? h.sessionVersion : null };
   },
   async getHost(hostId) { return db.hosts[hostId] || null; },
+  async bumpUsage(key) { db.usage = (db.usage || []).concat(key); },
   async createLoginRequest(r) {
     if (db.logins.filter(l => l.email === r.email).length >= r.perEmail) return false;
     if (db.logins.length >= r.perSite) return false;
