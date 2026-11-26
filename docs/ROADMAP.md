@@ -402,7 +402,7 @@ a locked board.
 `unlock` and `relink` with their confirm sheets.
 *Done:* decision 026 tests, including a past cutoff and a paid-out quarter; `/code-review high` clean.
 
-**R43. Changed by the host** — `Sonnet` build, `Opus` review — Depends on: R40, R42 ✅ (shows redraws: an unlock's
+**R43. Changed by the host** — `Sonnet` build, `Opus` review — ✅ built 2026-11-26, not pushed (decision 026, "As built (R43)"; `/code-review medium` done, browser check on Player View at 375 px and the TV at 1366 px). Depends on: R40, R42 ✅ (shows redraws: an unlock's
 `numbers` change then the new numbers, and a changed game).
 `game.changes` (written by R40's and R42's operations), the list on Player View, and the ten-minute line on the TV.
 *Done:* browser check on Player View and the TV; a board with no changes looks as it does today.

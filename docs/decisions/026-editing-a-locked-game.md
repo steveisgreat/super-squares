@@ -164,3 +164,12 @@ including a missing `updatedAt` and a lock from an old page; both stores.
 - Edit game: "Unlock and reopen picking" in Squares and numbers while locked; "Wrong game?" beside the live game
   under way, which opens the game picker. Each asks once in the server's words and saves on its own; unsaved edits
   in the form are dropped first, on a yes. The host log reads "Unlocked the board" and "Changed the live game".
+
+## As built (R43, 2026-11-26)
+- Display only; the server already wrote `game.changes`. The public board `GET` already carried it, so no `lib/` change.
+- Player View (`public/player-home.js`): a "Changed by the host" card, newest first, one line and a time each (the date too
+  when not today). An unlock followed by its redraw reads as one line, "Board unlocked; numbers drawn again"; an unlock not
+  yet relocked reads "Numbers cleared (board unlocked)". Payout splits show as percentages.
+- TV (`#tv-<id>`, `public/screen-gameday.js`): one line above the quarter strip for the newest change of the last ten
+  minutes, with "+N more", judged on each poll against the TV's clock; it ellipsizes rather than wrap.
+- A board with no changes (or, on the TV, none in ten minutes) draws nothing new.

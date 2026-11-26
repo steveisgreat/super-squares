@@ -1242,6 +1242,24 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: var(--fs-2xl); }
   color: var(--accent);
 }
 body.tv-fullscreen .tv-kickoff-clock { font-size: var(--fs-3xl); }
+/* R43: one line, so the board gives up as little height as it can. */
+.tv-change-line {
+  flex: 0 0 auto;
+  align-self: center;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  padding: 8px 26px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--warn);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* Controls have their own row above the header and quarter strip, so they never cover a chip,
    and fade out after a few idle seconds (the row keeps its room, so nothing jumps). Any tap or
    mouse move revives them. */
@@ -2498,6 +2516,12 @@ button.player-tab[aria-current="page"] { color: var(--accent); background: color
 .ph-slot { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .ph-slot:empty, .ph-note:empty, .ph-updated:empty { display: none; }
 .ph-note { margin: 0; padding: 12px 14px; border: 1px solid var(--accent); border-radius: var(--r-lg); font-weight: 700; overflow-wrap: anywhere; }
+.ph-changes { display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--warn-soft); border: 1px solid var(--warn); border-radius: var(--r-lg); }
+.ph-changes h2 { margin: 0; font-size: var(--fs-lg); font-weight: 800; color: var(--warn); }
+.ph-changes ul { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.ph-changes li { display: flex; justify-content: space-between; gap: 12px; font-size: var(--fs-md); line-height: 1.35; }
+.ph-changes li span { min-width: 0; overflow-wrap: anywhere; }
+.ph-changes time { flex: none; color: var(--muted); }
 .ph-countdown { display: flex; flex-direction: column; gap: 4px; }
 .ph-countdown strong { color: var(--text); font-size: var(--fs-xl); }
 .ph-who { display: flex; flex-direction: column; gap: 10px; }

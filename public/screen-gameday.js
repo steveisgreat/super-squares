@@ -1373,6 +1373,23 @@
     tickKickoffCountdown();
     const kickoffCountdownTimer = setInterval(tickKickoffCountdown, 1000);
 
+    // ---- "Host changed …" for ten minutes after a change (R43) ----
+    // Judged on each poll; the line exists only while there is something to say.
+    let changeLine = null;
+    function syncChangeLine(game) {
+      const text = game ? SBS.playerHome.tvChangeText(game, Date.now()) : '';
+      if (!text) {
+        if (changeLine) { changeLine.remove(); changeLine = null; }
+        return;
+      }
+      if (!changeLine) {
+        changeLine = el('div', 'tv-change-line');
+        changeLine.setAttribute('role', 'status');
+        screenEl.insertBefore(changeLine, tvQuarters);
+      }
+      if (changeLine.textContent !== text) changeLine.textContent = text;
+    }
+
     // ---- Randomly-drawn Final winner reveal (mirrors the board's) ----
     // While this is playing, the normal quarter-win celebration for Final is
     // held back so the trophy card doesn't pop up mid-spin — checkForNewWinners
@@ -1692,6 +1709,7 @@
         if (!game) return;
         lastGame = game;
         applyTeamColors(game);
+        syncChangeLine(game);
         syncJoinPanel(game);
         setCornerQr(game);
 
@@ -1806,6 +1824,7 @@
         // Deleted on another device — nothing left here to show.
         if (e && e.status === 404) {
           if (paired) {
+            syncChangeLine(null);
             // The host's board is gone; stay and keep checking the pairing for the next one.
             header.innerHTML = '<div class="error-msg">This board is no longer available. Waiting for the host…</div>';
             return;

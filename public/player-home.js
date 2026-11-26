@@ -75,6 +75,81 @@
     return null;
   }
 
+  // ----- changed by the host (R43, decision 026 section 7) -----
+  // The server writes game.changes; this only words it.
+  const TV_CHANGE_MS = 10 * 60 * 1000;
+  const split = (p) => QUARTERS.map(q => p[q]).join('/') + '%';
+  const teamName = (n) => n || '(none)';
+  const abbrs = (g) => ['A', 'B'].map(s => teamStyle(g, s).abbr || '?').join(' vs ');
+  const shortDay = (date) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+  function linkedGameText(from, to) {
+    const label = (g) => `${abbrs(g)}, ${shortDay(g.gameDate)}`;
+    if (label(from) !== label(to)) return `Live game changed: ${label(from)} to ${label(to)}`;
+    // Same teams on the same day: the kickoff, if that is what moved.
+    const at = (g) => formatKickoffTime(g.kickoffTime) || 'no time';
+    return at(from) !== at(to) ? `Kickoff changed: ${at(from)} to ${at(to)}` : `Live game changed: ${label(to)}`;
+  }
+
+  // One entry as Player View says it (`line`) and as the TV does (`tv`).
+  function changeWords(c) {
+    const { from, to } = c;
+    switch (c.kind) {
+      case 'price': return { line: `Square price ${money(from)} to ${money(to)}`, tv: `Host changed the square price to ${money(to)}` };
+      case 'payouts': return { line: `Payout split ${split(from)} to ${split(to)} (Q1/Half/Q3/Final)`, tv: `Host changed the payout split to ${split(to)}` };
+      case 'pot': return { line: `Total pot ${money(from)} to ${money(to)}`, tv: `Host changed the total pot to ${money(to)}` };
+      case 'swap': return { line: `Rows and columns swapped (${teamName(from[0])} ↔ ${teamName(from[1])})`, tv: 'Host swapped rows and columns' };
+      case 'teams': {
+        const names = [0, 1].filter(i => from[i] !== to[i]).map(i => `${teamName(from[i])} to ${teamName(to[i])}`);
+        return { line: `Team name${names.length === 1 ? '' : 's'}: ${names.join(', ')}`, tv: `Host changed the teams to ${teamName(to[0])} vs ${teamName(to[1])}` };
+      }
+      case 'game': return { line: linkedGameText(from, to), tv: `Host changed the live game to ${abbrs(to)}, ${shortDay(to.gameDate)}` };
+      default: return to.axisX === null
+        ? { line: 'Numbers cleared (board unlocked)', tv: 'Host unlocked the board and cleared the numbers' }
+        : { line: 'Numbers drawn again', tv: 'Host drew the numbers again' };
+    }
+  }
+
+  // Newest first. An unlock and the redraw that follows it read as one line, at the redraw's time.
+  function changeList(game) {
+    const list = Array.isArray(game.changes) ? game.changes : [];
+    const cleared = (c) => !!c && c.kind === 'numbers' && c.to.axisX === null;
+    const redrawn = (c) => !!c && c.kind === 'numbers' && c.to.axisX !== null;
+    const both = { line: 'Board unlocked; numbers drawn again', tv: 'Host unlocked the board and drew new numbers' };
+    return list.map((c, i) => {
+      if (cleared(c) && redrawn(list[i + 1])) return null;
+      const words = redrawn(c) && cleared(list[i - 1]) ? both : changeWords(c);
+      return Object.assign({ at: Date.parse(c.at) }, words);
+    }).filter(Boolean).reverse();
+  }
+
+  // The TV's one line: the newest change of the last ten minutes, or '' when there is none.
+  function tvChangeText(game, now) {
+    const recent = changeList(game).filter(c => now - c.at < TV_CHANGE_MS);
+    if (!recent.length) return '';
+    return recent[0].tv + (recent.length > 1 ? ` · +${recent.length - 1} more` : '');
+  }
+
+  // "7:42 PM", with the date when it was not today.
+  function changeTime(at) {
+    const d = new Date(at);
+    const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`;
+  }
+
+  function changesCard(changes) {
+    const card = el('section', 'ph-changes', '<h2>Changed by the host</h2>');
+    card.setAttribute('aria-label', 'Changed by the host');
+    const list = el('ul', '');
+    changes.forEach(c => {
+      const row = el('li', '');
+      row.append(textEl('span', '', c.line), textEl('time', '', changeTime(c.at)));
+      list.appendChild(row);
+    });
+    card.appendChild(list);
+    return card;
+  }
+
   // `opts`: title; payouts: say what a quarter still to come will pay.
   function winnersCard(game, computed, me, opts) {
     const o = opts || {};
@@ -223,6 +298,7 @@
     const hostLink = el('a', 'player-host-link', 'Running your own pool? Host your own board');
     hostLink.target = '_blank';
     hostLink.rel = 'noopener';
+    let changed = null;           // "Changed by the host", only on a board that has changes
     const hostSlot = slot();      // the bottom, or up top once the game is final
     const bottom = slot();
     bottom.append(inviteBtn, SBS.ui.legalLinks());
@@ -382,6 +458,11 @@
         finalSlot.appendChild(winnersCard(game, computed, me));
       }
 
+      if (changed) changed.remove();
+      const changes = changeList(game);
+      changed = changes.length ? changesCard(changes) : null;
+      if (changed) root.insertBefore(changed, who);
+
       drawWho();
       drawSquares(game, computed);
 
@@ -424,5 +505,5 @@
     };
   }
 
-  SBS.playerHome = { create, isAutoScored, totalWon, squaresOf, squareHtml, liveCards, WON_PHRASE };
+  SBS.playerHome = { create, isAutoScored, totalWon, squaresOf, squareHtml, liveCards, WON_PHRASE, tvChangeText };
 })();
