@@ -153,6 +153,7 @@ const TABLE = [
   ['payout split', board, { payouts: { q1: 20, q2: 20, q3: 20, final: 40 } }, [F, 'money', 'money', X, X]],
   ['total pot', board, { potOverride: 1200 }, [X, 'pot', 'pot', 'pot', 'pot']],
   ['pick mode', board, { pickMode: 'manual' }, [F, X, X, X, X]],
+  ['number draw', board, { numberDraw: 'animated' }, [F, X, X, X, X]],
   ['player picks', board, { guestPick: { on: true, max: 4, liftAt: null, lifted: false } }, [F, X, X, X, X]],
   ['Manual to Live', board, { scoring: 'live' }, [F, 'scoring', 'scoring', 'scoring', X]],
   ['Live to Manual', live, { scoring: 'manual' }, [F, 'scoring', X, X, X]],
@@ -373,11 +374,25 @@ check('lock: the server draws the numbers; nothing else of the board changes', (
   // pick(n) = 0 always swaps with the first slot: Fisher-Yates from the top.
   const drawn = (() => { const a = IDENTITY.slice(); for (let i = 9; i > 0; i--) [a[i], a[0]] = [a[0], a[i]]; return a; })();
   eq([r.game.status, r.game.axisX, r.game.axisY], ['started', drawn, drawn], 'locked');
-  const strip = (x) => JSON.stringify(Object.assign({}, x, { status: 0, axisX: 0, axisY: 0 }));
+  const strip = (x) => JSON.stringify(Object.assign({}, x, { status: 0, axisX: 0, axisY: 0, drawnAt: 0 }));
   eq(strip(r.game), strip(g), 'the rest');
   const seen = new Set();
   for (let i = 0; i < 20; i++) seen.add(JSON.stringify(ok(run(g, { op: 'lock' }, { pick: (n) => crypto.randomInt(n) })).game.axisX));
   assert(seen.size > 15, 'the draw is random');
+  eq(r.game.drawnAt, NOW, 'drawnAt is the lock time');
+  eq(ok(run(g, { op: 'lock' }, { pick: () => 0, now: NOW + 5000 })).game.drawnAt, NOW + 5000, 'drawnAt follows ctx.now');
+});
+
+check('numberDraw: unlock clears drawnAt, the setting is editable again, a new lock stamps a new drawnAt', () => {
+  const locked = ok(run(board('picking', { numberDraw: 'animated' }), { op: 'lock' }, { pick: () => 0 })).game;
+  no(edit(locked, { numberDraw: 'quick' }), 'illegal');
+  const open = ok(run(locked, { op: 'unlock', ack: ['unlock'] })).game;
+  eq(open.drawnAt, undefined, 'cleared at unlock');
+  const quick = ok(edit(open, { numberDraw: 'quick' })).game;
+  eq(quick.numberDraw, 'quick', 'editable after an unlock');
+  eq(ok(run(quick, { op: 'lock' }, { pick: () => 0, now: NOW + 9000 })).game.drawnAt, NOW + 9000, 'new lock, new drawnAt');
+  no(edit(board('picking'), { drawnAt: 5 }), 'invalid');
+  no(edit(board('locked'), { drawnAt: 5 }), 'invalid');
 });
 
 check('lock: a Simulation board gets its plan from the server clock', () => {
@@ -508,6 +523,18 @@ check('PUT: a lock keeps none of the client\'s numbers', () => {
   eq([open.axisX, open.axisY], [null, null], 'no numbers on a board that is picking');
 });
 
+check('PUT: drawnAt is the servers', () => {
+  const stored = board('picking');
+  const g = putOk(stored, Object.assign(clone(stored), { status: 'started', drawnAt: 1 }), { pick: () => 0 });
+  eq(g.drawnAt, NOW, 'a lock by PUT stamps it, whatever the client sent');
+  const open = putOk(stored, Object.assign(clone(stored), { drawnAt: 77 }));
+  eq(open.drawnAt, undefined, 'none on a board that is picking');
+  const lockedStored = board('locked', { drawnAt: 1234 });
+  eq(putOk(lockedStored, clone(lockedStored)).drawnAt, 1234, 'an echo passes');
+  const r = put(lockedStored, Object.assign(clone(lockedStored), { drawnAt: 99 }));
+  eq([r.code, r.field], ['illegal', 'drawnAt'], 'a locked board refuses a change');
+});
+
 check('PUT: on a locked board the numbers, the status and every settings field stay', () => {
   for (const stage of ['locked', 'underWay', 'over']) {
     const stored = board(stage);
@@ -522,7 +549,7 @@ check('PUT: on a locked board the numbers, the status and every settings field s
     try_(b => { b.axisX = IDENTITY.slice().reverse(); }, 'other numbers');
     try_(b => { b.simPlan = { startedAt: iso(NOW), events: [] }; }, 'a new plan');
     [['squarePrice', 20], ['payouts', { q1: 10, q2: 10, q3: 10, final: 70 }], ['potOverride', 900], ['teamA', 'Bills'], ['teamB', 'Bills'],
-      ['league', 'other'], ['gameDate', '2027-02-15'], ['kickoffTime', iso(NOW)], ['pickMode', 'auto'], ['scoring', 'live'], ['simulation', true],
+      ['league', 'other'], ['gameDate', '2027-02-15'], ['kickoffTime', iso(NOW)], ['pickMode', 'auto'], ['numberDraw', 'animated'], ['scoring', 'live'], ['simulation', true],
       ['guestPick', { on: true, max: 3, liftAt: null, lifted: false }], ['autoCutoffEnabled', true], ['description', 'x'], ['teamAColor', '#123456']
     ].forEach(([k, v]) => try_(b => { b[k] = v; }, k));
   }

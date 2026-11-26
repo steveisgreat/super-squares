@@ -383,6 +383,7 @@
   // Every guest's browser draws what a host saved, and hosts are strangers
   // (decision 012), so any field that reaches markup, a style or a lookup key
   // is held to the exact type the screens expect. The screens escape as well.
+  const NUMBER_DRAWS = ['quick', 'animated'];
   const PICK_MODES = ['manual', 'auto', 'both'];
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   const DATETIME_RE = /^\d{4}-\d{2}-\d{2}T[\d:.]{4,18}(Z|[+-]\d{2}:?\d{2})?$/;
@@ -503,6 +504,8 @@
     if (!isUnset(game.potOverride) && !isWhole(game.potOverride, 1e9)) return 'Total pot must be a whole number of 0 or more.';
 
     if (!isUnset(game.pickMode) && PICK_MODES.indexOf(game.pickMode) === -1) return `Pick mode must be one of: ${PICK_MODES.join(', ')}.`;
+    if (!isUnset(game.numberDraw) && NUMBER_DRAWS.indexOf(game.numberDraw) === -1) return `Number draw must be one of: ${NUMBER_DRAWS.join(', ')}.`;
+    if (!isUnset(game.drawnAt) && !isWhole(game.drawnAt, Number.MAX_SAFE_INTEGER)) return 'The draw time is not valid.';
     for (const [key, label] of [['autoCutoffTime', 'Cutoff'], ['kickoffTime', 'Kickoff']]) {
       const v = game[key];
       if (!isUnset(v) && v !== '' && !(typeof v === 'string' && DATETIME_RE.test(v))) return `${label} must be a date and time.`;
@@ -573,6 +576,7 @@
     game.axisX = shuffledDigits(o.pick);
     game.axisY = shuffledDigits(o.pick);
     game.status = 'started';
+    game.drawnAt = typeof o.now === 'number' ? o.now : Date.now(); // the sync key for the animated reveal (R46)
     // Numbers drawn again after an unlock are shown to players, whichever path locks (the settings op,
     // the cutoff on read, an old page's PUT); a first lock writes nothing. Picking writes no changes,
     // so an unlock's entry is still the last one at the next lock (decision 026, section 5).
@@ -1470,14 +1474,14 @@
   // save here, so a stale screen or an old cached page can't write past a line.
 
   const EDIT_FIELDS = ['description', 'teamA', 'teamB', 'teamAColor', 'teamBColor', 'swap', 'league', 'gameDate', 'kickoffTime',
-    'autoCutoffEnabled', 'autoCutoffTime', 'squarePrice', 'payouts', 'potOverride', 'pickMode', 'guestPick', 'scoring'];
+    'autoCutoffEnabled', 'autoCutoffTime', 'squarePrice', 'payouts', 'potOverride', 'pickMode', 'numberDraw', 'guestPick', 'scoring'];
   // What a whole-document PUT may not change once the board is locked: settings go through edit.
   const LOCKED_FIELDS = EDIT_FIELDS.filter(k => k !== 'swap').concat('simulation');
   const FIELD_LABEL = {
     description: 'The description', teamA: 'Team A', teamB: 'Team B', teamAColor: 'Team A color', teamBColor: 'Team B color',
     swap: 'Rows and columns', league: 'The league', gameDate: 'The date', kickoffTime: 'The kickoff', autoCutoffEnabled: 'Auto cutoff',
     autoCutoffTime: 'The cutoff time', squarePrice: 'The square price', payouts: 'The payout split', potOverride: 'Total pot',
-    pickMode: 'Pick mode', guestPick: 'Player picks', scoring: 'The scoring', simulation: 'Simulation'
+    pickMode: 'Pick mode', numberDraw: 'Number draw', guestPick: 'Player picks', scoring: 'The scoring', simulation: 'Simulation'
   };
   const QUARTER_WORDS = { q1: 'Q1', q2: 'Q2', q3: 'Q3', final: 'the Final' };
   const CHANGE_KINDS = ['price', 'payouts', 'pot', 'swap', 'teams', 'game', 'numbers'];
@@ -1562,6 +1566,7 @@
     if (k === 'scoring') return scoringMode(game);
     if (k === 'simulation' || k === 'autoCutoffEnabled') return v === true;
     if (k === 'pickMode') return v || 'both';
+    if (k === 'numberDraw') return v || 'quick';
     if (k === 'guestPick') return Object.assign({ on: false, max: DEFAULT_GUEST_MAX, liftAt: null, lifted: false }, isRecord(v) ? v : null);
     return v === undefined || v === '' ? null : v;
   }
@@ -1676,6 +1681,7 @@
     g.status = 'picking';
     g.axisX = null;
     g.axisY = null;
+    delete g.drawnAt;
     g.autoCutoffEnabled = false;
     g.changes = (Array.isArray(game.changes) ? game.changes : [])
       .concat({ kind: 'numbers', from: { axisX: game.axisX, axisY: game.axisY }, to: { axisX: null, axisY: null }, at: new Date(now).toISOString() })
@@ -1795,6 +1801,8 @@
           return warn('money', k);
         case 'potOverride':
           return picking ? 'Total pot is set once the board is locked.' : warn('pot', k);
+        case 'numberDraw':
+          return picking ? null : 'The number draw is set once the board is locked.';
         case 'pickMode': case 'guestPick':
           return picking ? null : 'Picks are closed once the board is locked.';
         case 'scoring': {
@@ -1901,6 +1909,7 @@
     const wasLocked = stored.status === 'started' || stored.status === 'finished';
     if (!wasLocked) {
       keep('simPlan');
+      keep('drawnAt');
       if (g.status === 'started' || g.status === 'finished') lockGame(g, { pick: c.pick, now });
       else { g.axisX = stored.axisX === undefined ? null : stored.axisX; g.axisY = stored.axisY === undefined ? null : stored.axisY; }
       const negative = negativeWords(stored, g);
@@ -1909,7 +1918,7 @@
     }
 
     if (g.status !== 'started' && g.status !== 'finished') return refuse("This board is locked, so it can't go back to picking.", 'status');
-    for (const k of ['axisX', 'axisY', 'simPlan']) {
+    for (const k of ['axisX', 'axisY', 'simPlan', 'drawnAt']) {
       if (!sameValue(g[k], stored[k])) return refuse("The numbers can't change once they're drawn.", k);
     }
     for (const k of LOCKED_FIELDS) {

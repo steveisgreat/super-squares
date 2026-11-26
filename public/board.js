@@ -374,6 +374,114 @@
 
     scroll.appendChild(table);
     frame.mount(holder, scroll);
+    applyDrawReveal(holder, game);
+  }
+
+  // ---------- Animated number draw (R46, decision 026) ----------
+  // The server drew the digits at the lock (lockGame) and stamped game.drawnAt. Here they are only
+  // revealed, one at a time: the columns left to right, then the rows top to bottom. Every screen
+  // works the reveal out from the same drawnAt and the clock, so a screen that learns of the lock on
+  // a later poll joins mid-sequence and ends with the others. Nothing here picks a digit.
+  const DRAW_STEP_MS = 400;
+  const DRAW_TOTAL_MS = 20 * DRAW_STEP_MS;
+  const reduceMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+  const drawHolders = new Set();
+  let drawTimer = null;
+  const skipKey = (game) => `sbs-draw-skip:${game.id}:${game.drawnAt}`;
+  const skippedDraws = new Set();
+
+  function drawSkipped(game) {
+    if (skippedDraws.has(skipKey(game))) return true;
+    try { return sessionStorage.getItem(skipKey(game)) === '1'; } catch (e) { return false; }
+  }
+
+  // When this screen's reveal starts. On the server's clock (drawnAt) when the screen saw the draw in
+  // time to keep step with the others. A screen that learns of it late (the TV and Party View poll every
+  // 8 s, guests every 15 s, plus the edge cache) but within DRAW_CATCHUP_MS plays the whole reveal from
+  // the moment it saw it. So does a screen whose clock runs behind the server's, so it never sits on
+  // "?" for the lag. Remembered per tab, so a reload carries on rather than replaying.
+  const DRAW_CATCHUP_MS = 30000;
+  const drawStarts = new Map();
+  function drawStart(game) {
+    const key = `sbs-draw-start:${game.id}:${game.drawnAt}`;
+    if (drawStarts.has(key)) return drawStarts.get(key);
+    let start = NaN;
+    try { start = Number(sessionStorage.getItem(key)); } catch (e) { /* private mode */ }
+    if (!start) {
+      const now = Date.now();
+      const lag = now - game.drawnAt;
+      start = lag > DRAW_CATCHUP_MS ? game.drawnAt : (lag < 0 || lag > DRAW_TOTAL_MS ? now : game.drawnAt);
+      try { sessionStorage.setItem(key, String(start)); } catch (e) { /* in-memory only */ }
+    }
+    drawStarts.set(key, start);
+    return start;
+  }
+
+  // How many of the 20 digits show now: 20 when there is nothing to play (a quick-pick board, a draw
+  // already over, a skip, reduced motion).
+  function digitsShown(game) {
+    if (!game || game.numberDraw !== 'animated' || !game.axisX || !game.axisY) return 20;
+    if (!Number.isFinite(game.drawnAt) || game.status !== 'started' && game.status !== 'finished') return 20;
+    const elapsed = Math.max(0, Date.now() - drawStart(game));
+    if (elapsed >= DRAW_TOTAL_MS || reduceMotion.matches || drawSkipped(game)) return 20;
+    return Math.floor(elapsed / DRAW_STEP_MS);
+  }
+
+  function paintDraw(holder) {
+    const game = holder._drawGame;
+    const outer = holder.querySelector('.board-grid-outer');
+    if (!game || !outer) return false;
+    const shown = digitsShown(game);
+    const cells = [].concat(
+      Array.prototype.slice.call(holder.querySelectorAll('.cell.head.x')).map((n, i) => [n, game.axisX[i], i]),
+      Array.prototype.slice.call(holder.querySelectorAll('.cell.head.y')).map((n, i) => [n, game.axisY[i], 10 + i]));
+    cells.forEach(([n, digit, order]) => {
+      const on = order < shown;
+      const text = on ? String(digit) : '?';
+      if (n.textContent !== text) {
+        n.textContent = text;
+        if (on && order === shown - 1) { n.classList.remove('landed'); void n.offsetWidth; n.classList.add('landed'); }
+      }
+      n.classList.toggle('drawing', !on);
+    });
+    let title = outer.querySelector('.draw-title');
+    if (shown >= 20) { if (title) title.remove(); return false; }
+    if (!title) {
+      title = el('div', 'draw-title', 'Drawing the numbers');
+      title.setAttribute('role', 'status');
+      outer.appendChild(title);
+    }
+    return true;
+  }
+
+  function tickDraw() {
+    let live = false;
+    drawHolders.forEach(h => {
+      if (!h.isConnected) { drawHolders.delete(h); return; }
+      if (paintDraw(h)) live = true; else drawHolders.delete(h);
+    });
+    if (!live) { clearInterval(drawTimer); drawTimer = null; }
+  }
+
+  function skipDraw() {
+    drawHolders.forEach(h => {
+      const g = h._drawGame;
+      if (!g || digitsShown(g) >= 20) return;
+      skippedDraws.add(skipKey(g));
+      try { sessionStorage.setItem(skipKey(g), '1'); } catch (e) { /* private mode: in-memory only */ }
+    });
+    tickDraw();
+  }
+  document.addEventListener('click', (e) => { if (drawHolders.size && e.target.closest && e.target.closest('.board-grid-outer')) skipDraw(); }, true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && drawHolders.size) skipDraw(); });
+
+  // Called after every render of the full board, so a poll's re-render carries on where the clock is.
+  function applyDrawReveal(holder, game) {
+    holder._drawGame = game;
+    if (digitsShown(game) >= 20) { drawHolders.delete(holder); return; }
+    drawHolders.add(holder);
+    paintDraw(holder);
+    if (!drawTimer) drawTimer = setInterval(tickDraw, 100);
   }
 
   // Both team bars span their full grid cell by default, which includes the

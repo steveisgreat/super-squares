@@ -1807,6 +1807,7 @@
         fitTeamBadges(tvQuarters);
         const liveHighlight = window.GameLogic.computeLiveHighlight(game);
         const boardSignature = JSON.stringify({
+          draw: [game.numberDraw, game.drawnAt, game.axisX, game.axisY],
           squares: game.squares,
           players: game.players,
           cellLabels: computed.cellLabels,

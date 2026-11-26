@@ -446,8 +446,8 @@ open; now everyone lands on **Home**, and picking is a tab.
 name, with picks on, off and closed, locked, live, hand-scored and final; a helper with both jobs; the TV view
 unchanged; `/code-review medium`.
 
-**R46. Animated number draw** — `Sonnet` build, `Opus` review (the draw stays the server's) — Depends on: R42.
-Requested by Steve 2026-11-26; not scheduled yet. A board setting, **Number draw: Quick pick or Animated** (set at
+**R46. Animated number draw** — `Sonnet` build, `Opus` review (the draw stays the server's) — Depends on: R42 ✅. — ✅ built 2026-11-26 ([decision 026](decisions/026-editing-a-locked-game.md), As built R46; no migration). Not tried on a real TV or phone. The Player View square list shows the digits at once.
+Requested by Steve 2026-11-26. A board setting, **Number draw: Quick pick or Animated** (set at
 setup and in Edit game until the lock; Quick pick, today's instant draw, is the default). With Animated, when the
 board locks (and after an unlock and a new lock), a fun reveal pulls the numbers one at a time onto the board's axes,
 on Game Day, Player View and the TV/Party View. Reuse the drawn-winner reveal for a final score where it fits. The animation only **reveals** the numbers the

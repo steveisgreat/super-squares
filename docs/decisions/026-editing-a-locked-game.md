@@ -39,6 +39,7 @@ that the real game is on.
 | Square price, payout split | Free; warn once anyone has paid | Warn | Warn until line 3, then blocked | Blocked |
 | Total pot | Not shown | Warn: changes only the Final | Same | Same; Needs settling if the Final is paid out |
 | Pick mode, player picks, limit | Free | Closed | Closed | Closed |
+| Number draw (R46) | Free | Closed | Closed | Closed |
 | Manual or Live scoring | Free | Warn | Manual to Live: warn, entered quarters stay. Live to Manual: blocked ("Enter the score myself" does it and keeps the score) | Blocked |
 | To or from Simulation | Free | Blocked | Blocked | Blocked |
 | Drawn numbers | Not drawn | Unlock only | Blocked | Blocked |
@@ -173,3 +174,16 @@ including a missing `updatedAt` and a lock from an old page; both stores.
 - TV (`#tv-<id>`, `public/screen-gameday.js`): one line above the quarter strip for the newest change of the last ten
   minutes, with "+N more", judged on each poll against the TV's clock; it ellipsizes rather than wrap.
 - A board with no changes (or, on the TV, none in ten minutes) draws nothing new.
+
+## As built (R46, 2026-11-26)
+A board setting **Number draw** (`numberDraw`: `quick` or `animated`; unset is `quick`) follows the pick mode row:
+editable while picking and again after an unlock, fixed from the lock on. `lockGame` also writes `game.drawnAt` (ms) on
+every lock, whichever path locks. It is server-owned: validated as a whole number, stripped on POST and create-by-PUT,
+kept from the stored board on a PUT, refused if a locked board's PUT changes it, and deleted by unlock. With Animated,
+every full-board render (Game Day, TV, Party View; `public/board.js`) shows "?" on the axes and reveals the server's
+digits one at a time, columns then rows, 400 ms each (8 s). A screen that sees the lock in time keeps step with the
+server's clock; one that sees it late (polls of 8-15 s plus the edge cache) but within 30 s, or whose clock runs behind
+the server's, plays the whole reveal from the moment it saw it. Later screens show the finished axes. The start is kept
+per tab in `sessionStorage`, so a reload carries on rather than replaying. A tap on the board or Escape skips it on that
+screen; `prefers-reduced-motion` gets no animation. The browser never picks a digit. Not done: the Player View square
+list shows the digit pairs at once (it has no grid), and the Final winner reveal is not reused.

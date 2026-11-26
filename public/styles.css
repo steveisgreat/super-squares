@@ -963,6 +963,20 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: var(--fs-2xl); }
 /* Placeholder dash shown before axis numbers are assigned — plain white,
    no color/shadow treatment, so it doesn't read as an actual drawn number. */
 .cell.head.pending { color: var(--text-strong); text-shadow: none; }
+/* Animated number draw (R46): axis cells hold "?" until their digit lands; the title floats over
+   the grid and never changes the layout. */
+.board-grid-outer { position: relative; }
+.cell.head.drawing { color: var(--muted); opacity: 0.7; }
+.cell.head.landed { animation: draw-land 0.35s ease-out; }
+@keyframes draw-land { 0% { transform: scale(1.5); } 100% { transform: scale(1); } }
+.draw-title {
+  position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); z-index: 5;
+  padding: 0.3rem 0.9rem; border-radius: var(--r-pill); pointer-events: none; white-space: nowrap;
+  background: var(--panel); color: var(--accent); border: 1px solid var(--accent);
+  font-size: var(--fs-sm); font-weight: 700; box-shadow: var(--shadow-pop);
+}
+.tv-screen .draw-title, .glass-board .draw-title { font-size: clamp(1rem, 1.6vw, 1.8rem); }
+@media (prefers-reduced-motion: reduce) { .cell.head.landed { animation: none; } }
 .cell.filled { background: var(--panel2); color: var(--text); cursor: default; }
 .cell.empty-pick { cursor: pointer; color: var(--muted); transition: box-shadow 0.12s ease, background 0.12s ease; }
 .cell.empty-pick:hover { box-shadow: inset 0 0 0 2px var(--pick-color, var(--accent2)), 0 0 8px var(--pick-color, var(--accent2)); }

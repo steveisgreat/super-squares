@@ -355,6 +355,10 @@ accepts('a pot override of 0', g => { g.potOverride = 0; });
 
 rejects('an unknown pick mode', g => { g.pickMode = HOSTILE; });
 ['manual', 'auto', 'both'].forEach(v => accepts('pick mode ' + v, g => { g.pickMode = v; }));
+rejects('an unknown number draw', g => { g.numberDraw = HOSTILE; });
+['quick', 'animated'].forEach(v => accepts('number draw ' + v, g => { g.numberDraw = v; }));
+['5', -1, 1.5, [1], true].forEach(v => rejects('a drawnAt of ' + show(v), g => { g.drawnAt = v; }));
+accepts('a drawnAt in ms', g => { g.drawnAt = 1800000000000; });
 rejects('a status sent as an array', g => { g.status = ['started']; });
 rejects('a scoring mode sent as an array', g => { g.scoring = ['live']; });
 [HOSTILE, 5, {}, 'tomorrow', '2026-02-08T18:45' + HOSTILE].forEach(v => {

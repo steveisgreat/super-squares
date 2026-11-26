@@ -17,12 +17,13 @@
   const LABEL = {
     description: 'description', teamA: 'Team A name', teamB: 'Team B name', teamAColor: 'Team A color', teamBColor: 'Team B color',
     swap: 'teams', league: 'league', gameDate: 'date', kickoffTime: 'kickoff', autoCutoffEnabled: 'auto cutoff', autoCutoffTime: 'cutoff time',
-    squarePrice: 'square price', payouts: 'payout split', potOverride: 'total pot', pickMode: 'pick mode', guestPick: 'player picks',
+    squarePrice: 'square price', payouts: 'payout split', potOverride: 'total pot', pickMode: 'pick mode', numberDraw: 'number draw', guestPick: 'player picks',
     scoring: 'scoring', game: 'game'
   };
   const SCORING = { manual: 'Manual', live: 'Live', simulation: 'Simulation' };
   const LEAGUE = { nfl: 'NFL', nba: 'NBA', other: 'Other' };
   const PICK_MODE = { manual: 'Manual only', auto: 'Auto only', both: 'Both' };
+  const NUMBER_DRAW = { quick: 'Quick pick', animated: 'Animated' };
   const QUARTER_NAME = { q1: 'Q1', q2: 'Q2', q3: 'Q3', final: 'Final' };
   const COLORS = { teamAColor: '#ff6b6b', teamBColor: '#4dabf7' };
 
@@ -42,6 +43,7 @@
     if (k === 'scoring') return GL.scoringMode(game);
     if (k === 'autoCutoffEnabled') return v === true;
     if (k === 'pickMode') return v || 'both';
+    if (k === 'numberDraw') return v || 'quick';
     if (k === 'guestPick') return Object.assign({ on: false, max: GL.DEFAULT_GUEST_MAX, liftAt: null, lifted: false }, v);
     return v === undefined || v === '' ? null : v;
   }
@@ -86,6 +88,7 @@
     if (k === 'scoring') return SCORING[v];
     if (k === 'league') return LEAGUE[v] || v;
     if (k === 'pickMode') return PICK_MODE[v] || v;
+    if (k === 'numberDraw') return NUMBER_DRAW[v] || v;
     if (k === 'guestPick') return guestText(v);
     if (k === 'autoCutoffEnabled') return v ? 'On' : 'Off';
     if (k === 'kickoffTime' || k === 'autoCutoffTime') return v ? formatKickoffTime(v) : '(none)';
@@ -182,6 +185,7 @@
         case 'potOverride': return probe({ potOverride: Math.round(potOf(b)) + 1000000 });
         case 'autoCutoffEnabled': case 'autoCutoffTime': return probe({ autoCutoffEnabled: !valueOf(b, 'autoCutoffEnabled') });
         case 'pickMode': return probe({ pickMode: valueOf(b, 'pickMode') === 'auto' ? 'both' : 'auto' });
+        case 'numberDraw': return probe({ numberDraw: valueOf(b, 'numberDraw') === 'animated' ? 'quick' : 'animated' });
         case 'guestPick': return probe({ guestPick: Object.assign(valueOf(b, 'guestPick'), { on: !valueOf(b, 'guestPick').on }) });
         case 'scoring': return to === valueOf(b, 'scoring') ? null : probe({ scoring: to });
         default: return null;
@@ -735,6 +739,12 @@
       pm.appendChild(textEl('span', '', 'Square pick mode'));
       pills(pm, 'pickMode', 'Square pick mode', Object.entries(PICK_MODE), cur('pickMode'), v => set('pickMode', v));
       sec.appendChild(pm);
+
+      const nd = textEl('div', 'eg-field', '');
+      nd.appendChild(textEl('span', '', 'Number draw'));
+      pills(nd, 'numberDraw', 'Number draw', Object.entries(NUMBER_DRAW), cur('numberDraw'), v => set('numberDraw', v));
+      nd.appendChild(textEl('span', 'eg-hint', 'Animated reveals the numbers one at a time on every screen when the board locks.'));
+      sec.appendChild(nd);
 
       const cut = textEl('div', 'eg-field', '');
       cut.appendChild(textEl('span', '', 'Auto cutoff'));

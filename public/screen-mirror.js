@@ -344,6 +344,7 @@
       const me = guest ? guest.nameFor(game) : null;
       const sig = JSON.stringify({
         me,
+        draw: [game.numberDraw, game.drawnAt, game.axisX, game.axisY],
         squares: game.squares,
         players: game.players,
         cellLabels: computed.cellLabels,

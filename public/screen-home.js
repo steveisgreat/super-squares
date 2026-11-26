@@ -864,6 +864,13 @@
         <div class="pill active" data-val="both">Both (player's choice)</div>
       </div>
 
+      <label id="number-draw-label">Number Draw</label>
+      <div class="radio-group" id="number-draw-group" role="radiogroup" aria-labelledby="number-draw-label">
+        <div class="pill active" data-val="quick" role="radio" aria-checked="true" tabindex="0">Quick pick</div>
+        <div class="pill" data-val="animated" role="radio" aria-checked="false" tabindex="0">Animated</div>
+      </div>
+      <p style="color:var(--muted); font-size:0.9rem;">Animated reveals the numbers one at a time on every screen when the board locks.</p>
+
       <label>Auto Cutoff Time?</label>
       <div class="toggle-group" id="cutoff-toggle">
         <div class="pill" data-val="yes">Yes</div>
@@ -935,6 +942,7 @@
     form.querySelector('#f-teamB-color').addEventListener('input', refreshPreviews);
 
     let pickMode = 'both';
+    let numberDraw = 'quick';
     let cutoffEnabled = false;
     let scoring = 'manual';
 
@@ -1055,6 +1063,17 @@
       });
     });
 
+    form.querySelectorAll('#number-draw-group .pill').forEach(p => {
+      const choose = () => {
+        form.querySelectorAll('#number-draw-group .pill').forEach(x => { x.classList.remove('active'); x.setAttribute('aria-checked', 'false'); });
+        p.classList.add('active');
+        p.setAttribute('aria-checked', 'true');
+        numberDraw = p.dataset.val;
+      };
+      p.addEventListener('click', choose);
+      p.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); } });
+    });
+
     form.querySelector('#f-guest-on').addEventListener('change', (e) => {
       form.querySelector('#guest-wrap').classList.toggle('hidden', !e.target.checked);
     });
@@ -1119,6 +1138,7 @@
         teamA, teamB, description, gameDate, squarePrice, league,
         payouts: { q1: pq1, q2: pq2, q3: pq3, final: pfinal },
         pickMode,
+        numberDraw,
         autoCutoffEnabled: cutoffEnabled,
         // With its zone, so the server's clock agrees with the host's (issue #4).
         autoCutoffTime: cutoffEnabled ? new Date(form.querySelector('#f-cutoff').value).toISOString() : null,
