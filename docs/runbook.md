@@ -117,7 +117,7 @@ needs a change there. On previews it blocks the Vercel toolbar, which is expecte
   features use it, so without it only those fail (the host's Helpers screen says so). A phone holding a scorer code
   from before needs a new one, so don't ship R37 on a game day. It was applied to
   `ci-tests` the same day and the Postgres suites pass there. Rollback needs no database change.
-- **Before the push that ships R39:** apply `migrations/011_board_changes.sql` to production
+- **R39:** `migrations/011_board_changes.sql` was applied to production on 2026-11-26, before the push
   (decision 025; applied to `ci-tests` 2026-11-25). Without it nothing fails: changes are not recorded and the host's list stays empty.
   It only adds a table.
 - **R33:** `migrations/007_host_themes.sql` was applied to production on 2026-11-24

@@ -374,7 +374,7 @@ with a real iPhone and Android phone; `/code-review high` clean.
 paid or part paid, remove unpaid squares, player picks on/off and limit; after lock, paid marks only.
 *Done:* rule and race tests from decision 025; browser check at 360 and 390 px; `/code-review high` clean.
 
-**R39. Recent changes** — `Sonnet` build, `Opus` review (migration 011) — ✅ built 2026-11-25, not pushed
+**R39. Recent changes** — `Sonnet` build, `Opus` review (migration 011) — ✅ shipped 2026-11-26 (migration 011 applied to production first)
 (Postgres tests passed on `ci-tests`, where 011 is applied; `/code-review high` done; real phones not checked). Depends on:
 R37 (covers squares once R38 ships).
 A host-only list of who did what on the board, the last 50. A failed log write never fails a score.
@@ -383,15 +383,15 @@ A host-only list of who did what on the board, the last 50. A failed log write n
 Editing a locked game (R40–R43): [decision 026](decisions/026-editing-a-locked-game.md), Steve approved the
 design 2026-11-25 ("Editing a locked game" canvas, claude.ai artifact `JJmzusrbdA7Cro7XCiWWHo`, private).
 
-**R40. Settings rules on the server** — `Opus` (money logic, test-first) — ✅ built 2026-11-25, not pushed
+**R40. Settings rules on the server** — `Opus` (money logic, test-first) — ✅ shipped 2026-11-26
 (`test-settings.js`; Postgres run on `ci-tests`; lock and Total Pot checked at 1366 and 1920 px and on the TV). Depends on: none.
 `gameUnderWay`, `applySettingsOp` (`edit`, `lock`), `PATCH /api/game/:id/settings`, and the guards on `PUT`. The
 server draws the numbers at lock. No save makes a quarter's amount negative (a $100 pot on a $1,000 board
 pays a Final of -$500 today). Locking and Total Pot move to the new route.
 *Done:* decision 026 tests; no browser draws the numbers that count; `/code-review high` clean.
 
-**R41. Edit form after lock** — `Sonnet` build, `Opus` review — ✅ built 2026-11-26, not pushed, Opus review
-pending (`screen-edit.js`; browser check at 360, 390, 1366 and 1920 px, also 1024, in all four stages, the TV view,
+**R41. Edit form after lock** — `Sonnet` build, `Opus` review — ✅ shipped 2026-11-26; Opus review done, findings fixed in dd28824
+(`screen-edit.js`; browser check at 360, 390, 1366 and 1920 px, also 1024, in all four stages, the TV view,
 and a stale save from a second tab; not tried on a real phone). Depends on: R40.
 Edit game from Home, the picking screen and Game Day; blocked fields with the reason, the review sheet, the paid-marks
 choice, a Kickoff field, and "Keep theirs or use mine". A date change no longer drops the kickoff and turns Live off on
