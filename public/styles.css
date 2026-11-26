@@ -31,6 +31,7 @@
   --glass-line: rgba(255,255,255,0.07);
   --silver: #cfd2d4; --silver-rgb: 207, 210, 212;
   --bronze: #d08a55; --bronze-rgb: 208, 138, 85;
+  --track-off: #4a5a6a;
   --shadow-card: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 14px rgb(0 0 0 / 30%), 0 0 24px rgba(var(--accent-rgb), 0.06);
   --shadow-pop: 0 10px 30px rgb(0 0 0 / 50%);
   /* Exo 2 everywhere except the topbar title, which uses Orbitron directly.
@@ -2469,7 +2470,7 @@ button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color:
 button.helpers-link { background: transparent; border: 0; box-shadow: none; color: var(--accent); min-height: 44px; padding: 0 4px; font-weight: 700; }
 button.helpers-link.is-danger { color: var(--danger); }
 button.helpers-switch { flex: none; width: 60px; min-height: 44px; padding: 0; background: transparent; border: 0; box-shadow: none; display: flex; align-items: center; justify-content: center; }
-.helpers-switch span { width: 52px; height: 30px; box-sizing: border-box; padding: 3px; border-radius: var(--r-pill); background: #4a5a6a; display: flex; }
+.helpers-switch span { width: 52px; height: 30px; box-sizing: border-box; padding: 3px; border-radius: var(--r-pill); background: var(--track-off); display: flex; }
 .helpers-switch span::after { content: ''; width: 24px; height: 24px; border-radius: 50%; background: var(--plate); }
 .helpers-switch[aria-checked="true"] span { background: #1f8a4d; justify-content: flex-end; }
 button.helpers-add, button.helpers-text-btn { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; }
