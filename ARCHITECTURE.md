@@ -128,6 +128,10 @@ Wide Game Day (`gd-wide`) and wide picking (`is-wide`) draw their grid with Part
 gets `.glass-board`, whose rules are shared with `.tv-screen` in `styles.css` (the sizes are the screen's own,
 at the end of the file). `board.js` refits a holder marked `data-fit` when its room changes (`ResizeObserver`),
 and `fitNames` covers `.glass-board` as well as `.pick-fill` and `.mirror-screen`.
+`styles.css` sizes come from tokens at the top of the file: fixed font sizes `--fs-3xs`…`--fs-4xl`, radii
+`--r-xs`…`--r-pill` (`--radius` = `--r-sm`), and theme-independent colors (`--plate`, `--text-strong`,
+`--glass-fill`, `--glass-line`, `--silver`, `--bronze`). Fluid `clamp()` sizes on the TV and Party View, `em`
+sizes, print styles and a few marked hero numbers stay literal.
 It is also a PWA (`manifest.webmanifest`, icons).
 
 `viewport-nudge.js` loads first, in the head. `el(tag, cls, html)` takes HTML, so callers
