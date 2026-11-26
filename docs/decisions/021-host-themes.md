@@ -12,8 +12,9 @@ host makes once. A per-game or per-device setting was ruled out.
   `cyan`, `blue`, `slate`, `indigo`, `emerald`. No custom colors. The colors are CSS tokens under
   `[data-theme]` in `styles.css`; adding a theme is a token block and an id.
 - **One per host, for everything of theirs.** Every screen that shows a host's board (Game Day, Player View,
-  Party View, a paired TV, a scorer phone) wears that host's theme. Team colors, gold winner colors and
-  payment colors keep their meaning in every theme.
+  Party View, a paired TV, a scorer phone) wears that host's theme. Team colors and payment colors keep
+  their meaning in every theme. Winner styling is a theme token (`--winner`, `--winner-rgb`,
+  `--on-winner`) at every width; it replaced the fixed gold on 2026-11-26.
 - **Storage:** table `host_themes` (migration 007), keyed by host id, or `site` in password and off modes
   where there is one host. Not a column on `hosts` (password mode has no host row) and not in a
   board's document (hosts PUT the whole document, and a theme is not per game).

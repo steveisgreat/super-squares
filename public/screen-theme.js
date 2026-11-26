@@ -74,8 +74,7 @@
     const T = window.SBSTheme;
     resetTeamColors();
     app.innerHTML = '';
-    const bar = topbar('Theme', [], { hideIcon: true });
-    bar.classList.add('setup-topbar');
+    const bar = topbar('Theme', [], { hideIcon: true, back: () => SBS.go({ screen: 'home' }) });
     app.appendChild(bar);
     const main = el('div', 'main theme-main');
     app.appendChild(main);

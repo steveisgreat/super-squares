@@ -213,7 +213,7 @@
     app.classList.remove('fit-screen'); // set again below on a wide screen (R35)
     const reopen = () => SBS.go({ screen: 'board', game });
     const phone = isPhone();
-    const headerMeta = [escapeHtml(SBS.ui.shownDescription(game) || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
+    const headerMeta = [escapeHtml(SBS.ui.shownDescription(game) || SBS.ui.formatGameDate(game.gameDate)), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
     // The top bar (R29): Home, the matchup on one line (full names when they fit, else short ones),
     // then on a wide screen the join chip and the "On the TV" pill, then Party View and Connect.
     const bar = topbar('', [], { hideIcon: true });
@@ -348,6 +348,7 @@
     const boardHolder = el('div', 'gd-board-holder');
     boardHolder.dataset.fit = '1'; // board.js keeps its axis bars and names fitted as it resizes
     boardCard.appendChild(boardHolder);
+    SBS.board.tapNames(boardCard); // phone widths show initials
     // Redraws the grid and fits what depends on its size: team pills, long names (R35).
     function drawBoard(c) {
       SBS.board.renderFullBoard(boardHolder, game, c);

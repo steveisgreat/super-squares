@@ -498,11 +498,22 @@
     ];
   }
 
-  // `title` is HTML: callers escape what they put in it.
+  // Tabler outline "chevron-left" (MIT).
+  const BACK_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6l6 6"></path></svg>';
+
+  // `title` is HTML: callers escape what they put in it. With opts.back it is a page header: a
+  // round Back button in place of Home, and the title beside it.
   function topbar(title, extraButtons, opts) {
     const bar = el('div', 'topbar');
     // Home is always the first thing in the bar, top left.
-    if (!opts || opts.hideHome !== true) {
+    if (opts && opts.back) {
+      bar.classList.add('page-topbar');
+      const backBtn = el('button', 'icon-btn page-back', BACK_ICON);
+      backBtn.type = 'button';
+      backBtn.setAttribute('aria-label', 'Back');
+      backBtn.addEventListener('click', opts.back);
+      bar.appendChild(backBtn);
+    } else if (!opts || opts.hideHome !== true) {
       const homeBtn = el('button', 'icon-btn home-btn', HOME_ICON);
       homeBtn.type = 'button';
       homeBtn.setAttribute('aria-label', 'Home');
@@ -528,6 +539,17 @@
 
   function statusLabel(s) {
     return { setup: 'Setup', picking: 'Picking Squares', started: 'In Progress', finished: 'Finished' }[s] || s;
+  }
+
+  // "2026-12-05" -> "Sat, Dec 5", parsed as a local date so it never shifts a day off from what
+  // the host picked. A year is added only when it is not this year.
+  function formatGameDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return dateStr;
+    const opts = { weekday: 'short', month: 'short', day: 'numeric' };
+    if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+    return d.toLocaleDateString(undefined, opts);
   }
 
   // "2026-01-26T18:00Z" -> "Sun, Jan 26 · 1:00 PM" in the viewer's local time.
@@ -1005,7 +1027,7 @@
   SBS.ui = {
     openSheet, el, textEl, escapeHtml, isColor, money, overlayEl, fullscreen, keepScreenAwake, keepPartyAwake, partyHistory,
     showModal, showConfirm, showAlert, disturbMessage, showChoice, showPasswordPrompt, showEmailPrompt, closeEmailPrompt, clearPendingLogin, signInConsent,
-    shownDescription, topbar, HOME_ICON, statusLabel, isTvBrowser, isPhone,
+    shownDescription, topbar, HOME_ICON, BACK_ICON, formatGameDate, statusLabel, isTvBrowser, isPhone,
     formatKickoffTime, kickoffNotice,
     teamMeta, teamStyle, applyTeamColors, resetTeamColors, teamLogoTag,
     legalLinks, teamColor, teamEdge, readableTextColor, teamBadge, fitTeamBadges, teamAbbr, shadeColor,

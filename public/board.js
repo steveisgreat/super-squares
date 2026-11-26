@@ -107,7 +107,56 @@
     const players = game.players || {};
     const color = players[name] && players[name].color;
     const style = isColor(color) ? ` style="--nc:${color};"` : '';
-    return `<div class="name-txt"${style}>${escapeHtml(name)}</div>`;
+    return `<div class="name-txt"${style}>${nameSpans(name, initials(name))}</div>`;
+  }
+
+  // Both forms are in the square; the CSS shows initials on a phone-width board.
+  function nameSpans(full, short) {
+    return `<span class="nm-full">${escapeHtml(full)}</span><span class="nm-init" aria-hidden="true">${escapeHtml(short)}</span>`;
+  }
+
+  // Two characters for a phone-width square: the first letters of the first and last words ("Ann Lee"
+  // -> "AL"), else the first two letters or digits; a name with neither keeps its first two characters.
+  function initials(name) {
+    const text = String(name || '').trim();
+    const words = text.split(/\s+/).map(w => (w.match(/[\p{L}\p{N}]/u) || [])[0]).filter(Boolean);
+    if (words.length > 1) return (words[0] + words[words.length - 1]).toUpperCase();
+    const letters = text.match(/[\p{L}\p{N}]/gu) || Array.from(text);
+    return letters.slice(0, 2).join('').toUpperCase();
+  }
+
+  // The width at which styles.css swaps names for initials.
+  const compactBoard = window.matchMedia('(max-width: 479px)');
+
+  // "Won Q1, Final" or "Push Q2" for a square, from what renderFullBoard left on it.
+  function quarterText(cell) {
+    return [cell.dataset.won && `Won ${cell.dataset.won}`, cell.dataset.push && `Push ${cell.dataset.push}`].filter(Boolean).join(' \u00b7 ');
+  }
+
+  // A phone-width board shows initials, so a tap on a square names it in a small label (again, or
+  // elsewhere in `root`, to hide it). The label is added to `root`, which must outlive redraws.
+  function tapNames(root) {
+    const tip = el('div', 'mirror-label');
+    tip.setAttribute('role', 'status');
+    root.appendChild(tip);
+    let shown = null;
+    const hide = () => { shown = null; tip.textContent = ''; tip.classList.remove('is-on'); };
+    root.addEventListener('click', (e) => {
+      const cell = e.target.closest('.cell[data-who]');
+      // Only where the square shows initials (styles.css decides, by width and screen).
+      const init = cell && cell.querySelector('.nm-init');
+      if (!cell || cell === shown || !init || !init.offsetWidth) return hide();
+      shown = cell;
+      const quarters = quarterText(cell);
+      tip.replaceChildren(SBS.ui.textEl('strong', '', cell.dataset.who));
+      if (quarters) tip.appendChild(SBS.ui.textEl('span', '', quarters));
+      tip.classList.add('is-on');
+      const r = cell.getBoundingClientRect();
+      const w = tip.offsetWidth, h = tip.offsetHeight;
+      tip.style.left = `${Math.min(Math.max(4, r.left + r.width / 2 - w / 2), window.innerWidth - w - 4)}px`;
+      tip.style.top = `${r.top - h - 6 >= 4 ? r.top - h - 6 : r.bottom + 6}px`;
+      window.addEventListener('scroll', hide, { once: true, capture: true });
+    });
   }
 
   // The grid's frame: a 2x2 grid where teamB's bar sits over the numbered columns (top-right) and
@@ -305,12 +354,16 @@
         const owing = sq && !document.body.classList.contains('tv-mode') && isUnpaid(r * 10 + c);
         if (owing) cls += ' is-unpaid';
 
-        const inner = sq ? nameTxt(game, sq.name) : (hasPush ? '<div class="name-txt">PUSH</div>' : '');
+        const inner = sq ? nameTxt(game, sq.name) : (hasPush ? `<div class="name-txt">${nameSpans('PUSH', '\u2014')}</div>` : '');
         const badges = !labels.length ? '' : `<div class="badges">${labels.map(l => `<span class="badge">${l.label === 'FINAL' ? TROPHY_SVG : l.label}</span>`).join('')}</div>`;
 
         const cellEl = el('div', cls, badges + inner);
         const who = sq && (game.players || {})[sq.name];
         if (who && isColor(who.color)) cellEl.style.setProperty('--who', who.color);
+        if (sq || hasPush) cellEl.dataset.who = sq ? sq.name : 'PUSH';
+        const quarters = (pushed) => labels.filter(l => !!l.pushed === pushed).map(l => l.label === 'FINAL' ? 'Final' : l.label).join(', ');
+        if (hasWin) cellEl.dataset.won = quarters(false);
+        if (hasPush) cellEl.dataset.push = quarters(true);
         if (sq && !document.body.classList.contains('tv-mode')) cellEl.title = sq.name; // full name on tap/hover; TV view stays as it was
         table.appendChild(cellEl);
       }
@@ -377,6 +430,7 @@
     const names = Array.prototype.slice.call((root || document).querySelectorAll('.mirror-screen .name-txt, .pick-fill .name-txt, .glass-board .name-txt, .gd-phone .name-txt'));
     if (!names.length) return;
     names.forEach(n => { n.style.fontSize = ''; });
+    if (compactBoard.matches) return; // initials have a fixed size (styles.css)
     const sizes = names.map(n => {
       // 1 px off each: the browser rounds these. Height matters for two words in a short square.
       const room = n.parentElement.clientHeight;
@@ -399,5 +453,5 @@
     axisResizeTimer = setTimeout(() => { document.querySelectorAll('.pick-fill .board-grid-outer').forEach(syncCornerInsets); fitAxisLabels(document); fitNames(document); }, 120);
   });
 
-  SBS.board = { renderPickBoard, renderFullBoard, renderLiveScoreBar, syncCornerInsets, fitAxisLabels, fitNames, periodLabel };
+  SBS.board = { tapNames, quarterText, renderPickBoard, renderFullBoard, renderLiveScoreBar, syncCornerInsets, fitAxisLabels, fitNames, periodLabel };
 })();

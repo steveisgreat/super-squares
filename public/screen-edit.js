@@ -27,7 +27,6 @@
   const COLORS = { teamAColor: '#ff6b6b', teamBColor: '#4dabf7' };
 
   const LOCK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z"></path><path d="M8 11v-4a4 4 0 1 1 8 0v4"></path></svg>';
-  const BACK = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6l6 6"></path></svg>';
 
   const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
   const canon = (v) => {
@@ -501,7 +500,7 @@
 
     function drawHead() {
       head.innerHTML = '';
-      const back = el('button', 'icon-btn eg-back', BACK);
+      const back = el('button', 'icon-btn page-back', SBS.ui.BACK_ICON);
       back.type = 'button';
       back.setAttribute('aria-label', 'Back');
       back.addEventListener('click', close);

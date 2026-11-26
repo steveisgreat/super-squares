@@ -29,8 +29,9 @@
 
     const phone = isPhone();
     if (view.id !== game.id) view = { id: game.id, tab: 'add' };
-    const headerMeta = [escapeHtml(SBS.ui.shownDescription(game) || game.gameDate), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
-    // The top bar: Home, the matchup in the exact center, then (wide) the join chip, and Connect.
+    const headerMeta = [escapeHtml(SBS.ui.shownDescription(game) || SBS.ui.formatGameDate(game.gameDate)), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
+    // The top bar: Home, the matchup in the exact center, then (wide) the join chip, Edit game,
+    // Party View (not on a phone) and Connect.
     const bar = topbar('', [], { hideIcon: true });
     bar.classList.add('gd-topbar', 'pick-topbar');
     if (phone) bar.classList.add('gd-topbar-phone');
@@ -41,7 +42,16 @@
     bar.replaceChild(head, bar.querySelector('h1'));
     const nav = bar.querySelector('.nav');
     if (!phone && game.joinCode) nav.appendChild(SBS.playerView.joinChip(game));
-    nav.appendChild(SBS.editForm.barButton(true, () => SBS.editForm.open(game.id, 'picking')));
+    nav.appendChild(SBS.editForm.barButton(phone, () => SBS.editForm.open(game.id, 'picking')));
+    if (!phone) {
+      const partyBtn = el('button', 'gd-bar-btn gd-party', SBS.ui.MAXIMIZE_ICON + '<span>Party View</span>');
+      partyBtn.type = 'button';
+      partyBtn.title = 'Party View';
+      partyBtn.setAttribute('aria-label', 'Party View');
+      // 'board' is the origin whose Exit reopens this board.
+      partyBtn.addEventListener('click', () => SBS.go({ screen: 'tv', id: game.id, from: 'board' }));
+      nav.appendChild(partyBtn);
+    }
     nav.appendChild(SBS.deviceChooser.button(game));
     app.appendChild(bar);
     fitTeamBadges(bar);
@@ -167,7 +177,7 @@
 
     // From 1024 px: one panel with Add squares and Players tabs, then the board. Below that one
     // column: that panel, the board, then player picks and the lock. A phone (or a window as narrow)
-    // shows one thing at a time, like Game Day: what is sold, then Squares, Grid and Players tabs.
+    // shows one thing at a time, like Game Day: what is sold, then Squares, Board and Players tabs.
     const layout = el('div', 'pick-fill' + (phone ? ' is-phone' : ''));
     main.appendChild(layout);
     const boardCard = el('div', 'card board-card');
@@ -207,7 +217,7 @@
     function labelTabs() {
       const n = new Set(game.squares.filter(Boolean).map(sq => sq.name)).size;
       tabs.add.btn.textContent = tabbed ? 'Squares' : 'Add squares';
-      tabs.grid.btn.textContent = 'Grid';
+      tabs.grid.btn.textContent = 'Board';
       tabs.players.btn.textContent = n ? `Players (${n})` : 'Players';
     }
     function selectTab(k) {
@@ -228,7 +238,7 @@
       side.hidden = tabbed && shown === 'grid';
       if (tabbed && shown === 'grid') drawPreview(); // it was hidden: fit the names again
     }
-    // Where a half-made pick is finished: beside the board, or on the phone's Grid tab.
+    // Where a half-made pick is finished: beside the board, or on the phone's Board tab.
     const claimTab = () => (tabbed ? 'grid' : 'add');
     side.append(tabBar, addSec, playersSec);
 
@@ -315,7 +325,7 @@
       onePane.appendChild(gridBtn);
     }
     if (tapToClaim) onePane.appendChild(el('p', 'tap-hint', actionBtn ? 'or tap open squares on the board' : 'Type a name, then tap open squares on the board.'));
-    addSec.appendChild(el('p', 'claim-note', 'Finish the pick on the Grid tab, or cancel it there.'));
+    addSec.appendChild(el('p', 'claim-note', 'Finish the pick on the Board tab, or cancel it there.'));
     const fullNote = el('p', 'tap-hint full-note hidden', 'Every square is taken. Tap a square on the board to remove it or give it to someone else.');
     addSec.insertBefore(fullNote, errBox);
 

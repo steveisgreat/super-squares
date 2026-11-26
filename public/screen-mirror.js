@@ -132,6 +132,7 @@
     let shownCell = null; // the square the label names
     let focusCell = 0;    // the one square Tab stops on; arrows move from it
     if (guest) screenEl.appendChild(label);
+    else SBS.board.tapNames(main); // phone widths show initials
     const squareCells = () => Array.from(boardWrap.querySelectorAll('.board-table .cell:not(.head)'));
     function hideLabel() {
       shownCell = null;
@@ -148,6 +149,8 @@
         ? `${SBS.ui.teamStyle(game, 'A').abbr} ${game.axisY[row]} | ${game.axisX[col]} ${SBS.ui.teamStyle(game, 'B').abbr}`
         : `Row ${row + 1}, column ${col + 1}`;
       label.replaceChildren(SBS.ui.textEl('strong', '', sq ? sq.name : 'Open square'), SBS.ui.textEl('span', '', where));
+      const quarters = SBS.board.quarterText(cell);
+      if (quarters) label.appendChild(SBS.ui.textEl('span', '', quarters));
       label.classList.add('is-on');
       // Above the square, or below it near the top, and never off the side of the screen.
       const r = cell.getBoundingClientRect();

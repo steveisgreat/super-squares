@@ -3,7 +3,7 @@
   'use strict';
 
   const SBS = window.SBS = window.SBS || {};
-  const { shownDescription, el, escapeHtml, topbar, showAlert, showConfirm, teamMeta, teamLogoTag, teamBadge, resetTeamColors, fitTeamBadges, isTvBrowser } = SBS.ui;
+  const { shownDescription, el, escapeHtml, topbar, showAlert, showConfirm, teamMeta, teamLogoTag, teamBadge, resetTeamColors, fitTeamBadges, isTvBrowser, formatGameDate } = SBS.ui;
   const { emptyGrid } = window.GameLogic;
   const { openManagePlayersModal } = SBS.players;
 
@@ -39,17 +39,10 @@
   }
   SBS.isArchivedGame = isArchived;
 
-  // "2026-12-05" -> "Sat, Dec 5" ("Today" for today), parsed as a local date so
-  // it never shifts a day off from what the host actually picked. A year is
-  // added only when it is not this year.
+  // "Today" for today, else the date as the board headers show it.
   function whenLabel(dateStr) {
-    if (!dateStr) return '';
-    if (dateStr === todayValue()) return 'Today';
-    const d = new Date(dateStr + 'T00:00:00');
-    if (isNaN(d.getTime())) return dateStr;
-    const opts = { weekday: 'short', month: 'short', day: 'numeric' };
-    if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
-    return d.toLocaleDateString(undefined, opts);
+    if (dateStr && dateStr === todayValue()) return 'Today';
+    return formatGameDate(dateStr);
   }
 
   async function openGame(id) {
@@ -793,16 +786,13 @@
     const app = SBS.appEl;
     resetTeamColors();
     app.innerHTML = '';
-    const bar = topbar('New Game — Setup', [], { hideIcon: true });
-    bar.classList.add('setup-topbar');
+    const bar = topbar('New game', [], { hideIcon: true, back: () => SBS.go({ screen: 'home' }) });
     app.appendChild(bar);
     const main = el('div', 'main');
     app.appendChild(main);
 
     const card = el('div', 'card');
     main.appendChild(card);
-    card.appendChild(el('h2', '', 'Game Setup'));
-
     const errBox = el('div', 'error-msg hidden');
     card.appendChild(errBox);
     function showErr(msg) {
@@ -830,7 +820,7 @@
       <input type="number" id="f-price" value="10" min="0" step="0.01">
 
       <label>Description</label>
-      <input type="text" id="f-description" placeholder="e.g. Super Bowl LX, Office Pool" maxlength="80">
+      <input type="text" id="f-description" placeholder="Big Game party, office pool" maxlength="80">
 
       <div class="row">
         <div>

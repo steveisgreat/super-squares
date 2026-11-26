@@ -47,6 +47,9 @@
   --accent-rgb: 0, 229, 255;
   --on-accent: #06070d;
   --glow2-rgb: 255, 46, 136;
+  --winner-rgb: 255, 46, 136;
+  --winner: rgb(var(--winner-rgb));
+  --on-winner: #fff;
   --on-glow2: #fff;
   --brand: #2ecc71;
   --brand-rgb: 46, 204, 113;
@@ -122,6 +125,9 @@
   --on-accent: #05080e;
   --on-glow2: #05080e;
   --glow2-rgb: 76, 201, 240;
+  --winner-rgb: 76, 201, 240;
+  --winner: rgb(var(--winner-rgb));
+  --on-winner: #05080e;
   --brand: #4cc9f0;
   --brand-rgb: 76, 201, 240;
   --btn-fill: #14507a;
@@ -153,6 +159,9 @@
   --on-accent: #060811;
   --on-glow2: #060811;
   --glow2-rgb: 124, 176, 255;
+  --winner-rgb: 124, 176, 255;
+  --winner: rgb(var(--winner-rgb));
+  --on-winner: #060811;
   --brand: #7cb0ff;
   --brand-rgb: 124, 176, 255;
   --btn-fill: #2457c5;
@@ -184,6 +193,9 @@
   --on-accent: #090b0f;
   --on-glow2: #090b0f;
   --glow2-rgb: 168, 212, 255;
+  --winner-rgb: 168, 212, 255;
+  --winner: rgb(var(--winner-rgb));
+  --on-winner: #090b0f;
   --brand: #a8d4ff;
   --brand-rgb: 168, 212, 255;
   --btn-fill: #34506b;
@@ -215,6 +227,9 @@
   --on-accent: #080710;
   --on-glow2: #080710;
   --glow2-rgb: 169, 173, 255;
+  --winner-rgb: 169, 173, 255;
+  --winner: rgb(var(--winner-rgb));
+  --on-winner: #080710;
   --brand: #a9adff;
   --brand-rgb: 169, 173, 255;
   --btn-fill: #4142b4;
@@ -246,6 +261,9 @@
   --on-accent: #040b0a;
   --on-glow2: #040b0a;
   --glow2-rgb: 61, 219, 176;
+  --winner-rgb: 61, 219, 176;
+  --winner: rgb(var(--winner-rgb));
+  --on-winner: #040b0a;
   --brand: #3ddbb0;
   --brand-rgb: 61, 219, 176;
   --btn-fill: #0f6b57;
@@ -350,10 +368,13 @@ body {
 .header-icon { color: var(--accent); flex-shrink: 0; }
 /* Home: the same size and place (20 px in, top left) on every screen that has it. */
 .topbar .home-btn { width: 44px; height: 44px; flex: none; }
-.topbar.setup-topbar { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; min-height: 64px; padding: 8px 20px; }
+/* The page header (New game, Theme; Edit game's .eg-head matches): round Back at the left, the
+   title beside it, a pill or actions at the right. */
+.topbar.page-topbar { flex-wrap: nowrap; justify-content: flex-start; min-height: 64px; padding: 10px 14px; }
+.topbar.page-topbar h1 { flex: 1; min-width: 0; font-family: var(--serif); font-size: 1.25rem; }
+button.icon-btn.page-back { width: 44px; height: 44px; flex: none; border-radius: 50%; }
 /* Where a tall title would center it lower, it stays up with the rest. */
-.setup-topbar .home-btn, .pick-topbar .home-btn { align-self: start; margin-top: 2px; }
-.setup-topbar h1 { justify-content: center; text-align: center; }
+.pick-topbar .home-btn { align-self: start; margin-top: 2px; }
 
 .topbar h1.brand-pill {
   padding: 8px 18px;
@@ -971,15 +992,15 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: 1.5rem; }
 .cell.empty-pick:hover { box-shadow: inset 0 0 0 2px var(--pick-color, var(--accent2)), 0 0 8px var(--pick-color, var(--accent2)); }
 .cell.selected, .cell.empty-pick.selected:hover { background: var(--pick-color, var(--accent2)); color: var(--on-accent); box-shadow: none; }
 .cell.pushed { background: rgba(51, 18, 15, 0.75); color: var(--danger); }
-/* Certificate frame: a hairline gold rule, a sliver of the cell's own
-   background, then a soft gold band — reads as "this square was awarded
+/* Certificate frame: a hairline winner-color rule, a sliver of the cell's own
+   background, then a soft band — reads as "this square was awarded
    something" without covering a corner or animating. */
 .cell.winner {
   color: var(--text);
   box-shadow:
-    inset 0 0 0 1px #f4c542,
+    inset 0 0 0 1px var(--winner),
     inset 0 0 0 4px var(--panel2),
-    inset 0 0 0 5px rgba(244, 197, 66, 0.45);
+    inset 0 0 0 5px rgba(var(--winner-rgb), 0.45);
 }
 .cell .badges {
   position: absolute;
@@ -998,9 +1019,9 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: 1.5rem; }
   border-radius: 5px;
   font-weight: 800;
 }
-/* Winning-quarter badges pick up the frame's gold rather than the default
+/* Winning-quarter badges pick up the frame's color rather than the default
    black pill, tying the corner label back to the border around the cell. */
-.cell.winner .badge { background: #f4c542; color: #1b1400; }
+.cell.winner .badge { background: var(--winner); color: var(--on-winner); }
 .cell .name-txt { padding-top: 8px; font-size: 0.78rem; line-height: 1.1; font-weight: 400; }
 /* A player's color arrives as --nc. In every theme but Neon it is softened toward the text color
    (--nc-mix) so a saturated color doesn't fight the theme. With no --nc the name just inherits. */
@@ -1017,16 +1038,16 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: 1.5rem; }
 .cell.is-unpaid { box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.5), 0 0 4px rgba(239, 68, 68, 0.25); }
 .cell.is-unpaid.winner {
   box-shadow:
-    inset 0 0 0 1px #f4c542,
+    inset 0 0 0 1px var(--winner),
     inset 0 0 0 4px var(--panel2),
-    inset 0 0 0 5px rgba(244, 197, 66, 0.45);
+    inset 0 0 0 5px rgba(var(--winner-rgb), 0.45);
   outline: 2px solid rgba(239, 68, 68, 0.7);
   outline-offset: -1px;
 }
 
 /* TV-only "where the game is heading" overlay (see compute.js
    computeLiveHighlight): a radar-ping ring on a pseudo-element, so it never
-   fights the .winner cell's own inset gold frame or badges for the
+   fights the .winner cell's own inset winner frame or badges for the
    box-shadow/innerHTML a cell already has from an earlier quarter. Needs
    overflow visible + a raised z-index so the ping can bloom past the cell's
    own edge instead of being clipped by it. */
@@ -1354,16 +1375,16 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
 .glass-board .cell.filled { background: rgba(255,255,255,0.05); }
 .tv-screen .cell.winner,
 .glass-board .cell.winner {
-  background: rgba(var(--glow2-rgb), 0.14);
-  box-shadow: 0 0 0 1.5px rgb(var(--glow2-rgb)), 0 0 18px rgba(var(--glow2-rgb), 0.55), inset 0 0 10px rgba(var(--glow2-rgb), 0.3);
+  background: rgba(var(--winner-rgb), 0.14);
+  box-shadow: 0 0 0 1.5px rgb(var(--winner-rgb)), 0 0 18px rgba(var(--winner-rgb), 0.55), inset 0 0 10px rgba(var(--winner-rgb), 0.3);
   animation: tv-neon-winner-glow 2.2s ease-in-out infinite;
 }
 @keyframes tv-neon-winner-glow {
-  0%, 100% { box-shadow: 0 0 0 1.5px rgb(var(--glow2-rgb)), 0 0 18px rgba(var(--glow2-rgb), 0.55), inset 0 0 10px rgba(var(--glow2-rgb), 0.3); }
-  50% { box-shadow: 0 0 0 1.5px rgb(var(--glow2-rgb)), 0 0 30px rgba(var(--glow2-rgb), 0.9), inset 0 0 14px rgba(var(--glow2-rgb), 0.5); }
+  0%, 100% { box-shadow: 0 0 0 1.5px rgb(var(--winner-rgb)), 0 0 18px rgba(var(--winner-rgb), 0.55), inset 0 0 10px rgba(var(--winner-rgb), 0.3); }
+  50% { box-shadow: 0 0 0 1.5px rgb(var(--winner-rgb)), 0 0 30px rgba(var(--winner-rgb), 0.9), inset 0 0 14px rgba(var(--winner-rgb), 0.5); }
 }
 .tv-screen .cell.winner .badge,
-.glass-board .cell.winner .badge { background: rgb(var(--glow2-rgb)); color: var(--on-glow2); }
+.glass-board .cell.winner .badge { background: var(--winner); color: var(--on-winner); }
 /* Team-color gradient fade (set inline by board.js's badgeStyle()) stays
    underneath — a light translucent dark wash (inset box-shadow, painted
    above the background but below the label's own text/logo) takes it down
@@ -1569,7 +1590,7 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
 .tv-needsdraw-card {
   text-align: center;
   background: rgba(10, 13, 16, 0.9);
-  border: 1px solid rgba(244, 197, 66, 0.4);
+  border: 1px solid rgba(var(--winner-rgb), 0.4);
   border-radius: 20px;
   padding: 26px 46px;
   animation: tv-cel-pop-in 0.5s ease-out;
@@ -1579,7 +1600,7 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
 .tv-needsdraw-title {
   font-size: clamp(1.6rem, 3.4vw, 2.4rem);
   font-weight: 900;
-  color: #f4c542;
+  color: var(--winner);
   letter-spacing: 0.02em;
   margin-bottom: 8px;
 }
@@ -1619,8 +1640,8 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
   font-size: clamp(7rem, 24vw, 15rem);
   font-weight: 900;
   line-height: 1;
-  color: #f4c542;
-  text-shadow: 0 0 50px rgba(244, 197, 66, 0.55);
+  color: var(--winner);
+  text-shadow: 0 0 50px rgba(var(--winner-rgb), 0.55);
   animation: draw-countdown-pop 1s ease-out;
 }
 @keyframes draw-countdown-pop {
@@ -1669,8 +1690,8 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
 .draw-wheel-num.landed {
   animation: draw-wheel-land 0.4s ease-out;
   filter: none;
-  border-color: var(--wheel-primary, #f4c542);
-  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.6), 0 0 6px var(--wheel-primary, #f4c542), 0 0 30px var(--wheel-primary, #f4c542);
+  border-color: var(--wheel-primary, var(--winner));
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.6), 0 0 6px var(--wheel-primary, var(--winner)), 0 0 30px var(--wheel-primary, var(--winner));
 }
 @keyframes draw-wheel-land {
   0% { transform: scale(1.18); }
@@ -1680,7 +1701,7 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
 .draw-reveal-nums {
   font-size: clamp(3rem, 8vw, 5.5rem);
   font-weight: 900;
-  color: #f4c542;
+  color: var(--winner);
   margin: 8px 0;
 }
 .draw-reveal-name {
@@ -1728,7 +1749,7 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
   font-size: clamp(0.65rem, 1.1vw, 0.78rem);
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--gold, #f4c542);
+  color: var(--winner);
   font-weight: 800;
   margin-bottom: 6px;
 }
@@ -1748,7 +1769,7 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
   color: var(--muted);
   font-size: clamp(0.78rem, 1.4vw, 0.95rem);
 }
-.tvfs-pot { color: #f4c542; font-weight: 700; }
+.tvfs-pot { color: var(--winner); font-weight: 700; }
 
 .tvfs-board {
   position: relative;
@@ -1779,9 +1800,9 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
   padding: 0 clamp(12px, 2vw, 20px);
 }
 .tvfs-row.rank-1 {
-  background: linear-gradient(135deg, rgba(244, 197, 66, 0.16), var(--panel) 55%);
-  border-color: rgba(244, 197, 66, 0.55);
-  box-shadow: 0 0 0 1px rgba(244, 197, 66, 0.2);
+  background: linear-gradient(135deg, rgba(var(--winner-rgb), 0.16), var(--panel) 55%);
+  border-color: rgba(var(--winner-rgb), 0.55);
+  box-shadow: 0 0 0 1px rgba(var(--winner-rgb), 0.2);
 }
 .tvfs-row.rank-2 { border-color: rgba(207, 210, 212, 0.35); }
 .tvfs-row.rank-3 { border-color: rgba(208, 138, 85, 0.4); }
@@ -1793,7 +1814,7 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
   color: var(--muted);
   text-align: center;
 }
-.tvfs-row.rank-1 .tvfs-rank { color: #f4c542; }
+.tvfs-row.rank-1 .tvfs-rank { color: var(--winner); }
 .tvfs-row.rank-2 .tvfs-rank { color: #cfd2d4; }
 .tvfs-row.rank-3 .tvfs-rank { color: #d08a55; }
 
@@ -1817,13 +1838,13 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
   display: flex;
   align-items: center;
   gap: 4px;
-  background: rgba(244, 197, 66, 0.12);
-  border: 1px solid rgba(244, 197, 66, 0.35);
+  background: rgba(var(--winner-rgb), 0.12);
+  border: 1px solid rgba(var(--winner-rgb), 0.35);
   border-radius: 20px;
   padding: 2px 8px 2px 6px;
   font-size: clamp(0.6rem, 1.1vw, 0.7rem);
   font-weight: 800;
-  color: #f4c542;
+  color: var(--winner);
   letter-spacing: 0.02em;
 }
 .tvfs-qtrophy svg { display: block; }
@@ -1838,7 +1859,7 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
   font-size: clamp(1rem, 2.1vw, 1.5rem);
   color: var(--text);
 }
-.tvfs-row.rank-1 .tvfs-amount-val { color: #f4c542; }
+.tvfs-row.rank-1 .tvfs-amount-val { color: var(--winner); }
 .tvfs-amount-lbl {
   font-size: 0.62rem;
   color: var(--muted);
@@ -2955,7 +2976,6 @@ button.grid-btn { display: none; min-height: 48px; margin-top: 8px; font-size: 1
 .pick-topbar button.gd-bar-btn.gd-connect { width: 44px; padding: 0; }
 .pick-topbar .gd-connect span { display: none; }
 @media (min-width: 1024px) {
-  .topbar.pick-topbar:not(.gd-topbar-phone) { grid-template-columns: 300px minmax(0, 1fr) 300px; }
   .pick-topbar:not(.gd-topbar-phone) .gd-head { flex-direction: column; align-items: center; gap: 3px; }
   .pick-topbar:not(.gd-topbar-phone) button.gd-bar-btn.gd-connect { width: auto; padding: 0 16px; }
   .pick-topbar:not(.gd-topbar-phone) .gd-connect span { display: inline; }
@@ -3496,7 +3516,7 @@ button.gd-pay.is-paid { background: var(--good-soft); color: var(--good); border
 .pick-fill.is-tabbed .cell.empty-pick:hover, .pick-fill.is-tabbed .cell.is-tappable:hover { box-shadow: inset 0 0 0 2px var(--pick-color, var(--accent)); }
 .pick-fill.is-tabbed .cell.empty-pick[role=button].selected { background: var(--pick-color, var(--accent)); box-shadow: none; }
 .pick-fill.is-tabbed .cell.filled.is-unpaid, .gd-phone .cell.filled.is-unpaid { box-shadow: inset 0 0 0 2px var(--danger); }
-.gd-phone .cell.winner, .gd-phone .cell.filled.winner, .gd-phone .cell.filled.is-unpaid.winner { box-shadow: inset 0 0 0 2px #f4c542; }
+.gd-phone .cell.winner, .gd-phone .cell.filled.winner, .gd-phone .cell.filled.is-unpaid.winner { box-shadow: inset 0 0 0 2px var(--winner); }
 .gd-phone .cell.is-unpaid.winner { outline-offset: -4px; }
 .gd-phone .cell .name-txt { padding-top: 0; font-size: 0.6rem; line-height: 1.1; font-weight: 600; }
 .gd-phone .cell.winner .name-txt, .gd-phone .cell.pushed .name-txt { padding-top: 8px; }
@@ -3559,7 +3579,6 @@ button.win-slim { width: 100%; min-height: 44px; background: var(--panel); color
 .eg { display: flex; flex-direction: column; width: 100%; max-width: 600px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; font-size: 1rem; }
 .eg-head { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px; min-height: 64px; padding: calc(10px + var(--sat)) 14px 10px; background: var(--bg); border-bottom: 1px solid var(--border); }
 .eg-head h1 { flex: 1; margin: 0; font-size: 1.25rem; }
-button.eg-back { width: 44px; height: 44px; flex: none; }
 .eg-chip { flex: none; padding: 5px 12px; border-radius: 14px; background: var(--panel2); font-weight: 800; font-size: .9rem; }
 .eg-chip.is-locked { background: var(--warn-soft); color: var(--warn); }
 .eg-chip.is-underWay { background: var(--danger-soft); color: var(--danger); }
@@ -3619,7 +3638,7 @@ button.eg-side strong { font-size: 1.2rem; }
 .eg-panel .eg-foot { position: static; padding-bottom: 12px; background: none; }
 .eg-panel .eg-two { grid-template-columns: minmax(0, 1fr); }
 button.gd-bar-btn.gd-edit[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
-/* The picking screen's bar has two buttons on the right: Edit game and Connect. */
+/* The picking screen's bar: Edit game, then (not a phone) Party View, and Connect on the right. */
 .topbar.pick-topbar { grid-template-columns: 44px minmax(0, 1fr) auto; }
 .pick-topbar .nav { flex-wrap: nowrap; gap: 8px; }
 .pick-topbar.gd-topbar-phone .nav { gap: 4px; }
@@ -3629,14 +3648,41 @@ button.gd-bar-btn.gd-edit[aria-pressed="true"] { background: var(--accent-soft);
   .gd-topbar-center:not(.gd-topbar-phone) .gd-edit span, .gd-topbar-center:not(.gd-topbar-phone) .gd-party span { display: none; }
 }
 @media (min-width: 1024px) {
-  .topbar.pick-topbar:not(.gd-topbar-phone) { grid-template-columns: 360px minmax(0, 1fr) 360px; }
+  .topbar.pick-topbar:not(.gd-topbar-phone) { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+}
+@media (min-width: 1024px) and (max-width: 1599px) {
+  .pick-topbar:not(.gd-topbar-phone) button.gd-edit, .pick-topbar:not(.gd-topbar-phone) .gd-party { width: 44px; padding: 0; }
+  .pick-topbar:not(.gd-topbar-phone) .gd-edit span, .pick-topbar:not(.gd-topbar-phone) .gd-party span { display: none; }
 }
 @media (min-width: 1024px) and (max-width: 1279px) {
-  .topbar.pick-topbar:not(.gd-topbar-phone) { grid-template-columns: 330px minmax(0, 1fr) 330px; }
   .pick-topbar:not(.gd-topbar-phone) button.gd-bar-btn.gd-connect { width: 44px; padding: 0; }
   .pick-topbar:not(.gd-topbar-phone) .gd-connect span { display: none; }
 }
 @media (min-width: 1024px) and (max-width: 1279px) {
   .gd-topbar-center:not(.gd-topbar-phone) button.gd-bar-btn.gd-connect { width: 44px; padding: 0; }
   .gd-topbar-center:not(.gd-topbar-phone) .gd-connect span { display: none; }
+}
+
+/* ---- Phone-width boards (under 480 px) ----
+   Squares are about 27 px, so a name shows as two initials and a quarter badge as a corner
+   triangle. The full name and the badge text stay for screen readers; a tap names the square. */
+.cell .nm-init { display: none; }
+@media (max-width: 479px) {
+  .gd-phone .board-table .cell .name-txt,
+  .pick-fill.is-tabbed .board-table .cell .name-txt,
+  .mirror-screen .tv-board-wrap .cell .name-txt { padding: 0; font-size: 11px; font-weight: 500; line-height: 1; text-align: center; white-space: nowrap; overflow: visible; }
+  .gd-phone .cell .nm-full, .pick-fill.is-tabbed .cell .nm-full, .mirror-screen .cell .nm-full,
+  .gd-phone .cell .badge, .mirror-screen .tv-board-wrap .cell .badge { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .gd-phone .cell .nm-init, .pick-fill.is-tabbed .cell .nm-init, .mirror-screen .cell .nm-init { display: inline; }
+  .gd-phone .cell .badges, .mirror-screen .tv-board-wrap .cell .badges { top: 0; right: 0; width: 0; height: 0; gap: 0; border-top: 8px solid var(--winner); border-left: 8px solid transparent; }
+  .gd-phone .cell.pushed .badges, .mirror-screen .tv-board-wrap .cell.pushed .badges { border-top-color: var(--danger); }
+}
+
+/* A phone on its side keeps full names and badges: in a square about 24 px tall the badge shrinks
+   and the name sits under it, so neither covers the other. */
+@media (min-width: 480px) and (max-height: 479px) {
+  .mirror-screen .tv-board-wrap .cell .badges { top: 0; right: 0; flex-wrap: nowrap; gap: 1px; }
+  .mirror-screen .tv-board-wrap .cell .badge { font-size: 7px; line-height: 9px; padding: 0 2px; border-radius: 3px; }
+  .mirror-screen .tv-board-wrap .cell.winner .name-txt,
+  .mirror-screen .tv-board-wrap .cell.pushed .name-txt { padding-top: 9px; font-size: 11px; line-height: 1; white-space: nowrap; }
 }
