@@ -1244,7 +1244,7 @@
       if (url === cornerQrKey) return;
       try {
         cornerQrBig.innerHTML = window.QRCode.toSvg(url, 200)
-          + '<div class="tv-corner-qr-label"><span>Scan to view your squares</span></div>';
+          + '<div class="tv-corner-qr-label"><span>Your squares</span></div>';
         cornerQrKey = url;
         cornerQrReady = true;
         positionCornerQrBig();

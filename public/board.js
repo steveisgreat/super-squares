@@ -426,6 +426,9 @@
   // to MIN_NAME_PX; past that the CSS cuts it with an ellipsis. Widths are read in one pass and
   // sizes written in another, so 100 squares cost one layout.
   const MIN_NAME_PX = 7;
+  // Party View on a phone held sideways is read from across a room: cut a long name rather than go under 11 px.
+  const SIDEWAYS_MIN_NAME_PX = 11;
+  const sideways = window.matchMedia('(min-width: 480px) and (max-height: 479px)');
   function fitNames(root) {
     const names = Array.prototype.slice.call((root || document).querySelectorAll('.mirror-screen .name-txt, .pick-fill .name-txt, .glass-board .name-txt, .gd-phone .name-txt'));
     if (!names.length) return;
@@ -440,7 +443,8 @@
       const h = room && n.offsetHeight > room ? (room - 1) / n.offsetHeight : 1;
       if (!n.clientWidth || (w === 1 && h === 1)) return 0;
       const px = parseFloat(window.getComputedStyle(n).fontSize) * Math.min(w, h);
-      return Math.max(MIN_NAME_PX, Math.floor(px * 10) / 10);
+      const min = sideways.matches && n.closest('.mirror-screen') ? SIDEWAYS_MIN_NAME_PX : MIN_NAME_PX;
+      return Math.max(min, Math.floor(px * 10) / 10);
     });
     names.forEach((n, i) => { if (sizes[i]) n.style.fontSize = sizes[i] + 'px'; });
   }
