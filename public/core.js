@@ -217,7 +217,10 @@
     guestStart: (id) => rawRequest(`/api/game/${id}/guest`, { method: 'POST' }),
     guestOp: (id, op) => rawRequest(`/api/game/${id}/guest`, json('PATCH', op)),
     deleteGame: (id) => request(`/api/game/${id}`, { method: 'DELETE' }),
-    getTodaysGames: (date, league) => request(`/api/todays-games?${new URLSearchParams({ date: date || '', league: league || '' })}`)
+    getTodaysGames: (date, league) => request(`/api/todays-games?${new URLSearchParams({ date: date || '', league: league || '' })}`),
+    // The admin usage page (R45). Raw: a refusal is the page's answer, never a sign-in prompt.
+    getAdminStats: (range) => rawRequest(`/api/admin/stats?${new URLSearchParams({ range })}`),
+    revealHostEmail: (id) => rawRequest(`/api/admin/stats?${new URLSearchParams({ reveal: id })}`)
   };
 
   // The host's screen for a game: the board once it has started.
@@ -331,6 +334,7 @@
     if (route.screen === 'home') return s.home();
     if (route.screen === 'setup') return s.setup();
     if (route.screen === 'theme') return s.theme();
+    if (route.screen === 'admin') return s.admin();
     if (route.screen === 'editGame') return s.editGame(route);
     if (route.screen === 'picking') return s.picking(route.game);
     if (route.screen === 'board') return s.board(route.game);
@@ -406,13 +410,15 @@
       return { screen: 'helper', token: m ? m[1] : null };
     }
     if (/^#handoff-/i.test(hash)) return { screen: 'helper', token: null, old: true };
+    // The site owner's usage page (R45). Nothing links to it.
+    if (/^#admin$/i.test(hash)) return { screen: 'admin' };
     return { screen: 'home' };
   };
 
   // Pasting a sign-in link into a tab that is already open only changes the
-  // hash. Other deep links are read at load, as before.
+  // hash; so does typing #admin. Other deep links are read at load, as before.
   window.addEventListener('hashchange', () => {
-    if (!/^#(login|helper|handoff)-/i.test(window.location.hash || '')) return;
+    if (!/^#((login|helper|handoff)-|admin$)/i.test(window.location.hash || '')) return;
     // The prompt asking for this very link would otherwise cover the page.
     SBS.ui.closeEmailPrompt();
     SBS.go(SBS.parseInitialRoute());

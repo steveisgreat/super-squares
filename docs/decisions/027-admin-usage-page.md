@@ -79,3 +79,14 @@ password, off and misconfigured modes, for an old session and for an unset list;
 admin; no full email in the answer and reveal for admins only; the sums (headline, funnel, games,
 guests per host, how boards run, services, per day across a clock change); the slate refresh's counts;
 the fs counters. `test-store-pg.js`: the upsert under concurrent calls and the board facts.
+
+## As built (R45b, 2026-11-26)
+- `public/screen-admin.js`, opened by typing `#admin` (nothing links to it). A 401, 403 or 503 shows one plain
+  "This page is for the site admin." with a link Home, and nothing from the answer.
+- Range picker (7 days, 30 days, Season), "Updated" time and Refresh; no polling. The shell and skeleton cards draw at
+  once, with "Waking the database…" after 2 s.
+- Cards in the roadmap's order; charts are inline SVG with a hidden table for screen readers; a game row opens its
+  stages by click or keyboard; feeds over the 4-a-minute target are marked. "Where hosts heard about us" says
+  "Coming with R45c", and Database and Hosting link to their dashboards.
+- A masked email is a button: one full email on screen at a time, never stored in the browser.
+

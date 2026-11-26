@@ -515,7 +515,7 @@ rows and end to end in the browser in accounts mode (360, 1366 and 1920 px); `/c
 sign-in (needs R16), a real phone. Wording waits for the lawyer review. Nothing sends the news yet;
 whatever does needs an unsubscribe link that works signed out.
 
-**R45. Admin usage page** — `Opus` (admin access, migration, outside API keys), `Sonnet` (front end) — split 2026-11-26 ([decision 027](decisions/027-admin-usage-page.md)): **R45a** server (access, counters, `GET /api/admin/stats`, migration 012) ✅ built 2026-11-26, not pushed; **R45b** `#admin` screen (`Sonnet`); **R45c** the heard-about-us question with `?src=` and the Neon and Vercel cards (`Opus` keys, `Sonnet` UI). —
+**R45. Admin usage page** — `Opus` (admin access, migration, outside API keys), `Sonnet` (front end) — split 2026-11-26 ([decision 027](decisions/027-admin-usage-page.md)): **R45a** server (access, counters, `GET /api/admin/stats`, migration 012) ✅ built 2026-11-26, not pushed; **R45b** `#admin` screen (`Sonnet`) ✅ built 2026-11-26, not pushed (checked with stubbed data at 375, 1366 and 1920 px; not yet with a real admin sign-in); **R45c** the heard-about-us question with `?src=` and the Neon and Vercel cards (`Opus` keys, `Sonnet` UI). —
 Depends on: R2 (real data once host accounts are live). Steve approved the design 2026-11-25 (inline mockups in a
 design session). Not a host page: it tracks use of the whole site, for Steve.
 - **Access:** `#admin`, open only to accounts in `ADMIN_EMAILS`. One `GET /api/admin/stats` route, answered
