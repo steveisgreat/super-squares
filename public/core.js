@@ -331,7 +331,7 @@
     if (route.screen === 'home') return s.home();
     if (route.screen === 'setup') return s.setup();
     if (route.screen === 'theme') return s.theme();
-    if (route.screen === 'editGame') return s.editGame(route.game);
+    if (route.screen === 'editGame') return s.editGame(route);
     if (route.screen === 'picking') return s.picking(route.game);
     if (route.screen === 'board') return s.board(route.game);
     if (route.screen === 'tv') return s.tv(route.id, route.paired, route.from);

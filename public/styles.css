@@ -3553,3 +3553,90 @@ button.gd-pay.is-paid { background: var(--good-soft); color: var(--good); border
 .win-text strong { color: var(--good); font-size: 1.15rem; }
 button.win-dismiss { flex: none; min-height: 44px; }
 button.win-slim { width: 100%; min-height: 44px; background: var(--panel); color: var(--good); border: 1px solid var(--good); font-weight: 700; }
+
+
+/* ---- Edit game (R41, screen-edit.js) ---- */
+.eg { display: flex; flex-direction: column; width: 100%; max-width: 600px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; font-size: 1rem; }
+.eg-head { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px; min-height: 64px; padding: calc(10px + var(--sat)) 14px 10px; background: var(--bg); border-bottom: 1px solid var(--border); }
+.eg-head h1 { flex: 1; margin: 0; font-size: 1.25rem; }
+button.eg-back { width: 44px; height: 44px; flex: none; }
+.eg-chip { flex: none; padding: 5px 12px; border-radius: 14px; background: var(--panel2); font-weight: 800; font-size: .9rem; }
+.eg-chip.is-locked { background: var(--warn-soft); color: var(--warn); }
+.eg-chip.is-underWay { background: var(--danger-soft); color: var(--danger); }
+.eg-chip.is-over { background: var(--good-soft); color: var(--good); }
+.eg-body { flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.eg-note { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--panel2); line-height: 1.4; }
+.eg-note.is-underWay { background: var(--warn-soft); }
+.eg-sec { flex: none; display: flex; flex-direction: column; gap: 14px; padding: 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+.eg-sec h2 { margin: 0; font-size: 1.05rem; color: var(--accent-hi); }
+.eg .eg-field, .eg-sheet .eg-field { display: flex; flex-direction: column; gap: 6px; margin: 0; min-width: 0; font-size: .95rem; font-weight: 700; color: var(--text); }
+.eg .eg-field input, .eg-sheet .eg-field input { width: 100%; min-width: 0; box-sizing: border-box; min-height: 48px; }
+.eg .checkbox-label { min-height: 44px; margin: 0; }
+.eg-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.eg-two > div { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.eg-four { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.eg-four input { padding-left: 8px; padding-right: 4px; }
+.eg-pays { font-weight: 600; font-variant-numeric: tabular-nums; }
+.eg-total { font-weight: 700; color: var(--good); }
+.eg-total.is-bad { color: var(--danger); }
+.eg-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+button.eg-pill { flex: 1 0 auto; min-height: 44px; padding: 0 16px; border-radius: 22px; background: transparent; color: var(--text); border: 1px solid var(--border-strong); font-weight: 700; }
+button.eg-pill[aria-pressed="true"], button.eg-choice[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.eg-summary { display: flex; align-items: center; gap: 12px; }
+.eg-summary > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; overflow-wrap: anywhere; }
+.eg-summary button.eg-pill { flex: none; }
+.eg-lbl { font-size: .95rem; font-weight: 700; }
+.eg-val { font-size: 1.05rem; font-weight: 600; }
+.eg-sub { font-size: .95rem; font-weight: 500; color: var(--muted); }
+.eg-why { display: flex; gap: 8px; margin: 0; font-size: .95rem; line-height: 1.35; color: var(--warn); }
+.eg-why svg { flex: none; }
+.eg-hint { margin: 0; font-size: .95rem; font-weight: 500; line-height: 1.4; color: var(--muted); }
+.eg-text { margin: 0; line-height: 1.4; }
+.eg-fixed { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.eg-fixed dt { font-size: .95rem; color: var(--muted); }
+.eg-fixed dd { margin: 0; font-size: 1.1rem; font-weight: 700; overflow-wrap: anywhere; }
+.eg-foot { position: sticky; bottom: 0; z-index: 5; display: flex; flex-direction: column; gap: 8px; padding: 10px 14px calc(16px + var(--sab)); background: var(--bg); border-top: 1px solid var(--border); }
+.eg-error, .eg-message { margin: 0; font-size: .95rem; font-weight: 700; line-height: 1.35; }
+.eg-error { color: var(--danger); }
+.eg-message { color: var(--good); }
+button.eg-primary { flex: none; min-height: 54px; font-size: 1.1rem; font-weight: 800; }
+button.eg-secondary { flex: none; min-height: 50px; }
+.eg-sheet { display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px); overflow-y: auto; }
+.eg-sheet h3, .eg-sheet p { margin: 0; line-height: 1.4; }
+.eg-change { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; overflow-wrap: anywhere; }
+.eg-arrow { color: var(--muted); }
+.eg-fromto strong { color: var(--accent); }
+.eg-warn { color: var(--warn); line-height: 1.4; }
+.eg-marks, .eg-games { display: flex; flex-direction: column; gap: 8px; }
+button.eg-choice { display: flex; flex-direction: column; gap: 3px; min-height: 48px; padding: 10px 14px; text-align: left; background: var(--bg); color: var(--text); border: 2px solid var(--border-strong); border-radius: 10px; font-weight: 600; line-height: 1.35; }
+.eg-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+button.eg-side { align-items: center; text-align: center; min-height: 76px; overflow-wrap: anywhere; }
+button.eg-side strong { font-size: 1.2rem; }
+/* Beside the board on a wide Game Day: the panel scrolls, the page does not. */
+.eg.eg-panel { flex: 1; min-height: 0; max-width: none; }
+.eg-panel .eg-head { position: static; padding-top: 10px; background: none; }
+.eg-panel .eg-body { min-height: 0; overflow-y: auto; }
+.eg-panel .eg-foot { position: static; padding-bottom: 12px; background: none; }
+.eg-panel .eg-two { grid-template-columns: minmax(0, 1fr); }
+button.gd-bar-btn.gd-edit[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+/* The picking screen's bar has two buttons on the right: Edit game and Connect. */
+.topbar.pick-topbar { grid-template-columns: 44px minmax(0, 1fr) auto; }
+.pick-topbar .nav { flex-wrap: nowrap; gap: 8px; }
+.pick-topbar.gd-topbar-phone .nav { gap: 4px; }
+@media (min-width: 1024px) and (max-width: 1599px) {
+  /* Icons only for Edit game and Party View, so the join chip stays clear of the matchup. */
+  .gd-topbar-center:not(.gd-topbar-phone) button.gd-edit, .gd-topbar-center:not(.gd-topbar-phone) .gd-party { width: 44px; padding: 0; }
+  .gd-topbar-center:not(.gd-topbar-phone) .gd-edit span, .gd-topbar-center:not(.gd-topbar-phone) .gd-party span { display: none; }
+}
+@media (min-width: 1024px) {
+  .topbar.pick-topbar:not(.gd-topbar-phone) { grid-template-columns: 360px minmax(0, 1fr) 360px; }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .topbar.pick-topbar:not(.gd-topbar-phone) { grid-template-columns: 330px minmax(0, 1fr) 330px; }
+  .pick-topbar:not(.gd-topbar-phone) button.gd-bar-btn.gd-connect { width: 44px; padding: 0; }
+  .pick-topbar:not(.gd-topbar-phone) .gd-connect span { display: none; }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .gd-topbar-center:not(.gd-topbar-phone) button.gd-bar-btn.gd-connect { width: 44px; padding: 0; }
+  .gd-topbar-center:not(.gd-topbar-phone) .gd-connect span { display: none; }
+}

@@ -17,7 +17,6 @@
   const MAIL_ICON = ic('<path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10z"/><path d="M3 7l9 6l9 -6"/>');
   const DOTS_ICON = ic('<path d="M5 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M19 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/>', 22);
   const PENCIL_ICON = ic('<path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/>');
-  const LOCK_ICON = ic('<path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z"/><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/>');
   const USERS_ICON = ic('<path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0 -3 -3.85"/>');
   const MOBILE_ICON = ic('<path d="M6 5a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-14z"/><path d="M11 4h2"/><path d="M12 17v.01"/>');
   const TRASH_ICON = ic('<path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/>');
@@ -201,15 +200,11 @@
   }
 
   function openCardMenu(g, opener) {
-    const locked = g.status === 'started' || g.status === 'finished';
     const items = [
       {
-        label: 'Edit game', icon: locked ? LOCK_ICON : PENCIL_ICON, disabled: locked,
-        sub: locked ? 'Locked once the numbers are drawn' : '',
-        onSelect: async () => {
-          const game = await loadFull(g.id);
-          if (game) SBS.go({ screen: 'editGame', game });
-        }
+        label: 'Edit game', icon: PENCIL_ICON,
+        sub: g.status === 'started' ? 'Some settings close as the game goes' : g.status === 'finished' ? 'Only a few things can still change' : '',
+        onSelect: () => SBS.editForm.open(g.id, 'home')
       },
       {
         label: 'Players', icon: USERS_ICON,
@@ -794,11 +789,11 @@
 
   const DEFAULT_OTHER_COLORS = { A: '#ff6b6b', B: '#4dabf7' };
 
-  function renderSetup(editGame) {
+  function renderSetup() {
     const app = SBS.appEl;
     resetTeamColors();
     app.innerHTML = '';
-    const bar = topbar(editGame ? `Edit Game — ${escapeHtml(shownDescription(editGame) || editGame.gameDate || '')}` : 'New Game — Setup', [], { hideIcon: true });
+    const bar = topbar('New Game — Setup', [], { hideIcon: true });
     bar.classList.add('setup-topbar');
     app.appendChild(bar);
     const main = el('div', 'main');
@@ -816,44 +811,36 @@
     }
 
     const form = el('div');
-    // Simulation builds its plan when the numbers are generated, so it can't be
-    // switched on for a board that is already locked.
-    const simLocked = !!editGame && (editGame.status === 'started' || editGame.status === 'finished') && window.GameLogic.scoringMode(editGame) !== 'simulation';
-    const scoringStart = editGame ? window.GameLogic.scoringMode(editGame) : 'manual';
     card.appendChild(form);
-    // Guest picks (R28): off unless the host turns it on. A board that never had it has no
-    // guestPick at all; turning it off later keeps the limit with on: false.
-    const priorGuest = editGame && editGame.guestPick ? editGame.guestPick : null;
-    const guestStart = { on: !!(priorGuest && priorGuest.on), max: priorGuest ? priorGuest.max : 5, liftAt: priorGuest ? priorGuest.liftAt : null };
 
     form.innerHTML = `
       <label>League</label>
       <div class="radio-group" id="league-group">
-        <div class="pill${!editGame || editGame.league === 'nfl' ? ' active' : ''}" data-val="nfl">NFL</div>
-        <div class="pill${editGame && editGame.league === 'nba' ? ' active' : ''}" data-val="nba">NBA</div>
-        <div class="pill${editGame && editGame.league === 'other' ? ' active' : ''}" data-val="other">Other</div>
+        <div class="pill active" data-val="nfl">NFL</div>
+        <div class="pill" data-val="nba">NBA</div>
+        <div class="pill" data-val="other">Other</div>
       </div>
 
       <label for="f-gamedate">Game Date</label>
-      <input type="date" id="f-gamedate" value="${editGame && editGame.gameDate ? escapeHtml(editGame.gameDate) : todayValue()}">
+      <input type="date" id="f-gamedate" value="${todayValue()}">
 
       <div id="games-picker" class="games-picker"></div>
 
       <label for="f-price">Square Price ($)</label>
-      <input type="number" id="f-price" value="${editGame ? escapeHtml(editGame.squarePrice) : 10}" min="0" step="0.01">
+      <input type="number" id="f-price" value="10" min="0" step="0.01">
 
       <label>Description</label>
-      <input type="text" id="f-description" placeholder="e.g. Super Bowl LX, Office Pool" maxlength="80" value="${editGame ? escapeHtml(editGame.description || '') : ''}">
+      <input type="text" id="f-description" placeholder="e.g. Super Bowl LX, Office Pool" maxlength="80">
 
       <div class="row">
         <div>
           <label>Team A (rows, left side)</label>
-          <input type="text" id="f-teamA" placeholder="e.g. Chiefs" value="${editGame ? escapeHtml(editGame.teamA || '') : ''}">
+          <input type="text" id="f-teamA" placeholder="e.g. Chiefs">
           <div id="preview-teamA" class="team-preview"></div>
         </div>
         <div>
           <label>Team B (columns, top)</label>
-          <input type="text" id="f-teamB" placeholder="e.g. Eagles" value="${editGame ? escapeHtml(editGame.teamB || '') : ''}">
+          <input type="text" id="f-teamB" placeholder="e.g. Eagles">
           <div id="preview-teamB" class="team-preview"></div>
         </div>
       </div>
@@ -861,61 +848,61 @@
       <div class="row hidden" id="other-color-row">
         <div>
           <label>Team A Color</label>
-          <input type="color" id="f-teamA-color" value="${editGame && editGame.teamAColor ? escapeHtml(editGame.teamAColor) : DEFAULT_OTHER_COLORS.A}">
+          <input type="color" id="f-teamA-color" value="${DEFAULT_OTHER_COLORS.A}">
         </div>
         <div>
           <label>Team B Color</label>
-          <input type="color" id="f-teamB-color" value="${editGame && editGame.teamBColor ? escapeHtml(editGame.teamBColor) : DEFAULT_OTHER_COLORS.B}">
+          <input type="color" id="f-teamB-color" value="${DEFAULT_OTHER_COLORS.B}">
         </div>
       </div>
 
       <label>Quarterly Payout — % of Pot</label>
       <div class="row">
-        <div><label style="margin-top:0">Q1</label><input type="number" id="f-pq1" value="${editGame ? escapeHtml(editGame.payouts.q1) : 20}" min="0" max="100"></div>
-        <div><label style="margin-top:0">Q2</label><input type="number" id="f-pq2" value="${editGame ? escapeHtml(editGame.payouts.q2) : 20}" min="0" max="100"></div>
-        <div><label style="margin-top:0">Q3</label><input type="number" id="f-pq3" value="${editGame ? escapeHtml(editGame.payouts.q3) : 20}" min="0" max="100"></div>
-        <div><label style="margin-top:0">Final</label><input type="number" id="f-pfinal" value="${editGame ? escapeHtml(editGame.payouts.final) : 40}" min="0" max="100"></div>
+        <div><label style="margin-top:0">Q1</label><input type="number" id="f-pq1" value="20" min="0" max="100"></div>
+        <div><label style="margin-top:0">Q2</label><input type="number" id="f-pq2" value="20" min="0" max="100"></div>
+        <div><label style="margin-top:0">Q3</label><input type="number" id="f-pq3" value="20" min="0" max="100"></div>
+        <div><label style="margin-top:0">Final</label><input type="number" id="f-pfinal" value="40" min="0" max="100"></div>
       </div>
       <div id="pct-total" class="pct-total"></div>
 
       <label>Square Pick Mode</label>
       <div class="radio-group" id="pick-mode-group">
-        <div class="pill${editGame && editGame.pickMode === 'manual' ? ' active' : ''}" data-val="manual">Manual Only</div>
-        <div class="pill${editGame && editGame.pickMode === 'auto' ? ' active' : ''}" data-val="auto">Auto Only</div>
-        <div class="pill${!editGame || editGame.pickMode === 'both' ? ' active' : ''}" data-val="both">Both (player's choice)</div>
+        <div class="pill" data-val="manual">Manual Only</div>
+        <div class="pill" data-val="auto">Auto Only</div>
+        <div class="pill active" data-val="both">Both (player's choice)</div>
       </div>
 
       <label>Auto Cutoff Time?</label>
       <div class="toggle-group" id="cutoff-toggle">
-        <div class="pill${editGame && editGame.autoCutoffEnabled ? ' active' : ''}" data-val="yes">Yes</div>
-        <div class="pill${!editGame || !editGame.autoCutoffEnabled ? ' active' : ''}" data-val="no">No</div>
+        <div class="pill" data-val="yes">Yes</div>
+        <div class="pill active" data-val="no">No</div>
       </div>
-      <div id="cutoff-time-wrap" class="${editGame && editGame.autoCutoffEnabled ? '' : 'hidden'}">
+      <div id="cutoff-time-wrap" class="hidden">
         <label>Cutoff Date &amp; Time</label>
-        <input type="datetime-local" id="f-cutoff" step="60" value="${editGame && editGame.autoCutoffTime ? escapeHtml(toLocalInput(editGame.autoCutoffTime)) : defaultCutoffValue()}">
+        <input type="datetime-local" id="f-cutoff" step="60" value="${defaultCutoffValue()}">
         <p style="color:var(--muted); font-size:0.9rem;">At this time, the app will automatically lock square picking and generate the grid numbers.</p>
       </div>
 
-      <label class="checkbox-label"><input type="checkbox" id="f-guest-on"${guestStart.on ? ' checked' : ''}> <span>Allow picks in Player View</span></label>
-      <div id="guest-wrap" class="${guestStart.on ? '' : 'hidden'}">
+      <label class="checkbox-label"><input type="checkbox" id="f-guest-on"> <span>Allow picks in Player View</span></label>
+      <div id="guest-wrap" class="hidden">
         <label for="f-guest-max">Most squares per person</label>
-        <input type="number" id="f-guest-max" min="1" max="100" step="1" value="${escapeHtml(guestStart.max)}">
+        <input type="number" id="f-guest-max" min="1" max="100" step="1" value="5">
         <label for="f-guest-lift">Limit ends at (optional)</label>
-        <input type="datetime-local" id="f-guest-lift" step="60" value="${guestStart.liftAt ? escapeHtml(toLocalInput(guestStart.liftAt)) : ''}">
+        <input type="datetime-local" id="f-guest-lift" step="60">
         <p style="color:var(--muted); font-size:0.9rem;">Anyone with the board link can claim squares, up to this number each, until the time you set (leave it empty for no end time). You mark players paid yourself; we never hold or move the money.</p>
       </div>
 
       <label>Scoring</label>
       <div class="radio-group" id="scoring-group" role="radiogroup" aria-label="Scoring">
-        <div class="pill${scoringStart === 'manual' ? ' active' : ''}" data-val="manual" role="radio" tabindex="0" aria-checked="${scoringStart === 'manual'}">Manual</div>
-        <div class="pill${scoringStart === 'live' ? ' active' : ''}" data-val="live" role="radio" tabindex="0" aria-checked="${scoringStart === 'live'}">Live</div>
-        <div class="pill${scoringStart === 'simulation' ? ' active' : ''}${simLocked ? ' disabled' : ''}" data-val="simulation" role="radio" tabindex="${simLocked ? -1 : 0}" aria-checked="${scoringStart === 'simulation'}"${simLocked ? ' aria-disabled="true" title="Simulation has to be chosen before the grid numbers are generated."' : ''}>Simulation</div>
+        <div class="pill active" data-val="manual" role="radio" tabindex="0" aria-checked="true">Manual</div>
+        <div class="pill" data-val="live" role="radio" tabindex="0" aria-checked="false">Live</div>
+        <div class="pill" data-val="simulation" role="radio" tabindex="0" aria-checked="false">Simulation</div>
       </div>
       <p style="color:var(--muted); font-size:0.9rem;">Manual: you enter the score yourself on the phone or Game Day screen, and the app never contacts a score feed. Live: pick a game above and the score comes from a live score feed while the game is on; you can enter it yourself if the feed drops. Simulation: for testing or demos, the app invents a random game and plays it out (2-minute quarters) starting the moment you generate the grid numbers.</p>
     `;
 
-    let league = editGame && window.GameLogic.LEAGUES.includes(editGame.league) ? editGame.league : 'nfl';
-    let selectedKickoff = editGame ? (editGame.kickoffTime || null) : null;
+    let league = 'nfl';
+    let selectedKickoff = null;
 
     function currentPreviewGame() {
       return {
@@ -955,9 +942,9 @@
     form.querySelector('#f-teamA-color').addEventListener('input', refreshPreviews);
     form.querySelector('#f-teamB-color').addEventListener('input', refreshPreviews);
 
-    let pickMode = editGame ? editGame.pickMode : 'both';
-    let cutoffEnabled = editGame ? !!editGame.autoCutoffEnabled : false;
-    let scoring = scoringStart;
+    let pickMode = 'both';
+    let cutoffEnabled = false;
+    let scoring = 'manual';
 
     function setScoring(val) {
       scoring = val;
@@ -992,7 +979,6 @@
       pickerBox.innerHTML = '';
       selectedKickoff = null;
       if (!initial && scoring === 'live') setScoring('manual');
-      if (initial && editGame) selectedKickoff = editGame.kickoffTime || null;
       if (league === 'other') return;
       const note = (msg) => {
         pickerBox.innerHTML = `<p class="games-picker-msg" role="status">${escapeHtml(msg)}</p>`;
@@ -1021,15 +1007,6 @@
       const select = pickerBox.querySelector('#f-games-picker');
       const msg = pickerBox.querySelector('#games-picker-msg');
       msg.textContent = MSG_MANUAL;
-      // An existing board shows its picked game; its Scoring stays as saved.
-      if (initial && editGame) {
-        const matchIdx = games.findIndex(g => g.teamA === editGame.teamA && g.teamB === editGame.teamB);
-        if (matchIdx !== -1) {
-          select.value = String(matchIdx);
-          selectedKickoff = games[matchIdx].date || editGame.kickoffTime || null;
-          if (scoring === 'live') msg.textContent = 'Live scores on';
-        }
-      }
       select.addEventListener('change', (e) => {
         const g = games[e.target.value];
         if (!g) {
@@ -1105,7 +1082,7 @@
     form.querySelectorAll('#f-pq1,#f-pq2,#f-pq3,#f-pfinal').forEach(inp => inp.addEventListener('input', updatePctTotal));
     updatePctTotal();
 
-    const submitLabel = editGame ? 'Save Changes' : 'Continue to Square Picking';
+    const submitLabel = 'Continue to Square Picking';
     const actions = el('div', 'actions');
     const submitBtn = el('button', '', submitLabel);
     const cancelBtn = el('button', 'secondary', 'Cancel');
@@ -1137,7 +1114,7 @@
       const guestOn = form.querySelector('#f-guest-on').checked;
       const guestMax = Number(form.querySelector('#f-guest-max').value);
       const guestLiftValue = form.querySelector('#f-guest-lift').value;
-      if ((guestOn || priorGuest) && (!Number.isInteger(guestMax) || guestMax < 1 || guestMax > 100)) {
+      if (guestOn && (!Number.isInteger(guestMax) || guestMax < 1 || guestMax > 100)) {
         return showErr('Most squares per person must be a whole number from 1 to 100.');
       }
       if (guestOn && guestLiftValue && isNaN(new Date(guestLiftValue).getTime())) {
@@ -1145,12 +1122,8 @@
       }
       // UTC with its zone, like the cutoff, so the server's clock agrees with the host's.
       const guestLiftAt = guestLiftValue && !isNaN(new Date(guestLiftValue).getTime()) ? new Date(guestLiftValue).toISOString() : null;
-      const wantsGuestPick = guestOn || !!priorGuest;
 
-      // Editing only ever touches setup fields (teams, price, payouts, pick
-      // mode, cutoff, simulation) — everything else about the game (squares,
-      // axis numbers, results, players, status) carries over untouched.
-      const game = Object.assign({}, editGame, {
+      const game = {
         teamA, teamB, description, gameDate, squarePrice, league,
         payouts: { q1: pq1, q2: pq2, q3: pq3, final: pfinal },
         pickMode,
@@ -1159,8 +1132,14 @@
         autoCutoffTime: cutoffEnabled ? new Date(form.querySelector('#f-cutoff').value).toISOString() : null,
         scoring,
         simulation: scoring === 'simulation',
-        kickoffTime: selectedKickoff
-      });
+        kickoffTime: selectedKickoff,
+        status: 'picking',
+        squares: emptyGrid(),
+        axisX: null,
+        axisY: null,
+        results: {},
+        players: {}
+      };
       if (league === 'other') {
         game.teamAColor = form.querySelector('#f-teamA-color').value;
         game.teamBColor = form.querySelector('#f-teamB-color').value;
@@ -1168,47 +1147,16 @@
         game.teamAColor = null;
         game.teamBColor = null;
       }
-      // Switching mode on an existing board drops the old running score so a
-      // stale feed value never poses as the manual one (or the reverse).
-      if (editGame && scoring !== window.GameLogic.scoringMode(editGame)) { game.liveScore = null; delete game.liveOverride; }
-      if (!editGame) {
-        game.status = 'picking';
-        game.squares = emptyGrid();
-        game.axisX = null;
-        game.axisY = null;
-        game.results = {};
-        game.players = {};
-      }
-
-      if (wantsGuestPick) {
-        game.guestPick = { on: guestOn, max: guestMax, liftAt: guestLiftAt, lifted: !!(priorGuest && priorGuest.lifted) };
-      }
+      if (guestOn) game.guestPick = { on: true, max: guestMax, liftAt: guestLiftAt, lifted: false };
 
       submitBtn.disabled = true;
       submitBtn.textContent = 'Saving…';
       try {
-        if (editGame) {
-          // A guest's pick may land while the host edits: re-apply only this form's fields to
-          // the newer board (the squares and players there are theirs, not ours).
-          const formFields = {};
-          ['teamA', 'teamB', 'description', 'gameDate', 'squarePrice', 'league', 'payouts', 'pickMode', 'autoCutoffEnabled', 'autoCutoffTime',
-            'scoring', 'simulation', 'kickoffTime', 'teamAColor', 'teamBColor'].forEach(k => { formFields[k] = game[k]; });
-          const modeChanged = scoring !== window.GameLogic.scoringMode(editGame);
-          const result = await SBS.saveWith(editGame, doc => {
-            Object.assign(doc, JSON.parse(JSON.stringify(formFields)));
-            if (modeChanged) { doc.liveScore = null; delete doc.liveOverride; }
-            // lifted is the picking screen's switch: keep the newer board's.
-            if (wantsGuestPick) doc.guestPick = { on: guestOn, max: guestMax, liftAt: guestLiftAt, lifted: !!(doc.guestPick && doc.guestPick.lifted) };
-          });
-          SBS.go({ screen: 'picking', game: result.game });
-        } else {
-          const saved = await SBS.api.createGame(game);
-          SBS.go({ screen: 'picking', game: saved });
-        }
+        const saved = await SBS.api.createGame(game);
+        SBS.go({ screen: 'picking', game: saved });
       } catch (e) {
         submitBtn.disabled = false;
         submitBtn.textContent = submitLabel;
-        if (editGame && await SBS.handleConflict(e, editGame.id)) return;
         showErr(e.message);
       }
     });
@@ -1216,5 +1164,4 @@
 
   SBS.screens.home = renderHome;
   SBS.screens.setup = renderSetup;
-  SBS.screens.editGame = renderSetup;
 })();

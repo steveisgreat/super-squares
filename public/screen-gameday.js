@@ -200,6 +200,9 @@
     return { cancel };
   }
 
+  // The Edit game panel open on a wide Game Day: { id, state } (screen-edit.js).
+  let gdEdit = null;
+
   function renderBoard(game) {
     const app = SBS.appEl;
     applyTeamColors(game);
@@ -240,7 +243,10 @@
     partyBtn.addEventListener('click', () => {
       SBS.go(phone ? { screen: 'mirror', id: game.id, from: 'board' } : { screen: 'tv', id: game.id, from: 'board' });
     });
-    nav.append(partyBtn, SBS.deviceChooser.button(game));
+    // Edit game (R41): beside the board on a wide screen, its own screen below that.
+    let toggleEdit = () => SBS.editForm.open(game.id, 'board');
+    const editBtn = SBS.editForm.barButton(phone, () => toggleEdit());
+    nav.append(editBtn, partyBtn, SBS.deviceChooser.button(game));
     app.appendChild(bar);
     const main = el('div', 'main' + (phone ? ' gd-phone' : ''));
     app.appendChild(main);
@@ -862,6 +868,45 @@
 
       drawWide = drawStage;
 
+      // The edit form takes the panel's place while it is open. It is kept across a redraw of
+      // this screen, so a change typed in it is not lost.
+      let editor = null;
+      function showEditor() {
+        const open = !!(gdEdit && gdEdit.id === game.id) && layout.classList.contains('gd-wide');
+        editBtn.setAttribute('aria-pressed', String(open));
+        potIn.disabled = open; // the form has the pot while it is open
+        if (!open) {
+          editor = null;
+          if (side.firstElementChild !== tabBar) { side.replaceChildren(tabBar, scorePane, playersPane, helpersPane); scorePanel.update(); }
+          return;
+        }
+        if (editor) return;
+        editor = SBS.editForm.create({
+          state: gdEdit.state,
+          panel: true,
+          onSaved: (saved) => { gdEdit = null; SBS.openGame(saved); },
+          onClose: () => { gdEdit = null; showEditor(); editBtn.focus(); }
+        });
+        side.replaceChildren(editor.el);
+      }
+      let opening = false;
+      toggleEdit = async () => {
+        if (!layout.classList.contains('gd-wide')) return SBS.editForm.open(game.id, 'board');
+        if (editor) return editor.close();
+        if (opening) return;
+        opening = true;
+        try {
+          const fresh = await SBS.api.getGame(game.id);
+          if (!editBtn.isConnected) return;
+          gdEdit = { id: game.id, state: SBS.editForm.newState(fresh) };
+          showEditor();
+        } catch (e) {
+          showAlert('Could not open Edit game: ' + e.message);
+        } finally {
+          opening = false;
+        }
+      };
+
       const wideQuery = window.matchMedia('(min-width: 1024px)');
       const fineQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
       const placeCards = () => {
@@ -881,7 +926,13 @@
           strip.remove();
           drawWide(computeGame(game));
           scorePanel.update();
+          showEditor();
         } else {
+          // Narrowed with the form open: it carries on as its own screen.
+          if (editor && gdEdit) {
+            SBS.go({ screen: 'editGame', game, from: 'board', state: gdEdit.state });
+            return;
+          }
           resultsCard.append(scorePanel.el, qsec, whoCard);
           layout.append(boardCard, resultsCard);
           side.remove();
@@ -895,6 +946,7 @@
       };
       [wideQuery, fineQuery].forEach(m => { if (m.addEventListener) m.addEventListener('change', placeCards); else m.addListener(placeCards); });
       SBS.onLeaveScreen(() => {
+        gdEdit = null;
         [wideQuery, fineQuery].forEach(m => { if (m.removeEventListener) m.removeEventListener('change', placeCards); else m.removeListener(placeCards); });
         app.classList.remove('fit-screen');
       });

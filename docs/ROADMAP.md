@@ -390,7 +390,9 @@ server draws the numbers at lock. No save makes a quarter's amount negative (a $
 pays a Final of -$500 today). Locking and Total Pot move to the new route.
 *Done:* decision 026 tests; no browser draws the numbers that count; `/code-review high` clean.
 
-**R41. Edit form after lock** — `Sonnet` build, `Opus` review — Depends on: R40.
+**R41. Edit form after lock** — `Sonnet` build, `Opus` review — ✅ built 2026-11-26, not pushed, Opus review
+pending (`screen-edit.js`; browser check at 360, 390, 1366 and 1920 px, also 1024, in all four stages, the TV view,
+and a stale save from a second tab; not tried on a real phone). Depends on: R40.
 Edit game from Home, the picking screen and Game Day; blocked fields with the reason, the review sheet, the paid-marks
 choice, a Kickoff field, and "Keep theirs or use mine". A date change no longer drops the kickoff and turns Live off on
 a locked board.

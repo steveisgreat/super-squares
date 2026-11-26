@@ -1,7 +1,7 @@
 # 026 — Editing a locked game: three lines, judged on the server
 
 **Date:** 2026-11-25 · **Status:** accepted (Steve approved the design 2026-11-25); server rules built
-2026-11-25 (R40); the form (R41), unlock and wrong game (R42) and the players' list (R43) not built ·
+2026-11-25 (R40); the form built 2026-11-26 (R41); unlock and wrong game (R42) and the players' list (R43) not built ·
 **Roadmap:** R40–R43 · **Related:** 004, 007, 008, 011, 012, 015, 019, 020, 023, 025 (its host column in
 section 1 is narrowed after lock, see section 2)
 
@@ -136,6 +136,18 @@ including a missing `updatedAt` and a lock from an old page; both stores.
 - Beyond section 4, `POST /api/game` (and a `PUT` that creates a board, in password and off modes) draws the numbers
   too when a board is created already locked. The cutoff lock on read was already the server's; it now draws with
   `crypto.randomInt` like the rest.
-- The Total Pot box and Lock board call the new route; the confirm shows the server's warning. The Edit game form
-  (picking only) still uses `PUT` until R41.
+- The Total Pot box and Lock board call the new route; the confirm shows the server's warning.
+
+## As built (R41, 2026-11-26)
+- `public/screen-edit.js` is the one Edit game form, at every stage, picking included; every save is an `edit`. The
+  setup screen makes new games only. It opens from Home, the picking screen and Game Day, beside the board on a wide
+  screen.
+- The form has no rules of its own: it runs `applySettingsOp` in the browser to learn what is blocked (and why), the
+  warnings and a negative amount. The server still judges the save, with its own clock and feed reading.
+- It keeps only the changed fields, each with the value on screen when first changed, so a board reloaded after a
+  refusal can't turn a stale edit into a silent overwrite. A line crossed while the form was open drops that edit,
+  says why and keeps the rest.
+- A Live board's league, date, teams and kickoff change only together, by picking a game ("Change"), and a conflict
+  over any of them is settled for all of them. Changing a date can no longer drop the kickoff or turn Live off.
+- Not shown yet: Unlock and "Wrong game?" (R42), and the mockup's line that players see the changes (R43).
 

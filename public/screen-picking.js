@@ -41,6 +41,7 @@
     bar.replaceChild(head, bar.querySelector('h1'));
     const nav = bar.querySelector('.nav');
     if (!phone && game.joinCode) nav.appendChild(SBS.playerView.joinChip(game));
+    nav.appendChild(SBS.editForm.barButton(true, () => SBS.editForm.open(game.id, 'picking')));
     nav.appendChild(SBS.deviceChooser.button(game));
     app.appendChild(bar);
     fitTeamBadges(bar);
