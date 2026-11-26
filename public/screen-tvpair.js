@@ -107,8 +107,8 @@
   }
 
   // ---------- Host: Connect (was "What's in the room?") ----------
-  // One box with three sections: Players (code, link, QR, print), TV (smart TV pairing, Present on
-  // an HDMI TV, Mirror this phone) and Scoring (hand score entry to another phone). A bottom sheet on
+  // One box with three sections: Players (code, link, View QR with Print inside), TV (smart TV
+  // pairing, Present on an HDMI TV, Mirror this phone) and Helpers (give someone a job). A bottom sheet on
   // a phone, a popover under the Connect button on a wide screen. Party View is its own top-bar
   // button, so there is no "open it here" row.
   // Tabler "devices" (MIT, 24 px outline), for the Connect button.
@@ -131,7 +131,7 @@
   function open(game, opener) {
     if (openChooser) return;
     const phone = SBS.ui.isPhone();
-    const { CLOSE_ICON, PRINT_ICON } = SBS.ui;
+    const { CLOSE_ICON, QR_ICON } = SBS.ui;
     const overlay = el('div', 'connect-layer ' + (phone ? 'connect-layer-sheet' : 'connect-layer-pop'));
     const box = el('div', 'card room-card connect-card ' + (phone ? 'connect-sheet' : 'connect-pop'));
     box.setAttribute('role', 'dialog');
@@ -196,7 +196,8 @@
     place();
     window.addEventListener('resize', place);
 
-    // Players: Share link on a phone (the share sheet), Copy link on a wide screen, Show QR on a phone, Print.
+    // Players: Share link on a phone (the share sheet) or Copy link on a wide screen, then View QR
+    // (the QR window, which has Print).
     const linkNote = box.querySelector('#room-link-note');
     const playersRow = box.querySelector('.connect-players-row');
     if (game.joinCode) {
@@ -207,16 +208,10 @@
         else SBS.playerView.copyJoinLink(game, linkNote);
       });
       playersRow.appendChild(link);
-      if (phone) {
-        const qr = el('button', 'secondary', 'Show QR');
-        qr.type = 'button';
-        qr.addEventListener('click', () => SBS.playerView.showPlayerLink(game.id, game.joinCode, game));
-        playersRow.appendChild(qr);
-      }
-      const print = el('button', 'secondary connect-print', `${PRINT_ICON}<span>Print</span>`);
-      print.type = 'button';
-      print.addEventListener('click', () => SBS.playerView.printSign(game));
-      playersRow.appendChild(print);
+      const qr = el('button', 'secondary connect-qr', `${QR_ICON}<span>View QR</span>`);
+      qr.type = 'button';
+      qr.addEventListener('click', () => SBS.playerView.showPlayerLink(game.id, game.joinCode, game, qr));
+      playersRow.appendChild(qr);
     }
 
     // On a laptop with a mouse: show the board on a TV plugged in by HDMI (R25 part b).
@@ -263,8 +258,9 @@
       openChooser = null;
       if (leaving !== true && opener && opener.focus) opener.focus();
     }
-    // Escape closes; Tab stays inside the box.
+    // Escape closes; Tab stays inside the box. The QR window on top handles its own keys.
     function onKey(e) {
+      if (document.querySelector('.qr-layer')) return;
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
       if (e.key !== 'Tab') return;
       const items = Array.from(box.querySelectorAll('button, input')).filter(n => !n.disabled && !n.closest('[hidden]'));

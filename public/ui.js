@@ -956,11 +956,13 @@
     };
   }
 
-  // Tabler outline icons (MIT, 24 px): arrows-maximize, copy, printer, chevron-right, playlist-add, x.
+  // Tabler outline icons (MIT, 24 px): arrows-maximize, copy, printer, qrcode, chevron-right,
+  // playlist-add, x.
   const ic = d => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   const MAXIMIZE_ICON = ic('<path d="M16 4l4 0l0 4"/><path d="M14 10l6 -6"/><path d="M8 20l-4 0l0 -4"/><path d="M4 20l6 -6"/><path d="M16 20l4 0l0 -4"/><path d="M14 14l6 6"/><path d="M8 4l-4 0l0 4"/><path d="M4 4l6 6"/>');
   const COPY_ICON = ic('<path d="M7 9.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"/><path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"/>');
   const PRINT_ICON = ic('<path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2"/><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4"/><path d="M7 13m0 2a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z"/>');
+  const QR_ICON = ic('<path d="M4 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M7 17l0 .01"/><path d="M14 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M7 7l0 .01"/><path d="M4 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z"/><path d="M17 7l0 .01"/><path d="M14 14l3 0"/><path d="M20 14l0 .01"/><path d="M14 14l0 3"/><path d="M14 20l3 0"/><path d="M17 17l3 0"/><path d="M20 17l0 3"/>');
   const CHEVRON_ICON = ic('<path d="M9 6l6 6l-6 6"/>');
   const PASTE_ICON = ic('<path d="M19 8h-14"/><path d="M5 12h9"/><path d="M11 16h-6"/><path d="M15 16h6"/><path d="M18 13v6"/>');
   const CLOSE_ICON = ic('<path d="M18 6l-12 12"/><path d="M6 6l12 12"/>');
@@ -1007,6 +1009,6 @@
     formatKickoffTime, kickoffNotice,
     teamMeta, teamStyle, applyTeamColors, resetTeamColors, teamLogoTag,
     legalLinks, teamColor, teamEdge, readableTextColor, teamBadge, fitTeamBadges, teamAbbr, shadeColor,
-    MAXIMIZE_ICON, COPY_ICON, PRINT_ICON, CHEVRON_ICON, PASTE_ICON, CLOSE_ICON
+    MAXIMIZE_ICON, COPY_ICON, PRINT_ICON, QR_ICON, CHEVRON_ICON, PASTE_ICON, CLOSE_ICON
   };
 })();

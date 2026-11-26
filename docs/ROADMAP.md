@@ -281,7 +281,8 @@ The Game Day top bar is Home, the matchup (one line: short team names when full 
 Party View and Connect; wide screens add a join-code chip (copies the link) and an "On the TV ·
 Stop" pill while presenting. Connect (was "What's in the room?") is a bottom sheet on a phone and
 a popover on wide screens, in three sections: Players (code, Share or Copy link, Show QR, Print a
-Letter QR sign), TV (smart TV pairing, Present on HDMI, Mirror this phone) and Scoring (hand-off).
+Letter QR sign; since 2026-11-25 a single View QR button opens the QR window, which has Print), TV
+(smart TV pairing, Present on HDMI, Mirror this phone) and Scoring (hand-off).
 "TV view" is now **Party View**, its own button, opening in the same tab with Exit back to Game
 Day; on a phone it is the mirror screen with a new portrait layout. A touch device that cannot
 keep the screen awake gets a one-time Auto-Lock tip. Hashes `#tv-<id>` and `#mirror-<id>` are
@@ -402,6 +403,43 @@ game once R42 ships).
 `game.changes` (written by R40's and R42's operations), the list on Player View, and the ten-minute line on the TV.
 *Done:* browser check on Player View and the TV; a board with no changes looks as it does today.
 
+**R44. Player View tabs: Home, Players, Live, Picks** — `Sonnet` build, `Opus` review — Depends on: R28 ✅,
+R37, R38. Steve approved the design 2026-11-25 (design session, inline phone mockups). Front end only: decision 019's
+rules, the pick cookie and the API stay as they are. Today a guest lands on "Pick your squares" while picking is
+open; now everyone lands on **Home**, and picking is a tab.
+- **Tabs** at the bottom: Home, Players, then **Picks** before the lock (only while player picks are on and the board
+  is picking) or **Live** after it, so three at a time. Helper tabs follow; the squares manager's Players tab merges
+  into this one, with its editing controls added for that helper. The first tab is always Home.
+- **Home:** status line (kickoff countdown, live score, or Final); who you are ("You are Steve R · Change"), or an
+  inline card on a phone that doesn't know yet: "Join and pick squares" / "Find my name" while picking is open,
+  "Which squares are yours?" with search otherwise, always with "Just watching? Skip this." No pop-up. Your squares
+  (row and column before the lock, digit pairs after) with one word each: Winning, Close (the existing one-likely-score
+  logic), Out, or Won Q1/Half/Q3/Final; won so far. Before the lock only, and only on the phone that picked: the amount
+  owed and "You can pick N more" (opens Picks). **View the board** opens the read-only Party View full screen;
+  **Rules and payouts** opens a sheet (price, pot, quarter split, rollover when nobody holds the square, "the host
+  collects and pays, never the app"). "Updated N s ago · live score" (or "scored by host"). Invite friends before the
+  game and "Host your own board" (R13) at the bottom; at Final, your total, all winners and Host your own board up top.
+- **Who you are:** a phone that picked is "You" by its key (the server's answer) and is the only one shown an amount
+  owed. Anyone else picks a name from a list: a remembered choice that only changes what this phone shows, undone
+  with Change or "Not you?". **Owed is hidden after the lock** (no server change; the host settles up in person).
+- **Players:** everyone A to Z with square counts (winnings once live), you pinned on top, search past 8 names. Tap a
+  player for their squares and a **This is me** button. Names held by another phone say "Picked on another phone".
+- **Live:** winning now (name, square, what the quarter pays if it ended now), squares one score away, every quarter
+  with its winner and payout, including the ones still to come. On a hand-scored board, quarter results only.
+- **Picks:** the guest pick panel on its own tab: name box first ("First name and last initial", 10 characters),
+  warning as you type when the name is taken ("Not you? Add your last initial"), then the grid, Pick for me, and a
+  claim bar. Claiming returns to Home with "You have N squares". When picking closes, picks go off or the board locks,
+  the tab leaves; a guest on it goes to Home with "Picking just closed" and what they kept.
+- **Read-only Party View for guests:** the phone Party View (`screen-mirror.js`) without the host check or score strip,
+  your squares outlined, tap a square for its name, sideways for a bigger board; Exit and Back return to Home.
+- **You won:** when a quarter resolves to your square, a banner on Home ("You won the half · $300 · Collect from the
+  host", Dismiss) and a slim one on other tabs that opens Home; once per win per phone, one vibration where supported.
+- Open fast from the last copy kept on the phone, then refresh (cold-start rule); keep the 15 s poll.
+*Check during the build:* that overtime counts toward the Final before the rules sheet says so.
+*Done:* browser check at 360, 390, 1366 and 1920 px for a new phone, a phone that picked and a phone that chose a
+name, with picks on, off and closed, locked, live, hand-scored and final; a helper with both jobs; the TV view
+unchanged; `/code-review medium`.
+
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
 
 **R8. Cache board reads at the edge** — `Opus` — ✅ built 2026-11-24 ([decision 023](decisions/023-edge-cached-reads.md)), not pushed. Depends on: R3, R4a.
@@ -494,6 +532,10 @@ office-pool groups.
 - Spring basketball tournament push (NBA/Other already supported).
 - Unlimited squares after a grid sells out (open questions in memory notes).
 - Apple TV: not planned — AirPlay and smart-TV browsers cover it.
+- Player View extras (after R44): "What it takes" per square ("Both teams need a touchdown"), "good numbers" odds
+  from a sourced table (needs a decision entry), "Request a spot" that tells the host, a host-approved "link this
+  phone" so a host-typed name can pick from a phone, and owed after the lock (pick-key endpoint answers read-only;
+  Opus, note in decision 019).
 
 ## Recently shipped
 

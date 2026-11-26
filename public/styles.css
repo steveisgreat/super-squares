@@ -3003,7 +3003,7 @@ button.pay-full:hover { background: var(--good-soft); color: var(--good); border
 .connect-code { font-size: 1.9rem; font-weight: 800; letter-spacing: 0.18em; color: var(--accent-hi, var(--accent)); line-height: 1.1; }
 .connect-url { font-size: 0.85rem; color: var(--muted); overflow-wrap: anywhere; text-align: right; }
 .connect-card .room-row button { min-height: 44px; }
-.connect-print { display: inline-flex; align-items: center; gap: 6px; }
+.connect-qr, .qr-print { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .connect-note { margin: 6px 0 0; color: var(--good); }
 .room-mirror h5 { margin: 12px 0 4px; font-size: 0.95rem; }
 .room-mirror[hidden], .room-present[hidden] { display: none; }

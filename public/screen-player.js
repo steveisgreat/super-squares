@@ -1174,14 +1174,21 @@
     SBS.onLeaveScreen(() => document.removeEventListener('visibilitychange', onShow));
   }
 
-  // The host's QR code for the guest view. Guests pass the link on with showInvite.
+  // The host's QR window for the guest view, opened by View QR in Connect, with Print for the
+  // sign below. Guests pass the link on with showInvite.
   // `code` (R22): when the board has a join code, the QR and link use the short
   // /<code> form, the same link the host shares and the TV shows.
-  function showPlayerLink(id, code, game) {
+  // It sits above the Connect layer, which leaves the keyboard alone while a .qr-layer is open.
+  // `opener` gets the focus back on close.
+  function showPlayerLink(id, code, game, opener) {
     const overlay = SBS.ui.overlayEl('0.65');
+    overlay.classList.add('qr-layer');
     const box = el('div', 'card');
     box.style.cssText = 'max-width:520px; width:100%; box-shadow: var(--shadow-pop);';
-    box.innerHTML = `<h3 style="margin-top:0">Scan to view your squares</h3>
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-labelledby', 'qr-title');
+    box.innerHTML = `<h3 id="qr-title" style="margin-top:0">Scan to view your squares</h3>
       <p style="color:var(--muted)">${guestPickingOn(game)
         ? "Point a phone's camera at this code to open Player View. Players can claim and release their own squares while picking is open, then follow their squares, quarter winners and a live status readout. They can't change anything else."
         : "Point a phone's camera at this code to open the same read-only Player View — your squares, quarter winners, and a live status readout. Nothing here can change the game."}</p>
@@ -1204,14 +1211,39 @@
     const actions = el('div', 'actions');
     const openHere = el('button', 'secondary', 'Open it on this device');
     openHere.addEventListener('click', () => {
-      overlay.remove();
+      close();
       window.open(`${location.origin}${location.pathname}#player-${id}`, '_blank');
     });
-    const close = el('button', '', 'Done');
-    close.addEventListener('click', () => overlay.remove());
-    actions.appendChild(close);
+    const print = el('button', 'secondary qr-print', `${SBS.ui.PRINT_ICON}<span>Print</span>`);
+    print.type = 'button';
+    print.addEventListener('click', () => printSign(game));
+    const done = el('button', '', 'Done');
+    done.addEventListener('click', () => close());
+    actions.appendChild(done);
+    actions.appendChild(print);
     actions.appendChild(openHere);
     box.appendChild(actions);
+
+    function close() {
+      if (!overlay.parentNode) return;
+      document.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+      if (opener && document.body.contains(opener)) opener.focus();
+    }
+    // Escape closes; Tab stays inside the window.
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
+      if (e.key !== 'Tab') return;
+      const items = Array.from(box.querySelectorAll('button'));
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!box.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    document.addEventListener('keydown', onKey, true);
+    SBS.onLeaveScreen(close);
+    done.focus();
   }
 
   // ---------- Printed sign (R29) ----------
