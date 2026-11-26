@@ -177,7 +177,7 @@
   // teamA's bar sits beside the numbered rows (bottom-left), starting flush with the top of the
   // grid's own blank corner cell — not stretched up alongside teamB's bar, which used to leave it
   // starting a row too low. mount() puts it in `holder` with the grid and fits the names.
-  function boardFrame(game) {
+  function boardFrame(game, zoom) {
     const outer = el('div', 'board-grid-outer');
     const teamALabel = el('div', 'teamA-label', `<span class="teamA-label-text">${escapeHtml(game.teamA)}</span>${teamLogoTag(game, 'A', 32)}`);
     teamALabel.style.cssText = badgeStyle(game, 'A', 'y');
@@ -204,7 +204,16 @@
 
     function mount(holder, scroll) {
       outer.appendChild(scroll);
-      holder.appendChild(outer);
+      // On a phone the grid can be pinched larger (pinch-zoom.js); the zoom lives on the holder, which
+      // outlives every redraw. Anywhere else the frame goes in as it always did.
+      if (zoom && SBS.pinchZoom && SBS.pinchZoom.enabled()) {
+        const viewport = el('div', 'pz-viewport');
+        viewport.appendChild(outer);
+        holder.appendChild(viewport);
+        SBS.pinchZoom.attach(viewport, outer, holder);
+      } else {
+        holder.appendChild(outer);
+      }
       syncCornerInsets(holder);
       fitAxisLabel(teamALabel, teamALabel.querySelector('.teamA-label-text'), 'A', true);
       fitAxisLabel(teamBLabel, teamBLabel.querySelector('span'), 'B', false);
@@ -295,7 +304,7 @@
     }
 
     scroll.appendChild(table);
-    boardFrame(game).mount(holder, scroll);
+    boardFrame(game, state.zoom).mount(holder, scroll);
     fitNames(holder);
 
     // The one tab stop: where the keyboard last was if that square can still be tapped, else the
@@ -319,14 +328,14 @@
   // (TV screen only — see compute.js computeLiveHighlight) overlays the
   // live-projected winner and its near-miss squares on top of whatever
   // quarter badges a cell already has; it never replaces them.
-  function renderFullBoard(holder, game, computed, liveHighlight) {
+  function renderFullBoard(holder, game, computed, liveHighlight, opts) {
     holder.innerHTML = '';
     const isUnpaid = unpaidChecker(game);
 
     const liveBar = renderLiveScoreBar(game);
     if (liveBar) holder.appendChild(liveBar);
 
-    const frame = boardFrame(game);
+    const frame = boardFrame(game, opts && opts.zoom);
 
     const scroll = el('div', 'board-scroll');
     const table = el('div', 'board-table');

@@ -2931,7 +2931,7 @@ button.grid-btn { display: none; min-height: 48px; margin-top: 8px; font-size: v
 .is-tabbed .teamB-label { padding: 1px 8px; font-size: var(--fs-sm); }
 .is-tabbed .teamA-label { padding: 6px 1px; }
 .is-tabbed .teamA-label-text { font-size: var(--fs-sm); }
-.is-tabbed .teamA-label .team-logo, .is-tabbed .teamB-label .team-logo { --logo-size: 22px !important; padding: 2px; }
+.is-tabbed .teamA-label .team-logo, .is-tabbed .teamB-label .team-logo { --logo-size: 16px !important; padding: 1px; }
 @media (max-width: 699px) {
   .main.pick-main { padding: 10px 10px calc(16px + var(--sab)); }
 }
@@ -3575,7 +3575,7 @@ button.gd-pay.is-paid { background: var(--good-soft); color: var(--good); border
 .gd-phone .teamB-label { padding: 1px 8px; font-size: var(--fs-sm); }
 .gd-phone .teamA-label { padding: 6px 1px; }
 .gd-phone .teamA-label-text { font-size: var(--fs-sm); }
-.gd-phone .teamA-label .team-logo, .gd-phone .teamB-label .team-logo { --logo-size: 22px !important; padding: 2px; }
+.gd-phone .teamA-label .team-logo, .gd-phone .teamB-label .team-logo { --logo-size: 16px !important; padding: 1px; }
 @media (max-width: 699px) {
   .main.gd-phone { padding: 10px 10px calc(16px + var(--sab)); }
   .gd-phone .card { padding: 10px 8px; }
@@ -3839,3 +3839,16 @@ a.adm-link { display: inline-flex; align-items: center; min-height: 44px; color:
 .heard-other[hidden] { display: none; }
 .heard-actions { margin: 0; }
 .adm-other { margin: 0 0 8px; overflow-wrap: anywhere; font-size: var(--fs-md); }
+
+/* ==========================================================================
+   Pinch-to-zoom on the phone grids (R47, pinch-zoom.js). The viewport clips the scaled grid and
+   keeps the grid's layout size; the Fit pill sits outside the transformed grid. Added only on a
+   phone, so no other layout meets these rules.
+   ========================================================================== */
+.pz-viewport { position: relative; overflow: hidden; }
+.pz-content { transform-origin: 0 0; }
+.pz-fit {
+  position: absolute; top: 6px; right: 6px; z-index: 3; width: auto; min-height: 0;
+  padding: 4px 12px; font-size: var(--fs-xs); border-radius: 999px; box-shadow: var(--shadow-pop);
+}
+.pz-fit[hidden] { display: none; }

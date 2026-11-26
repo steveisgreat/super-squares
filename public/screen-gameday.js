@@ -385,11 +385,11 @@
     SBS.board.tapNames(boardCard); // phone widths show initials
     // Redraws the grid and fits what depends on its size: team pills, long names (R35).
     function drawBoard(c) {
-      SBS.board.renderFullBoard(boardHolder, game, c);
+      SBS.board.renderFullBoard(boardHolder, game, c, null, { zoom: true });
       fitTeamBadges(boardHolder);
       SBS.board.fitNames(boardHolder);
     }
-    SBS.board.renderFullBoard(boardHolder, game, computed);
+    SBS.board.renderFullBoard(boardHolder, game, computed, null, { zoom: true });
     boardCard.appendChild(el('div', 'board-legend', '<span class="legend-chip"></span> Square is claimed but not paid for'));
 
     // ---- Results panel ----

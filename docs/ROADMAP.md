@@ -457,6 +457,11 @@ the same digits. Each screen plays it once per draw, and a screen that opens lat
 *Done:* the setting saves and is closed after the lock like pick mode (decision 026 table); Quick pick boards look as they do today; no change to the drawn numbers or the lock route; every screen plays the same order; reduced-motion users
 get no animation; skip by tap; TV view checked at 1366 and 1920 px; `/code-review medium`.
 
+**R47. Pinch-to-zoom on the phone grids** — `Sonnet` — ✅ built 2026-11-26, not pushed. Not tried on a real iPhone (checked with synthetic touch events in the preview only).
+Requested by Steve 2026-11-26. On a phone the 10x10 grid is fitted to about 360 px, so squares are tiny and the page's own pinch-zoom is off. `public/pinch-zoom.js` (`SBS.pinchZoom.attach`) lets two fingers scale the grid, team bars included, from 1x to 3x around the pinch point (a CSS transform; the frame clips it and keeps its size). Zoomed, one finger pans, clamped to the grid's edges; a "Fit" pill resets (no double tap: its first tap would claim or free a square); under 1.05x it snaps to 1x. A pinch or a drag never fires the square's click. Zoom state lives on the long-lived holder, so polls and taps keep it. Only on a touch phone (portrait or sideways), on the host's Grid tab, phone Game Day and the player's pick board; the Party View, TV, iPad and laptop are untouched.
+The phone grids' team-bar logos also shrank from 22 px to 16 px (pill padding 2 to 1 px), so each bar is only as thick as its name (24 px to 19 px at 375 px); the squares grew from 27 to 28 px. Hiding the logo gains nothing more, so it stays. The player view has no team bars.
+*Done:* the three grids zoom, pan and reset; taps still claim or name a square; a poll keeps the zoom; no change at 1366 and 1920 px or on the TV view. *Open:* a real iPhone check (Safari may still start a page zoom on some two-finger starts).
+
 ### Milestone 2 — Ready for game-day load (target 2027-01-10)
 
 **R8. Cache board reads at the edge** — `Opus` — ✅ built 2026-11-24 ([decision 023](decisions/023-edge-cached-reads.md)), not pushed. Depends on: R3, R4a.

@@ -671,6 +671,7 @@
         ? 'Lock the board to draw the numbers and go to Game Day. This cannot be undone.'
         : `${open} square${open === 1 ? ' is' : 's are'} still open. Locking draws the numbers and ends picking for good.`;
       SBS.board.renderPickBoard(boardHolder, game, {
+        zoom: true,
         selecting: manualSelecting,
         selected: manualSelected,
         target: manualTarget,

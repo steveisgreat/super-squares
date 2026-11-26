@@ -261,7 +261,14 @@
     const status = el('p', 'gp-status');
     status.setAttribute('role', 'status');
     status.setAttribute('aria-live', 'polite');
-    live.append(nameWrap, asLine, capLine, boardWrap, autoWrap);
+    // On a phone the grid can be pinched larger (pinch-zoom.js); the squares inside are redrawn, the frame is not.
+    let boardSlot = boardWrap;
+    if (SBS.pinchZoom && SBS.pinchZoom.enabled()) {
+      boardSlot = el('div', 'pz-viewport');
+      boardSlot.appendChild(boardWrap);
+      SBS.pinchZoom.attach(boardSlot, boardWrap, boardSlot);
+    }
+    live.append(nameWrap, asLine, capLine, boardSlot, autoWrap);
     // The claim bar stays above the tab bar while squares are selected.
     root.append(startRow, live, status, actionRow);
 
