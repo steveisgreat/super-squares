@@ -95,7 +95,7 @@ before and after, and how many squares are paid at the old price. The host must 
 clear them. Winners paid before a change go to Needs settling by themselves (015).
 
 ### 7. Flow, and what players see
-- Home ⋯ → **Edit game**, and Edit game on the picking screen and Game Day (beside the board on a wide screen). Saving
+- Home ⋯ → **Edit game**, and Edit game on the picking screen and Game Day (a popup over the screen, since UI-E). Saving
   returns to where the host came from.
 - Blocked fields show as text with the reason. Changes with no warning just save; the rest open one review sheet.
 - A refused field asks "Keep theirs or use mine" for that field only, and the other edits stay. Today a stale form puts back
@@ -141,8 +141,9 @@ including a missing `updatedAt` and a lock from an old page; both stores.
 
 ## As built (R41, 2026-11-26)
 - `public/screen-edit.js` is the one Edit game form, at every stage, picking included; every save is an `edit`. The
-  setup screen makes new games only. It opens from Home, the picking screen and Game Day, beside the board on a wide
-  screen.
+  setup screen makes new games only. It opens from Home, the picking screen and Game Day as a popup (UI-E, 2026-11-26: a
+  720 px dialog from 768 px, a full-screen sheet below; it replaced the wide Game Day side panel). A poll or redraw
+  under it never closes it or drops its changes.
 - The form has no rules of its own: it runs `applySettingsOp` in the browser to learn what is blocked (and why), the
   warnings and a negative amount. The server still judges the save, with its own clock and feed reading.
 - It keeps only the changed fields, each with the value on screen when first changed, so a board reloaded after a

@@ -929,7 +929,8 @@
 
     // Something the host has typed or is typing here, or has open. A full redraw would wipe it.
     function hostIsTyping() {
-      if (document.querySelector('.pick-dialog, .connect-layer')) return true;
+      // The Edit game popup counts too: a redraw through SBS.go would close it and drop its changes.
+      if (document.querySelector('.pick-dialog, .connect-layer, .eg-overlay')) return true;
       const a = document.activeElement;
       if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && a.type !== 'checkbox' && main.contains(a)) return true;
       return !!nameInput.value || !!countInput.value;

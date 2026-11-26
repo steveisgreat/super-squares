@@ -200,8 +200,11 @@
     return { cancel };
   }
 
-  // The Edit game panel open on a wide Game Day: { id, state } (screen-edit.js).
+  // The Edit game popup's form state, { id, state } (screen-edit.js), the popup itself, and the
+  // current screen's Edit game button (the popup hands focus back to it).
   let gdEdit = null;
+  let gdPopup = null;
+  let gdEditBtn = null;
   // Removes the layout listeners of the last wide render. A redraw in place (after a score save)
   // runs no screen cleanups, so without this each one would add another pair.
   let unplaceCards = null;
@@ -246,9 +249,43 @@
     partyBtn.addEventListener('click', () => {
       SBS.go(phone ? { screen: 'mirror', id: game.id, from: 'board' } : { screen: 'tv', id: game.id, from: 'board' });
     });
-    // Edit game (R41): beside the board on a wide screen, its own screen below that.
-    let toggleEdit = () => SBS.editForm.open(game.id, 'board');
+    // Edit game (R41): a popup over the board at every width. Its form state (gdEdit) and the popup
+    // itself (gdPopup) outlive a redraw of this screen, so a change typed in it is not lost and a
+    // poll never closes it.
     const editBtn = SBS.editForm.barButton(phone, () => toggleEdit());
+    gdEditBtn = editBtn;
+    editBtn.setAttribute('aria-pressed', String(!!(gdPopup && gdPopup.isOpen() && gdEdit && gdEdit.id === game.id)));
+    let opening = false;
+    function showEditor() {
+      gdPopup = SBS.editForm.openPopup({
+        state: gdEdit.state,
+        opener: gdEditBtn,
+        onSaved: (saved) => { gdEdit = null; gdPopup = null; SBS.openGame(saved); },
+        onClose: () => {
+          gdEdit = null;
+          gdPopup = null;
+          if (gdEditBtn) { gdEditBtn.setAttribute('aria-pressed', 'false'); if (gdEditBtn.isConnected) gdEditBtn.focus(); }
+        }
+      });
+      editBtn.setAttribute('aria-pressed', 'true');
+    }
+    async function toggleEdit() {
+      if (gdPopup && gdPopup.isOpen()) return gdPopup.focus();
+      if (opening) return;
+      opening = true;
+      try {
+        const fresh = await SBS.api.getGame(game.id);
+        if (!editBtn.isConnected && !gdEditBtn.isConnected) return;
+        gdEdit = { id: game.id, state: SBS.editForm.newState(fresh) };
+        showEditor();
+      } catch (e) {
+        showAlert('Could not open Edit game: ' + e.message);
+      } finally {
+        opening = false;
+      }
+    }
+    // Back on the same board after leaving it (the popup closed with the screen): carry on with its changes.
+    if (gdEdit && gdEdit.id === game.id && !(gdPopup && gdPopup.isOpen())) setTimeout(showEditor, 0);
     nav.append(editBtn, partyBtn, SBS.deviceChooser.button(game));
     app.appendChild(bar);
     const main = el('div', 'main' + (phone ? ' gd-phone' : ''));
@@ -871,44 +908,6 @@
 
       drawWide = drawStage;
 
-      // The edit form takes the panel's place while it is open. It is kept across a redraw of
-      // this screen, so a change typed in it is not lost.
-      let editor = null;
-      function showEditor() {
-        const open = !!(gdEdit && gdEdit.id === game.id) && layout.classList.contains('gd-wide');
-        editBtn.setAttribute('aria-pressed', String(open));
-        potIn.disabled = open; // the form has the pot while it is open
-        if (!open) {
-          editor = null;
-          if (side.firstElementChild !== tabBar) { side.replaceChildren(tabBar, scorePane, playersPane, helpersPane); scorePanel.update(); }
-          return;
-        }
-        if (editor) return;
-        editor = SBS.editForm.create({
-          state: gdEdit.state,
-          panel: true,
-          onSaved: (saved) => { gdEdit = null; SBS.openGame(saved); },
-          onClose: () => { gdEdit = null; showEditor(); editBtn.focus(); }
-        });
-        side.replaceChildren(editor.el);
-      }
-      let opening = false;
-      toggleEdit = async () => {
-        if (!layout.classList.contains('gd-wide')) return SBS.editForm.open(game.id, 'board');
-        if (editor) return editor.close();
-        if (opening) return;
-        opening = true;
-        try {
-          const fresh = await SBS.api.getGame(game.id);
-          if (!editBtn.isConnected) return;
-          gdEdit = { id: game.id, state: SBS.editForm.newState(fresh) };
-          showEditor();
-        } catch (e) {
-          showAlert('Could not open Edit game: ' + e.message);
-        } finally {
-          opening = false;
-        }
-      };
 
       const wideQuery = window.matchMedia('(min-width: 1024px)');
       const fineQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
@@ -929,13 +928,7 @@
           strip.remove();
           drawWide(computeGame(game));
           scorePanel.update();
-          showEditor();
         } else {
-          // Narrowed with the form open: it carries on as its own screen.
-          if (editor && gdEdit) {
-            SBS.go({ screen: 'editGame', game, from: 'board', state: gdEdit.state });
-            return;
-          }
           resultsCard.append(scorePanel.el, qsec, whoCard);
           layout.append(boardCard, resultsCard);
           side.remove();

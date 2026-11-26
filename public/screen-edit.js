@@ -101,11 +101,11 @@
     return { base: clone(game), draft: {}, message: '', error: '' };
   }
 
-  // opts: { state, onSaved(game), onClose(), panel }.
+  // opts: { state, onSaved(game), onClose(), popup }. `popup` drops the full-screen page chrome.
   function create(opts) {
     const state = opts.state;
     const draft = state.draft;
-    const root = el('section', 'eg' + (opts.panel ? ' eg-panel' : ''));
+    const root = el('section', 'eg' + (opts.popup ? ' eg-popup' : ''));
     root.setAttribute('aria-label', 'Edit game');
     const head = el('header', 'eg-head');
     const body = el('div', 'eg-body');
@@ -553,13 +553,17 @@
 
     function drawHead() {
       head.innerHTML = '';
-      const back = el('button', 'icon-btn page-back', SBS.ui.BACK_ICON);
+      const back = el('button', 'icon-btn page-back', opts.popup ? SBS.ui.CLOSE_ICON : SBS.ui.BACK_ICON);
       back.type = 'button';
-      back.setAttribute('aria-label', 'Back');
+      back.setAttribute('aria-label', opts.popup ? 'Close' : 'Back');
       back.addEventListener('click', close);
       const s = stage();
       const chip = { picking: 'Picking', locked: 'Locked', underWay: 'Started', over: 'Final' }[s];
-      head.append(back, textEl('h1', '', 'Edit game'), textEl('span', 'eg-chip is-' + s, chip));
+      const title = textEl('h1', '', 'Edit game');
+      title.id = 'eg-title';
+      // The close button goes last in a popup, the usual place for it.
+      if (opts.popup) head.append(title, textEl('span', 'eg-chip is-' + s, chip), back);
+      else head.append(back, title, textEl('span', 'eg-chip is-' + s, chip));
     }
 
     function drawNote() {
@@ -919,6 +923,12 @@
       btn.disabled = busy || !!p.empty || !!p.error;
       btn.addEventListener('click', submit);
       foot.appendChild(btn);
+      if (opts.popup) {
+        const cancel = textEl('button', 'secondary eg-secondary', 'Cancel');
+        cancel.type = 'button';
+        cancel.addEventListener('click', close);
+        foot.appendChild(cancel);
+      }
       if (had && !btn.disabled) btn.focus();
     }
 
@@ -943,7 +953,7 @@
       if (stage() === 'picking') drawPicking(); else drawSquares();
       update();
       body.scrollTop = top;
-      if (!opts.panel) window.scrollTo(0, y);
+      if (!opts.popup) window.scrollTo(0, y);
       const again = key && root.querySelector(`[data-eg="${key}"]`);
       if (again) again.focus({ preventScroll: true });
     }
@@ -952,16 +962,75 @@
     return { el: root, close };
   }
 
-  // Opens the form on the board as it is now. `from` is where saving and Back return to.
-  async function open(id, from) {
+  // The form in a dialog over the current screen. opts: { state, opener, onSaved(game), onClose() }.
+  // Cancel, the close button, Escape and a tap outside all go through the form's own close, which
+  // asks before dropping changes. Focus is trapped inside and goes back to `opener`. The dialog
+  // lives on <body>, so a redraw of the screen under it leaves it alone; leaving the screen removes it.
+  function openPopup(opts) {
+    const opener = opts.opener || document.activeElement;
+    let done = false;
+    const overlay = SBS.ui.overlayEl('0.72');
+    overlay.classList.add('eg-overlay');
+    const finish = (refocus) => {
+      if (done) return false;
+      done = true;
+      overlay.remove();
+      document.documentElement.classList.remove('eg-lock');
+      if (refocus && opener && document.body.contains(opener) && opener.focus) opener.focus();
+      return true;
+    };
+    const form = create({
+      state: opts.state,
+      popup: true,
+      onSaved: (game) => { if (finish(false)) opts.onSaved(game); },
+      onClose: () => { if (finish(true) && opts.onClose) opts.onClose(); }
+    });
+    const dlg = form.el;
+    dlg.setAttribute('role', 'dialog');
+    dlg.setAttribute('aria-modal', 'true');
+    dlg.setAttribute('aria-labelledby', 'eg-title');
+    dlg.removeAttribute('aria-label');
+    dlg.tabIndex = -1;
+    overlay.addEventListener('click', (e) => { e.stopPropagation(); if (e.target === overlay) form.close(); });
+    overlay.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); form.close(); return; }
+      if (e.key !== 'Tab') return;
+      const all = Array.from(dlg.querySelectorAll('button, input, select, textarea, [href]')).filter(n => !n.disabled && n.offsetParent !== null);
+      if (!all.length) { e.preventDefault(); return; }
+      const first = all[0];
+      const last = all[all.length - 1];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === dlg)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+    SBS.onLeaveScreen(() => finish(false));
+    overlay.appendChild(dlg);
+    document.body.appendChild(overlay);
+    document.documentElement.classList.add('eg-lock');
+    dlg.focus();
+    return { close: form.close, el: dlg, isOpen: () => !done, focus: () => dlg.focus() };
+  }
+
+  // Opens the form on the board as it is now, as a popup over this screen. `from` is where saving
+  // returns to: 'home' redraws Home, anything else reopens the saved board.
+  let opening = false;
+  async function open(id, from, opener) {
+    if (opening || document.querySelector('.eg-overlay')) return; // a double tap opens one popup
+    opening = true;
     let game;
     try {
       game = await SBS.api.getGame(id);
     } catch (e) {
       SBS.ui.showAlert('Could not open Edit game: ' + e.message);
       return;
+    } finally {
+      opening = false;
     }
-    SBS.go({ screen: 'editGame', game, from });
+    openPopup({
+      state: newState(game),
+      opener: opener || document.activeElement,
+      onSaved: (saved) => (from === 'home' ? SBS.go({ screen: 'home' }) : SBS.openGame(saved)),
+      onClose: () => {}
+    });
   }
 
   function renderEdit(route) {
@@ -994,6 +1063,6 @@
     return b;
   }
 
-  SBS.editForm = { create, newState, open, barButton };
+  SBS.editForm = { create, newState, open, openPopup, barButton };
   SBS.screens.editGame = renderEdit;
 })();

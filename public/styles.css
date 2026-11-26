@@ -34,6 +34,8 @@
   --track-off: #4a5a6a;
   --shadow-card: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 14px rgb(0 0 0 / 30%), 0 0 24px rgba(var(--accent-rgb), 0.06);
   --shadow-pop: 0 10px 30px rgb(0 0 0 / 50%);
+  /* The blur behind every popup (see "Popup backdrop" below). */
+  --blur-backdrop: 6px;
   /* Exo 2 everywhere except the topbar title, which uses Orbitron directly.
      --serif is kept only so existing rules don't need renaming; it now
      points at the same sans stack. */
@@ -3273,6 +3275,17 @@ button.tv-tile-pair:focus { outline: 5px solid var(--accent); outline-offset: 4p
    Centering alone put the top of a tall dialog off the screen, out of reach. */
 .sbs-overlay > * { margin: auto !important; }
 
+/* Popup backdrop: every popup blurs the page behind it, on top of its own dim. The dialogs
+   (overlayEl), the Connect bottom sheet, and the TV's quarter celebration. The draw reveal and the
+   game-end summary are opaque, so they have nothing to blur. With reduced transparency: dim only. */
+.sbs-overlay, .connect-layer-sheet, .tv-celebration {
+  -webkit-backdrop-filter: blur(var(--blur-backdrop));
+  backdrop-filter: blur(var(--blur-backdrop));
+}
+@media (prefers-reduced-transparency: reduce) {
+  .sbs-overlay, .connect-layer-sheet, .tv-celebration { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
 /* ---- Theme page (R33) ----
    Each card wears its own theme (data-theme on the label), so the tokens below resolve to that
    card's palette, not the page's. */
@@ -3666,12 +3679,20 @@ button.eg-choice { display: flex; flex-direction: column; gap: 3px; min-height: 
 .eg-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 button.eg-side { align-items: center; text-align: center; min-height: 76px; overflow-wrap: anywhere; }
 button.eg-side strong { font-size: var(--fs-lg); }
-/* Beside the board on a wide Game Day: the panel scrolls, the page does not. */
-.eg.eg-panel { flex: 1; min-height: 0; max-width: none; }
-.eg-panel .eg-head { position: static; padding-top: 10px; background: none; }
-.eg-panel .eg-body { min-height: 0; overflow-y: auto; }
-.eg-panel .eg-foot { position: static; padding-bottom: 12px; background: none; }
-.eg-panel .eg-two { grid-template-columns: minmax(0, 1fr); }
+/* Edit game as a popup (screen-edit.js openPopup): a centered dialog from 768 px, a full-screen sheet
+   below. The head and foot stay put; only the body scrolls. */
+html.eg-lock { overflow: hidden; }
+.eg.eg-popup { flex: none; width: 100%; max-width: 720px; min-height: 0; height: auto; max-height: 90vh; max-height: 90dvh; overflow: hidden; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); }
+.eg-popup:focus { outline: none; }
+.eg-popup .eg-head { position: static; padding-top: 10px; flex: none; }
+.eg-popup .eg-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.eg-popup .eg-foot { position: static; flex: none; padding-bottom: 14px; }
+@media (max-width: 767px) {
+  .eg-overlay { padding: 0 !important; }
+  .eg.eg-popup { max-width: none; height: 100vh; height: 100dvh; max-height: none; border: 0; border-radius: 0; }
+  .eg-popup .eg-head { padding-top: calc(10px + var(--sat)); }
+  .eg-popup .eg-foot { padding-bottom: calc(14px + var(--sab)); }
+}
 button.gd-bar-btn.gd-edit[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
 /* The picking screen's bar: Edit game, then (not a phone) Party View, and Connect on the right. */
 .topbar.pick-topbar { grid-template-columns: 44px minmax(0, 1fr) auto; }
