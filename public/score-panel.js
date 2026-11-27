@@ -43,7 +43,7 @@
     if (!t || t === document.body || t === document.documentElement || !t.matches) return false;
     return t.matches('button, a[href], summary, input, select, textarea, [contenteditable], [role=button], [role=link], [role=tab], [tabindex]:not([tabindex="-1"])');
   }
-  // Any dialog or overlay: a confirm, Manage Players, the room chooser, the winner reveal.
+  // Any dialog or overlay: a confirm, the player window, the room chooser, the winner reveal.
   function overlayOpen() {
     if (document.querySelector('[role=dialog], [aria-modal=true], .manage-modal, .draw-reveal-overlay')) return true;
     return Array.prototype.some.call(document.body.children, n => n.tagName === 'DIV' && n.id !== 'app' && n.style.position === 'fixed');
@@ -503,14 +503,6 @@
         actions.appendChild(end);
       }
       if (keysOffered() && scoring) actions.appendChild(keysSwitch());
-      if (!scoring && !finished && mode === 'live') {
-        const take = textEl('button', 'sp-btn sp-end', 'Enter the score myself');
-        take.type = 'button';
-        take.setAttribute('data-spkey', 'take');
-        // No points: the server starts from its own copy of the feed, newer than this screen's.
-        take.addEventListener('click', () => send({ op: 'add', side: 'a', points: 0 }, { what: 'You are keeping score now.' }));
-        actions.appendChild(take);
-      }
       // Ending the game before the fourth quarter is out of the way on purpose.
       if (scoring && !finished && (cur.period < 4 || cur.a === cur.b)) {
         const fin = textEl('button', 'sp-link', 'Make this the final score');
@@ -541,27 +533,50 @@
       return b;
     }
 
-    // Why the pad is here, or why there is nothing to tap.
+    // Tabler player-pause (MIT, outline), copied from @tabler/icons 3.19.0.
+    const PAUSE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"/><path d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"/></svg>';
+
+    // Where the score comes from: one banner per Live state, its one control on the right.
     function drawNote(g, mode, scoring, finished) {
       noteEl.innerHTML = '';
       noteEl.className = 'sp-note';
-      let text = '';
-      let back = false;
-      if (!finished) {
-        if (mode === 'simulation') text = 'This is a practice game with made-up scores. Each quarter fills in on its own.';
-        else if (mode === 'live' && !scoring) text = 'Scores are coming in on their own. There is nothing to tap.';
-        else if (mode === 'live' && g.liveOverride) { text = 'You are entering the score. Live is paused.'; back = true; }
-        else if (mode === 'live') text = 'Live scores have stopped. Enter the score here until they come back.';
-        if (scoring && mode === 'live') noteEl.classList.add('is-warn');
+      noteEl.hidden = finished || (mode !== 'simulation' && mode !== 'live');
+      if (noteEl.hidden) return;
+      if (mode === 'simulation') {
+        noteEl.appendChild(textEl('span', '', 'This is a practice game with made-up scores. Each quarter fills in on its own.'));
+        return;
       }
-      noteEl.hidden = !text;
-      if (!text) return;
-      noteEl.appendChild(textEl('span', '', text));
-      if (back) {
-        const b = textEl('button', 'sp-btn', 'Back to live');
+      // Active: the feed is scoring. Paused: the host took over. Down: the feed stopped on its own.
+      const state = !scoring ? 'active' : g.liveOverride ? 'paused' : 'down';
+      const copy = {
+        active: { word: 'Active', sub: 'Scoring is updating automatically' },
+        paused: { word: 'Paused', sub: 'Enter every score and end each quarter yourself.' },
+        down: { word: 'Down', sub: 'Enter the score until the feed comes back.' },
+      }[state];
+      noteEl.classList.add('sp-live', 'is-' + state);
+      const text = el('div', 'sp-live-text');
+      const title = el('div', 'sp-live-title');
+      title.appendChild(document.createTextNode('Live scoring is '));
+      const word = el('span', 'sp-live-word');
+      const mark = el('span', 'sp-live-mark');
+      mark.setAttribute('aria-hidden', 'true');
+      if (state === 'paused') mark.innerHTML = PAUSE_SVG;
+      word.append(mark, document.createTextNode(copy.word));
+      title.appendChild(word);
+      text.append(title, textEl('div', 'sp-live-sub', copy.sub));
+      noteEl.appendChild(text);
+      if (state === 'active') {
+        const b = textEl('button', 'sp-btn', 'Pause live');
+        b.type = 'button';
+        b.setAttribute('data-spkey', 'take');
+        // No points: the server starts from its own copy of the feed, newer than this screen's.
+        b.addEventListener('click', () => send({ op: 'add', side: 'a', points: 0 }, { what: 'Live scoring is paused. You are keeping score now.' }));
+        noteEl.appendChild(b);
+      } else if (state === 'paused') {
+        const b = textEl('button', 'sp-btn', 'Enable live');
         b.type = 'button';
         b.setAttribute('data-spkey', 'resume');
-        b.addEventListener('click', () => send({ op: 'resume' }, { what: 'Handed back to the live feed.' }));
+        b.addEventListener('click', () => send({ op: 'resume' }, { what: 'Live scoring is on again.' }));
         noteEl.appendChild(b);
       }
     }

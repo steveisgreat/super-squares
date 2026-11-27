@@ -167,8 +167,8 @@
   const changedMsg = "That player's squares just changed. Check the list and try again.";
   const countOf = (doc, name) => doc.squares.filter(sq => sq && sq.name === name).length;
 
-  // The one guarded way to say what a name has paid for (the Paid pill, the payment box and Manage
-  // Players all save it): `p` is the summary the host was looking at and `n` how many of its squares
+  // The one guarded way to say what a name has paid for (the Paid pill and the player window
+  // both save it): `p` is the summary the host was looking at and `n` how many of its squares
   // are paid. If that name's squares changed since, the mark could settle squares nobody has paid
   // for, so it is refused.
   function paidCountChange(p, n) {
@@ -180,10 +180,42 @@
   const payState = (p) => (p.paid ? 'paid' : p.paidCount > 0 ? 'part' : 'none');
   const PAY_WORD = { paid: 'Paid', part: 'Partial', none: 'Unpaid' };
 
-  // How many of one player's squares are paid for: a stepper, saved once on Done (or at once by
-  // Paid in full). `p` is the summary the host tapped; `apply(n)` saves and resolves to a message
-  // when it was refused, null when it was saved or the failure was dealt with elsewhere.
-  function openPaymentBox(p, price, apply, refocus) {
+  // The changes the player window makes besides payment. Each is guarded like paidCountChange:
+  // refused if that name's squares changed since the host opened the window.
+  function renameChange(p, newName) {
+    const taken = (doc) => Object.keys(ensurePlayers(doc)).concat(doc.squares.filter(Boolean).map(sq => sq.name))
+      .find(nm => nm.toLowerCase() === newName.toLowerCase() && nm !== p.name);
+    return (doc) => {
+      if (countOf(doc, p.name) !== p.count) return changedMsg;
+      const clash = taken(doc);
+      if (clash) return `"${clash}" is already a player in this game. Choose a different name.`;
+      renameSquares(doc, p.name, newName);
+    };
+  }
+  function removeChange(p) {
+    return (doc) => {
+      if (countOf(doc, p.name) !== p.count) return changedMsg;
+      doc.squares.forEach((sq, i) => { if (sq && sq.name === p.name) doc.squares[i] = null; });
+      delete ensurePlayers(doc)[p.name];
+    };
+  }
+  // A new name as typed, or the message that says why it can't be used. `names` are the board's.
+  function checkNewName(raw, p, names) {
+    const name = raw.trim().slice(0, MAX_NAME_LEN);
+    if (!name) return { msg: 'Name cannot be empty.' };
+    if (!isPlayerName(name)) return { msg: 'That name is not allowed. Choose a different name.' };
+    const clash = names.find(nm => nm.toLowerCase() === name.toLowerCase() && nm !== p.name);
+    if (clash) return { msg: `"${clash}" is already a player in this game. Choose a different name.` };
+    return { name };
+  }
+
+  // The player window: how many of one player's squares are paid for (a stepper, saved once on
+  // Save, or at once by Paid in full), the player's name (the pencil), and Remove player.
+  // `p` is the summary the host tapped; `apply(n)` saves and resolves to a message when it was
+  // refused, null when it was saved or the failure was dealt with elsewhere. `edit`, when given,
+  // is { names(), rename(name), remove(), started, guest }: rename and remove resolve the same
+  // way; `guest` is the "Picked on their own phone" line (HTML), or ''.
+  function openPaymentBox(p, price, apply, refocus, edit) {
     const opener = document.activeElement;
     let n = p.paidCount;
     let saving = false;
@@ -193,8 +225,9 @@
     box.setAttribute('aria-modal', 'true');
     box.setAttribute('aria-labelledby', 'pay-name');
     box.innerHTML = `
-      <h3 id="pay-name">${escapeHtml(p.name)}</h3>
+      <div class="pay-name-row"><h3 id="pay-name">${escapeHtml(p.name)}</h3>${edit ? `<button type="button" class="icon-btn pay-rename" data-act="rename" aria-label="Rename ${escapeHtml(p.name)}" title="Rename">${EDIT_ICON}</button>` : ''}</div>
       <p class="pick-dialog-sub">${p.count} square${p.count === 1 ? '' : 's'} &middot; ${money(p.total)}</p>
+      ${edit && edit.guest ? `<p class="pick-dialog-sub player-guest-line">${edit.guest}</p>` : ''}
       <div class="pay-row"><span>Squares paid for</span>
         <div class="pay-step">
           <button type="button" class="secondary" data-act="less" aria-label="One less">&minus;</button>
@@ -209,11 +242,17 @@
       <div class="pick-dialog-actions">
         <button type="button" class="pay-full" data-act="full">Paid in full</button>
         <button type="button" data-act="done">Save</button>
-      </div>`;
+      </div>
+      ${edit ? `<button type="button" class="pay-remove" data-act="remove">Remove ${escapeHtml(p.name)} and ${p.count === 1 ? 'their square' : `all ${p.count} squares`}</button>` : ''}`;
     overlay.appendChild(box);
     document.body.appendChild(overlay);
     const q = (act) => box.querySelector(`[data-act="${act}"]`);
     SBS.ui.addCloseX(box, () => close());
+    const showErr = (m) => {
+      const err = box.querySelector('.error-msg');
+      err.textContent = m;
+      err.classList.toggle('hidden', !m);
+    };
     function draw() {
       box.querySelector('.pay-count').textContent = `${n} of ${p.count}`;
       box.querySelector('[data-v="paid"]').textContent = money(n * price);
@@ -222,6 +261,7 @@
       q('less').disabled = saving || n <= 0;
       q('more').disabled = saving || n >= p.count;
       q('full').disabled = q('done').disabled = saving;
+      if (edit) q('remove').disabled = saving;
     }
     function close() {
       if (!overlay.isConnected) return; // also runs when the screen changes
@@ -229,19 +269,61 @@
       overlay.remove();
       if (opener && opener !== document.body && opener.isConnected) opener.focus(); else refocus(); // a save rebuilt the row
     }
-    function onKey(e) { if (e.key === 'Escape') close(); }
-    async function commit(to) {
+    // Esc cancels a rename in progress first, then closes.
+    function onKey(e) {
+      if (e.key !== 'Escape') return;
+      if (box.querySelector('.pay-name-input')) { e.preventDefault(); drawName(); return; }
+      close();
+    }
+    // Saves through `run` and closes, or shows why it was refused.
+    async function save(run) {
       if (saving) return;
-      if (to === p.paidCount) return close();
       saving = true;
+      showErr('');
       draw();
-      const refused = await apply(to);
+      const refused = await run();
       saving = false;
       if (!refused) return close();
-      const err = box.querySelector('.error-msg');
-      err.textContent = refused;
-      err.classList.remove('hidden');
+      showErr(refused);
       draw();
+    }
+    function commit(to) {
+      if (to === p.paidCount) return close();
+      return save(() => apply(to));
+    }
+    // The name row: the name and its pencil, or a field while renaming.
+    function drawName() {
+      if (!edit) return;
+      const row = box.querySelector('.pay-name-row');
+      row.innerHTML = `<h3 id="pay-name">${escapeHtml(p.name)}</h3><button type="button" class="icon-btn pay-rename" data-act="rename" aria-label="Rename ${escapeHtml(p.name)}" title="Rename">${EDIT_ICON}</button>`;
+      q('rename').addEventListener('click', startRename);
+    }
+    function startRename() {
+      const row = box.querySelector('.pay-name-row');
+      row.innerHTML = `<input type="text" class="pay-name-input" id="pay-name" maxlength="${MAX_NAME_LEN}" aria-label="Player name">
+        <button type="button" class="icon-btn" data-act="name-ok" aria-label="Save name" title="Save">&#10003;</button>
+        <button type="button" class="icon-btn" data-act="name-no" aria-label="Cancel rename" title="Cancel">&#10005;</button>`;
+      const input = row.querySelector('input');
+      input.value = p.name;
+      const ok = () => {
+        const got = checkNewName(input.value, p, edit.names());
+        if (got.msg) { showErr(got.msg); input.focus(); return; }
+        if (got.name === p.name) { drawName(); return; }
+        save(() => edit.rename(got.name));
+      };
+      q('name-ok').addEventListener('click', ok);
+      q('name-no').addEventListener('click', () => { showErr(''); drawName(); q('rename').focus(); });
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ok(); } });
+      input.focus();
+      input.select();
+    }
+    if (edit) {
+      q('rename').addEventListener('click', startRename);
+      q('remove').addEventListener('click', async () => {
+        const warn = edit.started ? ' The game has already started — this may change quarter results tied to their square(s).' : '';
+        if (!(await showConfirm(`Remove ${p.count === 1 ? 'the square' : `all ${p.count} squares`} picked by "${p.name}"?${warn} This cannot be undone.`))) return;
+        save(() => edit.remove());
+      });
     }
     document.addEventListener('keydown', onKey);
     overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
@@ -255,10 +337,10 @@
   }
 
   // The Players card of a wide screen (the picking screen and Game Day share it): what is
-  // collected and still owed, then each name, its squares, what it owes, a Paid, Partial or
-  // Unpaid pill, and the Manage Players button. The pill makes the same guarded save as Manage
-  // Players (paidCountChange); a name, or a Partial pill, opens the payment box.
-  // opts: { getGame(), save(change, showErr) -> result or null, onSaved(result), manage(), cls?,
+  // collected and still owed, then each name, its squares, what it owes, and a Paid, Partial or
+  // Unpaid pill. The pill makes the same guarded save as the player window (paidCountChange); a
+  // name, or a Partial pill, opens the player window (payment, rename, remove).
+  // opts: { getGame(), save(change, showErr) -> result or null, onSaved(result), cls?,
   //         busy?(), setBusy?(bool), emptyText? }. `save` is the screen's own saver (it knows how
   //         to handle a conflict there); null means it dealt with the failure. `onSaved` redraws.
   function playersCard(opts) {
@@ -273,10 +355,6 @@
     card.appendChild(msg);
     const list = el('div', 'fill-players');
     card.appendChild(list);
-    const manage = el('button', 'secondary', 'Manage Players');
-    manage.type = 'button';
-    manage.addEventListener('click', () => opts.manage());
-    card.appendChild(el('div', 'actions players-foot', '')).appendChild(manage);
 
     let busyNow = false;
     const busy = () => (opts.busy ? opts.busy() : busyNow);
@@ -325,15 +403,14 @@
       });
     }
 
-    // Refused if someone changed this name's squares since the list was drawn. Resolves to the
-    // message to show, or null.
-    async function set(p, n) {
+    // Saves one guarded change. Resolves to the message to show, or null.
+    async function run(change) {
       if (busy()) return 'Still saving. Try again.';
       setBusy(true);
       let failed = '';
       let r = null;
       try {
-        r = await opts.save(paidCountChange(p, n), m => { failed = m; });
+        r = await opts.save(change, m => { failed = m; });
       } finally {
         setBusy(false);
       }
@@ -342,150 +419,34 @@
       opts.onSaved(r);
       return r.refused || null;
     }
+    // Refused if someone changed this name's squares since the list was drawn.
+    const set = (p, n) => run(paidCountChange(p, n));
     async function toggle(p) {
       if (busy()) return;
       msg.textContent = (await set(p, p.paid ? 0 : p.count)) || '';
     }
     function pay(p) {
       msg.textContent = '';
-      openPaymentBox(p, parseFloat(opts.getGame().squarePrice) || 0, (n) => set(p, n), () => {
+      const g = opts.getGame();
+      openPaymentBox(p, parseFloat(g.squarePrice) || 0, (n) => set(p, n), () => {
         const again = Array.from(list.querySelectorAll('.fill-player-info')).find(b => b.dataset.name === p.name);
         if (again) again.focus();
+      }, {
+        names: () => { const doc = opts.getGame(); return Object.keys(ensurePlayers(doc)).concat(doc.squares.filter(Boolean).map(sq => sq.name)); },
+        rename: (name) => run(renameChange(p, name)),
+        remove: () => run(removeChange(p)),
+        started: g.status === 'started' || g.status === 'finished',
+        guest: g.players && g.players[p.name] && g.players[p.name].g ? guestLine(g, p.name) : '' // already escaped
       });
     }
 
     return { el: card, draw };
   }
 
-  // Modal for marking players paid/unpaid and removing a player's picks entirely.
-  // Available from both Step 2 and Step 3 on purpose — someone may call in to
-  // claim squares before lock but only pay after the game has started.
-  function openManagePlayersModal(game, onUpdate) {
-    const overlay = overlayEl('0.65');
-    const box = el('div', 'card manage-modal');
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-
-    // Every change goes through saveWith, so a guest picking at the same moment does not
-    // make it fail: the change is re-applied to the newer board and only a real clash
-    // (`change` returns a message) is reported.
-    async function apply(change) {
-      let result;
-      try {
-        result = await SBS.saveWith(game, change);
-      } catch (e) {
-        overlay.remove();
-        if (await SBS.handleConflict(e, game.id)) return;
-        const denied = await SBS.handleForbidden(e, game.id);
-        if (denied) {
-          if (denied.fresh) replaceGame(game, denied.fresh);
-          if (onUpdate) onUpdate();
-          return;
-        }
-        showAlert('Failed to save: ' + e.message);
-        return;
-      }
-      // Assigned over, not replaced: a Live board's feed state is not in a save's answer.
-      Object.assign(game, result.game);
-      if (result.refused) await showAlert(result.refused);
-      renderList();
-      if (onUpdate) onUpdate();
-    }
-
-
-    function renderList() {
-      const summaries = playerSummaries(game);
-      box.innerHTML = '';
-      const headRow = el('div', 'manage-modal-head');
-      headRow.innerHTML = `<h3>Manage Players</h3>`;
-      box.appendChild(headRow);
-      SBS.ui.addCloseX(box, () => overlay.remove());
-
-      if (summaries.length === 0) {
-        box.appendChild(el('p', '', 'No squares have been picked yet.'));
-      } else {
-        const list = el('div', 'player-list');
-        summaries.forEach(p => {
-          const row = el('div', 'player-row');
-          const isGuest = !!(game.players[p.name] && game.players[p.name].g);
-          row.innerHTML = `
-            <div class="player-info">
-              <div class="player-name-row">
-                <span class="player-name">${escapeHtml(p.name)}</span>
-                <button class="icon-btn player-rename" type="button" aria-label="Rename player" title="Rename">${EDIT_ICON}</button>
-              </div>
-              <div class="player-sub">${ownedLine(p)}</div>
-              ${isGuest ? `<div class="player-sub player-guest-line">${guestLine(game, p.name)}</div>` : ''}
-            </div>
-            <label class="paid-toggle is-${payState(p) === 'none' ? 'unpaid' : payState(p)}">
-              <input type="checkbox" ${p.paid ? 'checked' : ''}>
-              <span>${PAY_WORD[payState(p)]}</span>
-            </label>
-            <button class="ghost small btn-delete">Remove</button>
-          `;
-          row.querySelector('input[type=checkbox]').addEventListener('change', async (e) => {
-            const checked = e.target.checked;
-            await apply(paidChange(p, checked));
-          });
-          row.querySelector('.player-rename').addEventListener('click', () => {
-            const nameRow = row.querySelector('.player-name-row');
-            nameRow.innerHTML = `
-              <input type="text" class="player-name-input" maxlength="${MAX_NAME_LEN}" value="${escapeHtml(p.name)}">
-              <button class="icon-btn player-rename-save" type="button" aria-label="Save name" title="Save">&#10003;</button>
-              <button class="icon-btn player-rename-cancel" type="button" aria-label="Cancel rename" title="Cancel">&#10005;</button>
-            `;
-            const input = nameRow.querySelector('.player-name-input');
-            input.focus();
-            input.select();
-
-            async function commit() {
-              const newName = input.value.trim().slice(0, MAX_NAME_LEN);
-              if (!newName) return showAlert('Name cannot be empty.');
-              if (!isPlayerName(newName)) return showAlert('That name is not allowed. Choose a different name.');
-              if (newName === p.name) return renderList();
-              const taken = (doc) => Object.keys(ensurePlayers(doc)).concat(doc.squares.filter(Boolean).map(sq => sq.name))
-                .find(n => n.toLowerCase() === newName.toLowerCase() && n !== p.name);
-              const collision = taken(game);
-              if (collision) return showAlert(`"${collision}" is already a player in this game. Choose a different name.`);
-              await apply(doc => {
-                if (!countOf(doc, p.name)) return changedMsg;
-                const clash = taken(doc);
-                if (clash) return `"${clash}" is already a player in this game. Choose a different name.`;
-                renameSquares(doc, p.name, newName);
-              });
-            }
-            nameRow.querySelector('.player-rename-save').addEventListener('click', commit);
-            nameRow.querySelector('.player-rename-cancel').addEventListener('click', () => renderList());
-            input.addEventListener('keydown', (e) => {
-              if (e.key === 'Enter') commit();
-              else if (e.key === 'Escape') renderList();
-            });
-          });
-          row.querySelector('button.btn-delete').addEventListener('click', async () => {
-            const startedWarning = (game.status === 'started' || game.status === 'finished') ? ' The game has already started — this may change quarter results tied to their square(s).' : '';
-            const ok = await showConfirm(`Remove all ${p.count} square${p.count === 1 ? '' : 's'} picked by "${p.name}"?${startedWarning} This cannot be undone.`);
-            if (!ok) return;
-            await apply(doc => {
-              if (countOf(doc, p.name) !== p.count) return changedMsg;
-              doc.squares.forEach((sq, i) => { if (sq && sq.name === p.name) doc.squares[i] = null; });
-              delete ensurePlayers(doc)[p.name];
-            });
-          });
-          list.appendChild(row);
-        });
-        box.appendChild(list);
-      }
-
-      box.appendChild(el('div', 'unpaid-summary', `Total Unpaid: <strong>${money(unpaidTotal(game))}</strong>`));
-    }
-
-    renderList();
-  }
-
   SBS.players = {
     ensurePlayers, ensurePlayerColor, addSquares, replaceGame, formatAt, renameSquares,
     collectNameGroups, resolveNameForPick, paidChange, ownedLine,
-    playerSummaries, unpaidTotal, playersCard, openPaymentBox, payState, PAY_WORD, openManagePlayersModal,
+    playerSummaries, unpaidTotal, playersCard, openPaymentBox, payState, PAY_WORD,
     toSubscript, fromSubscript, stripSubscript
   };
 })();

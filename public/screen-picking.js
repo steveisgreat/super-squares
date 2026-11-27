@@ -4,14 +4,14 @@
 
   const SBS = window.SBS = window.SBS || {};
   const { el, textEl, escapeHtml, money, topbar, showConfirm, showAlert, applyTeamColors, teamBadge, fitTeamBadges, isPhone, overlayEl } = SBS.ui;
-  const { openManagePlayersModal, resolveNameForPick, ensurePlayerColor, addSquares, replaceGame, formatAt, ensurePlayers, renameSquares, collectNameGroups } = SBS.players;
+  const { resolveNameForPick, ensurePlayerColor, addSquares, replaceGame, formatAt, ensurePlayers, renameSquares, collectNameGroups } = SBS.players;
   const { shuffle, isPlayerName, unpaidGuestPicks, pruneEmptyPlayers, parsePlayerList } = window.GameLogic;
 
   // Guards the one irreversible action in the app (drawing the axis numbers).
   // Module-level so a re-render can't reset it mid-save.
   let lockInFlight = false;
 
-  // A pasted list, kept outside the render so a redraw (Cancel, Manage Players, a save) never
+  // A pasted list, kept outside the render so a redraw (Cancel, a player change, a save) never
   // loses it. One board at a time.
   let pasteDraft = { id: null, text: '' };
 
@@ -691,7 +691,6 @@
       emptyText: 'No one is in yet. Add the first player, or share the join code.',
       getGame: () => game,
       save: persist,
-      manage: () => openManagePlayersModal(game, reopen),
       busy: () => saving,
       setBusy: (v) => { saving = v; },
       onSaved: (r) => { replaceGame(game, r.game); afterGameChange(); }

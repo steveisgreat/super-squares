@@ -648,15 +648,22 @@ input[type=color] {
   gap: 22px;
   align-items: start;
 }
-/* Game day puts the board first and the score panel second. This must be a
-   class, not an inline style — an inline style outranks the breakpoint below
-   and pushed the score inputs off-screen on an iPad in portrait. */
+/* Game day: the board comes first in the page, so it leads when the columns stack (900 px and
+   under), but the score panel sits on the left beside it, as it does on wide screens. This must be
+   a class, not an inline style — an inline style outranks the breakpoint below and pushed the
+   score inputs off-screen on an iPad in portrait. */
 .pick-layout.board-first {
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
 }
+.pick-layout.board-first > .gd-results { order: -1; }
+/* Beside the panel (901–1023 px) the board column is too narrow for 58 px squares: let them
+   shrink to fit, and stay square, rather than cut off the last columns. */
+.main:not(.gd-phone) > .pick-layout.board-first:not(.gd-wide) .board-table { grid-template-columns: repeat(11, minmax(0, 1fr)); }
+.main:not(.gd-phone) > .pick-layout.board-first:not(.gd-wide) .cell { min-height: 0; aspect-ratio: 1; min-width: 0; overflow: hidden; }
 @media (max-width: 900px) {
   .pick-layout,
   .pick-layout.board-first { grid-template-columns: minmax(0, 1fr); }
+  .pick-layout.board-first > .gd-results { order: 0; }
 }
 
 .cell[role=button] { cursor: pointer; }
@@ -2003,22 +2010,7 @@ body.tv-fullscreen .tv-meta { font-size: var(--fs-2xl); }
   --logo-size: clamp(32px, 4.5vw, 64px) !important;
 }
 
-/* --- Manage Players & Payments modal --- */
-.manage-modal {
-  max-width: 560px;
-  width: 100%;
-  max-height: 82vh;
-  overflow-y: auto;
-  box-shadow: var(--shadow-pop);
-}
-.manage-modal-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-.manage-modal-head h3 { margin: 0; color: var(--text); font-family: var(--serif); font-size: var(--fs-xl); }
-
+/* --- Player names and lines (players list, player view) --- */
 .player-list {
   display: flex;
   flex-direction: column;
@@ -2027,51 +2019,9 @@ body.tv-fullscreen .tv-meta { font-size: var(--fs-2xl); }
   overflow-y: auto;
   padding-right: 4px;
 }
-.player-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  background: var(--panel2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 12px 16px;
-  flex-wrap: wrap;
-}
 .player-info { flex: 1 1 140px; min-width: 120px; }
 .player-name { font-weight: 700; font-size: var(--fs-md); }
 .player-sub { color: var(--muted); font-size: var(--fs-sm); margin-top: 2px; }
-.player-name-row { display: flex; align-items: center; gap: 6px; }
-.player-name-row .icon-btn { width: 26px; height: 26px; border-radius: var(--r-sm); }
-.player-name-row .icon-btn svg { width: 14px; height: 14px; }
-.player-name-input { width: 120px; padding: 4px 8px; font-size: var(--fs-md); }
-
-.paid-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  padding: 8px 14px;
-  border-radius: var(--r-pill);
-  background: var(--warn-soft);
-  color: var(--warn);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.paid-toggle input { width: 18px; height: 18px; accent-color: var(--good); cursor: pointer; }
-.paid-toggle.is-paid { background: var(--good-soft); color: var(--good); }
-.paid-toggle.is-part { background: var(--part-soft); color: var(--part); }
-.paid-toggle.is-unpaid { background: var(--danger-soft); color: var(--bad-text); }
-
-.unpaid-summary {
-  margin-top: 16px;
-  padding: 12px 16px;
-  background: var(--panel2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: var(--fs-md);
-  text-align: right;
-}
-.unpaid-summary strong { color: var(--danger); font-size: var(--fs-lg); }
 
 .phone-link-list { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 12px 0; }
 .phone-qr-block { display: flex; flex-direction: column; align-items: center; gap: 8px; }
@@ -2281,6 +2231,18 @@ body.player-mode #app { padding: 0; }
 .sp-note { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; background: var(--panel2); border-radius: var(--radius); font-size: var(--fs-sm); line-height: 1.3; }
 .sp-note.is-warn { background: var(--warn-soft); border: 1px solid var(--warn); }
 .sp-note .sp-btn { flex: none; }
+/* Live scoring banner: Active (green), Paused (amber), Down (red). The mark carries the state too, not color alone. */
+.sp-live { padding: 10px 14px; border: 1px solid var(--border); }
+.sp-live-text { min-width: 0; }
+.sp-live-title { font-size: var(--fs-lg); font-weight: 600; line-height: 1.25; white-space: nowrap; }
+.sp-live-sub { font-size: var(--fs-sm); color: var(--muted); margin-top: 2px; }
+.sp-live-word { display: inline-flex; align-items: center; gap: 5px; margin-left: 2px; padding: 2px 9px 2px 7px; border-radius: 999px; vertical-align: 2px; font-size: var(--fs-sm); color: var(--sp-live-c); background: color-mix(in srgb, var(--sp-live-c) 14%, transparent); border: 1px solid color-mix(in srgb, var(--sp-live-c) 55%, transparent); box-shadow: 0 0 8px color-mix(in srgb, var(--sp-live-c) 35%, transparent); text-shadow: 0 0 6px color-mix(in srgb, var(--sp-live-c) 45%, transparent); }
+.sp-live-mark { flex: none; width: 0.6em; height: 0.6em; border-radius: 50%; background: var(--sp-live-c); box-shadow: 0 0 6px color-mix(in srgb, var(--sp-live-c) 55%, transparent); }
+.sp-live.is-active { --sp-live-c: var(--live); }
+.sp-live.is-paused { --sp-live-c: var(--warn); background: var(--warn-soft); border-color: var(--warn); }
+.sp-live.is-down { --sp-live-c: var(--bad-text); background: var(--danger-soft); border-color: var(--danger-border); }
+.sp-live.is-paused .sp-live-mark { width: 0.9em; height: 0.9em; border-radius: 0; background: none; box-shadow: none; }
+.sp-live-mark svg { width: 100%; height: 100%; display: block; }
 .sp-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
 .sp-title h3 { margin: 0; font-size: var(--fs-xl); flex: none; }
 .sp-winning { min-width: 0; text-align: right; font-size: var(--fs-sm); color: var(--muted); line-height: 1.25; display: flex; flex-direction: column; }
@@ -2859,7 +2821,7 @@ button.lock-btn:hover { background: var(--accent-soft); color: var(--accent-hi);
 .board-stat { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; padding: 6px 4px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel); text-align: center; }
 .board-stat .lbl { white-space: nowrap; }
 .board-stat.is-pot .val { color: var(--accent); }
-/* Game Day's tiles: the pot is typed into, and what is unpaid opens Manage Players. */
+/* Game Day's tiles: the pot is typed into, and what is unpaid opens the Players tab. */
 label.board-stat { margin: 0; }
 .board-stat .pot-line { display: flex; align-items: baseline; justify-content: center; max-width: 100%; }
 .board-stat input.val-input {
@@ -2963,7 +2925,7 @@ button.grid-btn { display: none; min-height: 48px; margin-top: 8px; font-size: v
   /* The lock closes the panel at the same line as the board. */
   .pick-fill.is-wide .pick-foot { flex: 1 0 auto; display: flex; flex-direction: column; border-top: 1px solid var(--border); }
   .pick-fill.is-wide .lock-sec { margin-top: auto; }
-  /* Players has the whole panel: what is owed, the list (it scrolls) and Manage Players. */
+  /* Players has the whole panel: what is owed, and the list (it scrolls). */
   .pick-fill.is-wide .pick-side > .players-sec { flex: 1 1 0; min-height: 0; padding: 12px 18px; display: flex; flex-direction: column; }
   .pick-fill.is-wide .pick-side > .players-sec[hidden] { display: none; }
   .pick-fill.is-wide .players-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -3035,6 +2997,12 @@ button.danger-line:hover { background: var(--danger-soft); color: var(--bad-text
 .pick-dialog-actions button { min-height: 48px; }
 .pick-dialog .money-boxes { margin: 0; }
 .pay-dialog { max-width: 380px; }
+.pay-name-row { display: flex; align-items: center; gap: 8px; min-height: 40px; padding-right: 40px; /* clear of the close X */ }
+.pay-name-row h3 { min-width: 0; overflow-wrap: anywhere; }
+.pay-name-row .icon-btn { flex: none; width: 36px; height: 36px; }
+.pay-name-input { flex: 1; min-width: 0; font-size: var(--fs-lg); }
+button.pay-remove { background: transparent; border: 0; box-shadow: none; color: var(--bad-text); font-size: var(--fs-sm); font-weight: 600; min-height: 40px; padding: 4px; border-top: 1px solid var(--border); border-radius: 0; }
+button.pay-remove:hover { background: var(--danger-soft); color: var(--bad-text); }
 .pay-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 600; }
 .pay-step { display: flex; align-items: center; gap: 8px; }
 .pay-step button { width: 44px; height: 44px; padding: 0; font-size: var(--fs-xl); }
@@ -3186,10 +3154,8 @@ button.home-acct:hover { background: var(--panel2); border-color: var(--border);
 .home-card {
   position: relative; display: flex; flex-direction: column; min-width: 0; overflow: hidden;
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-lg);
-  box-shadow: var(--shadow-card); cursor: pointer; text-align: center;
-  transition: border-color 0.15s ease;
+  box-shadow: var(--shadow-card); text-align: center;
 }
-.home-card:hover { border-color: var(--accent); }
 .home-chip {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--r-lg);
   font-size: var(--fs-xs); font-weight: 700; white-space: nowrap;
@@ -3461,7 +3427,7 @@ label.theme-card.is-chosen .theme-check { display: inline-flex; }
 
   .gd-pane { container-type: inline-size; }
 
-  /* Players: the numbers, then the list (the only thing that scrolls), then Manage Players. */
+  /* Players: the numbers, then then the list (the only thing that scrolls). */
   .gd-pane.players-sec { overflow: hidden; }
   .gd-side .players-card { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; margin: 0; background: none; border: 0; box-shadow: none; }
   .gd-side .fill-players { flex: 1 1 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; padding-right: 4px; border-top: 1px solid var(--border); scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }

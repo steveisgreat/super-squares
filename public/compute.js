@@ -1812,7 +1812,7 @@
           if (stage === 'locked') return warn('scoring', k);
           if (stage === 'over') return 'The game is over, so the scoring is fixed.';
           if (mode === 'manual') return warn('scoring', k);
-          return `${STARTED}. Use "Enter the score myself" instead: it keeps the score.`;
+          return `${STARTED}. Use "Pause live" on the Score tab instead: it keeps the score.`;
         }
         default: return 'That field is not a setting.';
       }

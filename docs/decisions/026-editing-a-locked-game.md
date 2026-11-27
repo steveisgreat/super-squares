@@ -40,7 +40,7 @@ that the real game is on.
 | Total pot | Not shown | Warn: changes only the Final | Same | Same; Needs settling if the Final is paid out |
 | Pick mode, player picks, limit | Free | Closed | Closed | Closed |
 | Number draw (R46) | Free | Closed | Closed | Closed |
-| Manual or Live scoring | Free | Warn | Manual to Live: warn, entered quarters stay. Live to Manual: blocked ("Enter the score myself" does it and keeps the score) | Blocked |
+| Manual or Live scoring | Free | Warn | Manual to Live: warn, entered quarters stay. Live to Manual: blocked ("Pause live" on the Score tab does it and keeps the score) | Blocked |
 | To or from Simulation | Free | Blocked | Blocked | Blocked |
 | Drawn numbers | Not drawn | Unlock only | Blocked | Blocked |
 | Add squares | Free | Blocked: unlock first | Blocked | Blocked |

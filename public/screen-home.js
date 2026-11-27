@@ -5,7 +5,6 @@
   const SBS = window.SBS = window.SBS || {};
   const { shownDescription, el, escapeHtml, topbar, showAlert, showConfirm, teamMeta, teamLogoTag, teamBadge, resetTeamColors, fitTeamBadges, isTvBrowser, formatGameDate } = SBS.ui;
   const { emptyGrid } = window.GameLogic;
-  const { openManagePlayersModal } = SBS.players;
 
 
   // Tabler outline icons (MIT, 24 px, pinned 3.19.0), path data copied inline.
@@ -17,8 +16,7 @@
   const MAIL_ICON = ic('<path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10z"/><path d="M3 7l9 6l9 -6"/>');
   const DOTS_ICON = ic('<path d="M5 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M19 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/>', 22);
   const PENCIL_ICON = ic('<path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/>');
-  const USERS_ICON = ic('<path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0 -3 -3.85"/>');
-  const MOBILE_ICON = ic('<path d="M6 5a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-14z"/><path d="M11 4h2"/><path d="M12 17v.01"/>');
+  const DEVICES_ICON = ic('<path d="M13 9a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1v-10z"/><path d="M18 8v-3a1 1 0 0 0 -1 -1h-13a1 1 0 0 0 -1 1v12a1 1 0 0 0 1 1h9"/><path d="M16 9h2"/>');
   const TRASH_ICON = ic('<path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/>');
   const { MAXIMIZE_ICON, CHEVRON_ICON } = SBS.ui;
 
@@ -200,22 +198,14 @@
         onSelect: () => SBS.editForm.open(g.id, 'home')
       },
       {
-        label: 'Players', icon: USERS_ICON,
+        // The same Connect as the Game Day top bar: TVs, Present, Mirror, Helpers.
+        label: 'Connect', icon: DEVICES_ICON,
         onSelect: async () => {
           const game = await loadFull(g.id);
-          if (game) openManagePlayersModal(game, null);
+          if (game) SBS.deviceChooser.open(game, opener);
         }
       }
     ];
-    if (g.status === 'picking' || g.status === 'started') {
-      items.push({
-        label: 'Helpers', icon: MOBILE_ICON,
-        onSelect: async () => {
-          const game = await loadFull(g.id);
-          if (game) SBS.helpers.open(game, opener);
-        }
-      });
-    }
     items.push({ divider: true });
     items.push({
       label: 'Delete game…', icon: TRASH_ICON, danger: true,
@@ -283,8 +273,6 @@
         <button class="home-party" type="button" aria-label="${escapeHtml('Party View for ' + name)}" title="Party View">${MAXIMIZE_ICON}<span class="home-party-text">Party View</span></button>
         <button class="home-more" type="button" aria-label="${escapeHtml('More for ' + name)}" aria-haspopup="dialog" aria-expanded="false">${DOTS_ICON}</button>
       </div>`;
-    // The card body is a mouse convenience; the primary button is the keyboard target.
-    c.addEventListener('click', () => openGame(g.id));
     const more = c.querySelector('.home-more');
     more.addEventListener('click', (e) => { e.stopPropagation(); openCardMenu(g, more); });
     c.querySelector('.home-primary').addEventListener('click', (e) => { e.stopPropagation(); openGame(g.id); });

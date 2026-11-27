@@ -97,6 +97,9 @@ phone, wide Game Day, the Party View strip's sheet, and taken-over live boards.
 - **Fix** on each ended quarter shows whether the winner changes, and keeps the paid-out warning (015).
 - Live with the feed up: read-only, with "Enter the score myself". Feed down or taken over: the pad,
   with "Back to live". Simulation stays read-only.
+  *Update 2026-11-26:* one banner at the top of the Score tab says "Live scoring is Active / Paused /
+  Down" (green dot, amber pause mark, red dot), with its one control beside it: "Pause live" (take
+  over) or "Enable live" (back to the feed). Nothing sits under the score.
 - Keyboard letters on wide screens become Q W E R and U I O P, left to right down the buttons.
 
 Removed: the `#score` screen and keypad (old `#score-` links open the board's Score tab or Player

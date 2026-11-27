@@ -47,5 +47,5 @@ rollover (carry) changes.
 - A paid record survives undo, a reset score or a pot change, and shows as "Needs
   settling" until the host acts. That is deliberate: forgetting a payment is worse than
   one extra tap.
-- Renaming a player in Manage Players renames their paid-out records too, so a rename
+- Renaming a player (the player window, 2026-11-26; Manage Players before) renames their paid-out records too, so a rename
   alone never reads as "Needs settling".

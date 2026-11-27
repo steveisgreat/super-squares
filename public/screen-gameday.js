@@ -5,7 +5,7 @@
 
   const SBS = window.SBS = window.SBS || {};
   const { el, escapeHtml, money, topbar, showAlert, showConfirm, applyTeamColors, teamBadge, teamStyle, fitTeamBadges, readableTextColor, isPhone } = SBS.ui;
-  const { unpaidTotal, openManagePlayersModal } = SBS.players;
+  const { unpaidTotal } = SBS.players;
   const { disturbMessage } = SBS.ui;
   const { QUARTERS, QLABEL, computeGame, payoutAmount, drawnDigits, payoutStatus, whoToPay, paidQuartersDisturbed } = window.GameLogic;
 
@@ -304,7 +304,7 @@
       <div class="board-stat is-unpaid${unpaidNow > 0 ? ' warn' : ''} clickable" id="unpaid-stat"><span class="val" data-v="unpaid">${money(unpaidNow)}</span><span class="lbl">Unpaid</span></div>
     `;
     main.appendChild(strip);
-    strip.querySelector('#unpaid-stat').addEventListener('click', () => openManagePlayersModal(game, reopen));
+    strip.querySelector('#unpaid-stat').addEventListener('click', () => showPlayers());
     // The box is as wide as the number in it, so the "$" sits against it.
     const stripPot = strip.querySelector('#pot-input');
     const sizeStripPot = () => { stripPot.style.width = Math.max(1, stripPot.value.length) + 'ch'; };
@@ -421,28 +421,34 @@
     resultsCard.appendChild(scorePanel.el);
     scorePanel.update();
 
-    // ---- Phone tabs: Score | Board | Players ----
-    let playersCard = null;
+    // ---- Phone tabs: Score | Board | Live | Players ----
+    // Live is the guest view's Live tab, the same cards (player-home.js), because the phone's
+    // grid is too small to read who is winning or close.
+    const livePane = phone ? el('div', 'player-pane gd-live') : null;
+    function drawLive() {
+      if (livePane) livePane.replaceChildren(...SBS.playerHome.liveCards(game, null));
+    }
+    // The Players list (players.js), the same on a phone and a wide screen. Built here so the
+    // phone's Players tab can hold it; the wide panel takes it further down.
+    const players = SBS.players.playersCard({
+      getGame: () => game,
+      save: savePlayers,
+      // Assigned over, not replaced: the answer to a save has no live-feed fields.
+      onSaved: (r) => { Object.assign(game, r.game); redrawAll(); }
+    });
+    players.draw();
+    // The Unpaid tile opens the Players tab (set once the tabs exist).
+    let showPlayers = () => {};
     let updateFeedBanner = () => {};
     if (phone) {
-      playersCard = el('div', 'card');
-      playersCard.innerHTML = '<h3 style="margin-top:0">Players</h3><p class="gd-players-note"></p>';
-      const openBtn = el('button', '', 'Manage players');
-      openBtn.type = 'button';
-      openBtn.addEventListener('click', () => openManagePlayersModal(game, reopen));
-      playersCard.appendChild(openBtn);
+      layout.appendChild(livePane);
+      drawLive();
+      const playersCard = players.el;
       layout.appendChild(playersCard);
-      const refreshPlayersNote = () => {
-        const sold = game.squares.filter(s => s).length;
-        const unpaid = unpaidTotal(game);
-        playersCard.querySelector('.gd-players-note').textContent =
-          `${sold} of 100 squares claimed. ` + (unpaid > 0 ? `${money(unpaid)} still unpaid.` : 'Everyone is paid up.');
-      };
-      refreshPlayersNote();
 
-      const panels = { score: resultsCard, board: boardCard, players: playersCard };
-      const names = { score: 'Score', board: 'Board', players: 'Players' };
-      const order = ['score', 'board', 'players'];
+      const panels = { score: resultsCard, board: boardCard, live: livePane, players: playersCard };
+      const names = { score: 'Score', board: 'Board', live: 'Live', players: 'Players' };
+      const order = ['score', 'board', 'live', 'players'];
       const mode = window.GameLogic.scoringMode(game);
       let tab = SBS.gamedayTab && SBS.gamedayTab.id === game.id
         ? SBS.gamedayTab.tab
@@ -461,10 +467,10 @@
         t.addEventListener('keydown', (e) => {
           const i = order.indexOf(k);
           let n = null;
-          if (e.key === 'ArrowRight') n = order[(i + 1) % 3];
-          else if (e.key === 'ArrowLeft') n = order[(i + 2) % 3];
+          if (e.key === 'ArrowRight') n = order[(i + 1) % order.length];
+          else if (e.key === 'ArrowLeft') n = order[(i + order.length - 1) % order.length];
           else if (e.key === 'Home') n = order[0];
-          else if (e.key === 'End') n = order[2];
+          else if (e.key === 'End') n = order[order.length - 1];
           if (n) { e.preventDefault(); select(n, true); }
         });
         tabEls[k] = t;
@@ -484,6 +490,7 @@
         updateFeedBanner(); // the pad says it on the Score tab
       }
       select(tab, false);
+      showPlayers = () => select('players', true);
 
       // ---- Feed-down banner (live boards only) ----
       // Signal: the server marks a live board's response liveFeed.available === false
@@ -507,7 +514,6 @@
         }
       }
       updateFeedBanner = () => {
-        refreshPlayersNote();
         const live = window.GameLogic.scoringMode(game) === 'live' && game.status === 'started';
         const holding = game.liveOverride === true;
         const down = !!(game.liveFeed && game.liveFeed.available === false);
@@ -666,6 +672,7 @@
       renderWhoToPay();
       drawRows(c);
       drawWide(c);
+      drawLive();
     }
 
     // ---- Payout tracking (R21) ----
@@ -734,7 +741,6 @@
     // ---- Wide screens (1024 px and up, not a phone): board left, panel right ----
     // Everything above is built in the order of the narrow page. On a wide screen the same pieces
     // are put in the panel in their reading order, which is the keyboard order too.
-    let players = null;
     function redrawAll() {
       const c = computeGame(game);
       drawBoard(c);
@@ -745,7 +751,7 @@
       if (players) players.draw();
     }
 
-    // The Paid pill: the same guarded save as Manage Players, through saveWith, so a score that
+    // The Players list: its guarded saves go through saveWith, so a score that
     // changed on another device is kept (the change is applied again to the newer board).
     async function savePlayers(change, showErr) {
       try {
@@ -763,15 +769,7 @@
     }
 
     if (!phone) {
-      players = SBS.players.playersCard({
-        getGame: () => game,
-        save: savePlayers,
-        manage: () => openManagePlayersModal(game, reopen),
-        // Assigned over, not replaced: the answer to a save has no live-feed fields.
-        onSaved: (r) => { Object.assign(game, r.game); redrawAll(); }
-      });
       players.el.classList.remove('card'); // it sits inside the wide panel
-      players.draw();
 
       // ---- Wide Game Day (R35): a tabbed panel on the left, the grid on the right ----
       const periodLabel = SBS.board.periodLabel;
@@ -830,6 +828,7 @@
         if (focus) tabEls[k].focus();
       }
       side.append(tabBar, scorePane, playersPane, helpersPane);
+      showPlayers = () => selectWide('players', true);
 
       function shown(g) {
         const ls = g.liveScore;
@@ -947,7 +946,7 @@
         unplaceCards = null;
       };
       SBS.onLeaveScreen(() => {
-        // Reopening this same board (after Manage players) keeps the open form and its changes.
+        // Reopening this same board (after the Edit game form) keeps the open form and its changes.
         const next = SBS.getRoute();
         if (!(next && next.screen === 'board' && next.game && next.game.id === game.id)) gdEdit = null;
         if (unplaceCards) unplaceCards();

@@ -66,8 +66,8 @@ name today, so a paid guest who claims more would look paid for all of it. There
 - A name with no squares left carries no paid mark over to whoever takes it next.
 
 ### 6. Host oversight
-- Each guest square stores its claim time (`squares[i].at`, server clock). Manage Players
-  shows who picked on their own device, their squares and times.
+- Each guest square stores its claim time (`squares[i].at`, server clock). The player window
+  (Manage Players until 2026-11-26) shows who picked on their own device and when.
 - The host can remove or reassign one square, remove a player as today, turn guest picks off
   (existing picks stay), change the cap, lift it, and **remove all unpaid guest picks** in one
   confirmed step (also the answer to someone flooding the board).
