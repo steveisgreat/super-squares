@@ -40,7 +40,7 @@ that the real game is on.
 | Total pot | Not shown | Warn: changes only the Final | Same | Same; Needs settling if the Final is paid out |
 | Pick mode, player picks, limit | Free | Closed | Closed | Closed |
 | Number draw (R46) | Free | Closed | Closed | Closed |
-| Manual or Live scoring | Free | Warn | Manual to Live: warn, entered quarters stay. Live to Manual: blocked ("Pause live" on the Score tab does it and keeps the score) | Blocked |
+| Manual or Live scoring | Free | Warn | Warn either way; entered quarters stay. Live to Manual keeps the running score (the way out of a wrong or stuck feed; see the 2026-11-26 update) | Blocked |
 | To or from Simulation | Free | Blocked | Blocked | Blocked |
 | Drawn numbers | Not drawn | Unlock only | Blocked | Blocked |
 | Add squares | Free | Blocked: unlock first | Blocked | Blocked |
@@ -188,3 +188,11 @@ the server's, plays the whole reveal from the moment it saw it. Later screens sh
 per tab in `sessionStorage`, so a reload carries on rather than replaying. A tap on the board or Escape skips it on that
 screen; `prefers-reduced-motion` gets no animation. The browser never picks a digit. Not done: the Player View square
 list shows the digit pairs at once (it has no grid), and the Final winner reveal is not reused.
+
+## Update 2026-11-26: Live to Manual once the game is under way
+
+"Pause live" is gone from the Score tab (decision 025 section 6), so Edit game is now the way out of a
+feed that is wrong (the wrong game matched, a stuck score). Live to Manual is allowed with the
+`scoring` warning while the game is under way, as Manual to Live already was, and blocked once it is
+over. The host's pad starts from the score as it stands (a feed overtime period is capped at the one OT
+period), and entered quarters stay. A Manual board shows no live strip and no MANUAL tag.

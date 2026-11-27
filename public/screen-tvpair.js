@@ -128,12 +128,15 @@
   // earlier board moves them back (a Set would skip it).
   let lastFollowed = null;
 
-  function open(game, opener) {
+  // opts.centered: on a wide screen, a centered popup over a blurred page instead of the
+  // popover under the opener (Home's card menu has no Connect button to hang it from).
+  function open(game, opener, opts) {
     if (openChooser) return;
     const phone = SBS.ui.isPhone();
+    const centered = !phone && !!(opts && opts.centered);
     const { CLOSE_ICON, QR_ICON } = SBS.ui;
-    const overlay = el('div', 'connect-layer ' + (phone ? 'connect-layer-sheet' : 'connect-layer-pop'));
-    const box = el('div', 'card room-card connect-card ' + (phone ? 'connect-sheet' : 'connect-pop'));
+    const overlay = el('div', 'connect-layer ' + (phone ? 'connect-layer-sheet' : centered ? 'connect-layer-center' : 'connect-layer-pop'));
+    const box = el('div', 'card room-card connect-card ' + (phone ? 'connect-sheet' : centered ? 'connect-center' : 'connect-pop'));
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'true');
     box.setAttribute('aria-labelledby', 'room-title');
@@ -186,7 +189,7 @@
 
     // Where the popover sits: right-aligned under the Connect button.
     function place() {
-      if (phone) return;
+      if (phone || centered) return;
       const r = opener && opener.getBoundingClientRect ? opener.getBoundingClientRect() : null;
       const top = r ? Math.round(r.bottom + 8) : 72;
       box.style.top = top + 'px';

@@ -368,9 +368,12 @@
     strip.querySelector('#pot-input').addEventListener('change', (e) => savePot(e.target.value));
 
     const layout = el('div', 'pick-layout board-first');
-    // Phone: banner for a down feed, then tabs; each tab shows one panel.
-    const feedBanner = phone ? el('div', 'gd-feed-banner') : null;
-    if (feedBanner) { feedBanner.hidden = true; feedBanner.setAttribute('role', 'status'); main.appendChild(feedBanner); }
+    // "Live scoring is Active / Offline" above the tabs, shared by every tab (a Live board only).
+    // Phone: the strip, then tabs; each tab shows one panel. Wide: the strip tops the side panel.
+    const liveStrip = SBS.scorePanel.liveStrip();
+    const updateLiveStrip = () => liveStrip.update(game);
+    updateLiveStrip();
+    if (phone) main.appendChild(liveStrip.el);
     const tabBar = phone ? el('div', 'gd-tabs') : null;
     if (tabBar) { tabBar.setAttribute('role', 'tablist'); tabBar.setAttribute('aria-label', 'Game Day'); main.appendChild(tabBar); }
     main.appendChild(layout);
@@ -385,11 +388,11 @@
     SBS.board.tapNames(boardCard); // phone widths show initials
     // Redraws the grid and fits what depends on its size: team pills, long names (R35).
     function drawBoard(c) {
-      SBS.board.renderFullBoard(boardHolder, game, c, null, { zoom: true });
+      SBS.board.renderFullBoard(boardHolder, game, c, null, { zoom: true, liveBar: 'live' });
       fitTeamBadges(boardHolder);
       SBS.board.fitNames(boardHolder);
     }
-    SBS.board.renderFullBoard(boardHolder, game, computed, null, { zoom: true });
+    SBS.board.renderFullBoard(boardHolder, game, computed, null, { zoom: true, liveBar: 'live' });
     boardCard.appendChild(el('div', 'board-legend', '<span class="legend-chip"></span> Square is claimed but not paid for'));
 
     // ---- Results panel ----
@@ -399,6 +402,7 @@
     const scorePanel = SBS.scorePanel.create({
       keyboard: !phone, // the Keyboard scoring switch shows on wide screens with a mouse only
       quarters: false,
+      liveNote: false, // the live strip sits above the tabs
       // The winner the server drew: spin for it here at once, as the TV does on its next poll.
       onDrawn: (g) => {
         const info = g.results && g.results.final && g.results.final.autoResolve;
@@ -416,6 +420,7 @@
         const c = computeGame(game);
         drawBoard(c);
         refreshResults(c);
+        updateLiveStrip();
       }
     });
     resultsCard.appendChild(scorePanel.el);
@@ -439,7 +444,6 @@
     players.draw();
     // The Unpaid tile opens the Players tab (set once the tabs exist).
     let showPlayers = () => {};
-    let updateFeedBanner = () => {};
     if (phone) {
       layout.appendChild(livePane);
       drawLive();
@@ -487,55 +491,10 @@
         });
         if (focus) tabEls[k].focus();
         if (k === 'board') fitTeamBadges(boardHolder);
-        updateFeedBanner(); // the pad says it on the Score tab
       }
       select(tab, false);
       showPlayers = () => select('players', true);
 
-      // ---- Feed-down banner (live boards only) ----
-      // Signal: the server marks a live board's response liveFeed.available === false
-      // when the shared slate is stale or erroring (lib/api.js readLiveGame); the poll
-      // below replaces `game`, so this just re-reads it. Take over = a score op with
-      // override (what the first tap in the score panel does anyway); Resume = op 'resume'.
-      async function runOp(op) {
-        try {
-          const saved = await SBS.api.patchScore(game.id, op);
-          // Resume drops liveOverride from the document; assign alone would keep the old one.
-          if (!('liveOverride' in saved)) delete game.liveOverride;
-          Object.assign(game, saved);
-          const c = computeGame(game);
-          drawBoard(c);
-          refreshResults(c);
-          scorePanel.update();
-          updateFeedBanner();
-        } catch (e) {
-          if (await SBS.handleConflict(e, game.id)) return;
-          showAlert('Could not switch scoring: ' + e.message);
-        }
-      }
-      updateFeedBanner = () => {
-        const live = window.GameLogic.scoringMode(game) === 'live' && game.status === 'started';
-        const holding = game.liveOverride === true;
-        const down = !!(game.liveFeed && game.liveFeed.available === false);
-        feedBanner.innerHTML = '';
-        feedBanner.hidden = tab === 'score' || !(live && (down || holding));
-        if (feedBanner.hidden) return;
-        const msg = el('span', 'gd-feed-msg');
-        const b = el('button', '');
-        b.type = 'button';
-        if (holding) {
-          msg.textContent = 'You are entering scores by hand.';
-          b.textContent = 'Resume live';
-          b.addEventListener('click', () => runOp({ op: 'resume' }));
-        } else {
-          msg.innerHTML = '<strong>Live scores are down.</strong>';
-          b.textContent = 'Take over';
-          // No points: the server starts from its own copy of the feed, newer than this screen's.
-          b.addEventListener('click', () => runOp({ op: 'add', side: 'a', points: 0, override: true }));
-        }
-        feedBanner.append(msg, b);
-      };
-      updateFeedBanner();
     }
     // A wide screen (R35) keeps its panel in sync from here; set once that panel is built.
     let drawWide = () => {};
@@ -746,7 +705,7 @@
       drawBoard(c);
       refreshResults(c);
       scorePanel.update();
-      updateFeedBanner();
+      updateLiveStrip();
       drawStrip();
       if (players) players.draw();
     }
@@ -827,7 +786,7 @@
         if (k === 'helpers') helpersTab.show(); else helpersTab.stop();
         if (focus) tabEls[k].focus();
       }
-      side.append(tabBar, scorePane, playersPane, helpersPane);
+      side.append(liveStrip.el, tabBar, scorePane, playersPane, helpersPane);
       showPlayers = () => selectWide('players', true);
 
       function shown(g) {
@@ -852,7 +811,7 @@
         const ls = g.liveScore;
         const mode = GL.scoringMode(g);
         if (mode === 'simulation' || (ls && ls.simulation)) return ['SIMULATION', 'sim'];
-        if (mode === 'manual' || (ls && ls.manual)) return ['MANUAL', 'manual'];
+        if (mode === 'manual') return null; // the score pad says who keeps score
         if (g.liveFeed && g.liveFeed.available === false) return ['FEED OFFLINE', 'off'];
         return ls && ls.state !== 'pre' ? ['LIVE', 'live'] : null; // nothing is live before kickoff
       }
@@ -988,7 +947,7 @@
         // A save may have started while the poll was out: its answer wins.
         if (!fresh || scorePanel.busy()) return;
         const feedChanged = !!(fresh.liveFeed && fresh.liveFeed.available === false) !== !!(game.liveFeed && game.liveFeed.available === false);
-        if (feedChanged) { game.liveFeed = fresh.liveFeed; updateFeedBanner(); scorePanel.update(); drawWide(computeGame(game)); }
+        if (feedChanged) { game.liveFeed = fresh.liveFeed; updateLiveStrip(); scorePanel.update(); drawWide(computeGame(game)); }
         const saved = fresh.updatedAt !== game.updatedAt;
         if (saved || SBS.boardKey(fresh) !== SBS.boardKey(game)) {
           SBS.takeBoard(game, fresh);
@@ -997,7 +956,7 @@
           drawBoard(newComputed);
           refreshResults(newComputed);
           scorePanel.update();
-          updateFeedBanner();
+          updateLiveStrip();
           drawStrip();
           if (saved && players) players.draw();
           // A change made somewhere else: what this screen scored no longer undoes cleanly.

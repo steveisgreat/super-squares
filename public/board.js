@@ -332,7 +332,10 @@
     holder.innerHTML = '';
     const isUnpaid = unpaidChecker(game);
 
-    const liveBar = renderLiveScoreBar(game);
+    // liveBar 'live': only the feed's LIVE bar (Game Day says Offline above its tabs, and a score
+    // the host keeps needs no MANUAL bar there).
+    let liveBar = renderLiveScoreBar(game);
+    if (liveBar && opts && opts.liveBar === 'live' && liveBar.matches('.manual, .offline')) liveBar = null;
     if (liveBar) holder.appendChild(liveBar);
 
     const frame = boardFrame(game, opts && opts.zoom);

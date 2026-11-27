@@ -1811,8 +1811,9 @@
           if (to === 'simulation' || mode === 'simulation') return "Simulation can't be turned on or off once the board is locked.";
           if (stage === 'locked') return warn('scoring', k);
           if (stage === 'over') return 'The game is over, so the scoring is fixed.';
-          if (mode === 'manual') return warn('scoring', k);
-          return `${STARTED}. Use "Pause live" on the Score tab instead: it keeps the score.`;
+          // Under way, either direction warns. Live to Manual is the way out of a feed that is
+          // wrong (the wrong game, stuck), and keeps the score as it stands.
+          return warn('scoring', k);
         }
         default: return 'That field is not a setting.';
       }
@@ -1833,6 +1834,11 @@
       g.simulation = g.scoring === 'simulation';
       g.liveScore = null;
       delete g.liveOverride;
+      // Live to Manual once the game is under way: the host's pad starts from the score as it stands.
+      if (mode === 'live' && g.scoring === 'manual' && stage !== 'picking' && isRecord(game.liveScore) && pastNil(game.liveScore)) {
+        const cur = manualState(game);
+        g.liveScore = { a: cur.a, b: cur.b, period: cur.period, clock: '', state: 'in', manual: true };
+      }
     }
 
     const negative = negativeWords(game, g);

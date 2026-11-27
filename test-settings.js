@@ -156,7 +156,7 @@ const TABLE = [
   ['number draw', board, { numberDraw: 'animated' }, [F, X, X, X, X]],
   ['player picks', board, { guestPick: { on: true, max: 4, liftAt: null, lifted: false } }, [F, X, X, X, X]],
   ['Manual to Live', board, { scoring: 'live' }, [F, 'scoring', 'scoring', 'scoring', X]],
-  ['Live to Manual', live, { scoring: 'manual' }, [F, 'scoring', X, X, X]],
+  ['Live to Manual', live, { scoring: 'manual' }, [F, 'scoring', 'scoring', 'scoring', X]],
   ['to Simulation', board, { scoring: 'simulation' }, [F, X, X, X, X]],
   ['from Simulation', (s) => board(s, { scoring: 'simulation', simulation: true }), { scoring: 'manual' }, [F, X, X, X, X]]
 ];
@@ -318,6 +318,18 @@ check('edit: swapping exchanges the teams and their colors', () => {
   const r = ok(edit(g, { swap: true }, { ack: ['swap'] })).game;
   eq([r.teamA, r.teamB, r.teamAColor, r.teamBColor], ['Eagles', 'Chiefs', '#0000aa', '#aa0000'], 'swapped');
   eq([r.axisX, r.axisY, r.squares], [g.axisX, g.axisY, g.squares], 'numbers and squares stay');
+});
+
+check('edit: Live to Manual once the game is under way keeps the running score and the quarters', () => {
+  const g = live('line3', { liveScore: { a: 14, b: 10, period: 3, clock: '4:12', state: 'in', provider: 'espn' }, liveOverride: true });
+  const r = ok(edit(g, { scoring: 'manual' }, { ack: ['scoring'] })).game;
+  eq([r.scoring, r.liveOverride, r.results.q1], ['manual', undefined, g.results.q1], 'mode, hold gone, quarters stay');
+  eq([r.liveScore.a, r.liveScore.b, r.liveScore.period, r.liveScore.manual], [14, 10, 3, true], 'score kept');
+  eq(GL.manualState(r), { a: 14, b: 10, period: 3 }, 'the pad starts there');
+  const ot = ok(edit(live('line3', { liveScore: { a: 24, b: 24, period: 6, state: 'in' } }), { scoring: 'manual' }, { ack: ['scoring'] })).game;
+  eq(ot.liveScore.period, 5, 'a feed OT period is capped at the one OT');
+  const none = ok(edit(live('underWay'), { scoring: 'manual' }, { ack: ['scoring'] })).game;
+  eq(none.liveScore, null, 'no feed score yet: starts at 0-0');
 });
 
 check('edit: changing the scoring drops the old running score; entered quarters stay', () => {

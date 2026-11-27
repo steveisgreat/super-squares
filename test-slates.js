@@ -226,13 +226,27 @@ async function run() {
     eq(m.filled, []);
     eq(m.game.results.q1, { a: 6, b: 7 });
   });
-  await check('host wins: with liveOverride or a manual score, the feed changes neither liveScore nor results', () => {
-    const feed = rowOf([lg({ state: 'break', period: 1, clock: null, hs: 7, as: 3, hq: [7, null, null, null], aq: [3, null, null, null] })]);
-    const held = board('2099-03-01', { liveOverride: true, liveScore: { a: 1, b: 2, period: 1, clock: '', state: 'in', manual: true } });
+  await check('feed back: a good reading takes the score back from a host who held it during an outage', () => {
+    const feed = rowOf([lg({ state: 'break', period: 2, clock: null, hs: 7, as: 10, hq: [7, 0, null, null], aq: [3, 7, null, null] })]);
+    const held = board('2099-03-01', { liveOverride: true, liveScore: { a: 1, b: 2, period: 1, clock: '', state: 'in', manual: true }, results: { q1: { a: 9, b: 9 } } });
     const m = Slate.applyToGame(held, feed, NOW);
-    eq([m.game.liveScore.a, m.game.liveScore.b, m.filled], [1, 2, []]);
+    eq([m.resumed, m.game.liveOverride, m.game.liveScore.manual, m.game.liveScore.a, m.game.liveScore.b], [true, undefined, undefined, 10, 7]);
+    eq([m.game.results.q1, m.game.results.q2, m.filled], [{ a: 9, b: 9 }, { a: 10, b: 7 }, ['q2']], "the host's quarter stays, the feed fills the rest");
     const manualOnly = board('2099-03-01', { liveScore: { a: 4, b: 5, period: 1, clock: '', state: 'in', manual: true } });
-    eq(Slate.applyToGame(manualOnly, feed, NOW).game.liveScore.a, 4);
+    const m2 = Slate.applyToGame(manualOnly, feed, NOW);
+    eq([m2.resumed, m2.game.liveScore.a], [true, 10]);
+    eq(Slate.applyToGame(board('2099-03-01'), feed, NOW).resumed, false, 'nothing held, nothing resumed');
+  });
+  await check('feed down: the host keeps the score they hold', () => {
+    const held = board('2099-03-01', { liveOverride: true, liveScore: { a: 1, b: 2, period: 1, clock: '', state: 'in', manual: true } });
+    const failing = rowOf([lg({ hs: 7, as: 3 })], { fetchedAt: new Date(NOW - 61000).toISOString() });
+    failing.payload.error = 'down';
+    const m = Slate.applyToGame(held, failing, NOW);
+    eq([m.resumed, m.game.liveOverride, m.game.liveScore.a, m.filled], [false, true, 1, []]);
+    const gone = Slate.applyToGame(held, rowOf([]), NOW);
+    eq([gone.resumed, gone.game.liveScore.a], [false, 1], 'the game missing from the slate is down too');
+    const firstFetch = Slate.applyToGame(held, { payload: { provider: 'espn', games: [] }, checkedAt: null, fetchedAt: null }, NOW);
+    eq([firstFetch.resumed, firstFetch.game.liveScore.a], [false, 1], 'a slate still on its first fetch is not a reading');
   });
   await check('a board that is not started, or not locked in a quarter way, is not filled', () => {
     const g = board('2099-03-01', { status: 'picking' });
@@ -424,23 +438,25 @@ async function run() {
       const stored = await store.getGame(g.id);
       eq([stored.liveFeed, stored.liveScore], [undefined, null]);
     });
-    await check('manual fallback: a tap on a Live board needs override, then holds the score; resume hands it back', async () => {
+    await check('manual fallback: while the feed is down a tap needs override and holds the score; the feed takes it back when it returns', async () => {
       const date = '2099-05-09';
-      await seed(date, [lg({ etDate: date, hs: 7, as: 3 })], { at: fresh() });
+      await seed(date, [], { at: fresh() }); // this game missing from the slate: the feed is down
       const g = await mk(date);
       eq((await call('PATCH', `/api/game/${g.id}/score`, { op: 'add', side: 'a', points: 3 })).statusCode, 409);
       const tap = await call('PATCH', `/api/game/${g.id}/score`, { op: 'add', side: 'a', points: 3, override: true });
       eq(tap.statusCode, 200);
-      eq([tap.json.liveOverride, tap.json.liveScore.a, tap.json.liveScore.b, tap.json.liveScore.manual], [true, 6, 7, true], 'starts from the feed score');
+      eq([tap.json.liveOverride, tap.json.liveScore.a, tap.json.liveScore.manual, tap.json.liveFeed.available], [true, 3, true, false]);
       const next = await call('PATCH', `/api/game/${g.id}/score`, { op: 'add', side: 'b', points: 1 });
       eq(next.statusCode, 200, 'later taps need no flag');
+      eq([(await call('GET', `/api/game/${g.id}`)).json.liveScore.a], [3], 'still down: the host score stands');
       await seed(date, [lg({ etDate: date, hs: 20, as: 20 })], { at: fresh() });
-      const held = (await call('GET', `/api/game/${g.id}`)).json;
-      eq([held.liveScore.a, held.liveScore.b], [6, 8], 'the feed does not overwrite the host');
-      const back = await call('PATCH', `/api/game/${g.id}/score`, { op: 'resume' });
-      eq([back.statusCode, back.json.liveOverride, back.json.liveScore], [200, undefined, null]);
-      const live = (await call('GET', `/api/game/${g.id}`)).json;
-      eq([live.liveScore.a, live.liveScore.b], [20, 20], 'the feed is back');
+      const back = (await call('GET', `/api/game/${g.id}`)).json;
+      eq([back.liveOverride, back.liveScore.a, back.liveScore.b, !!back.liveScore.manual], [undefined, 20, 20, false], 'the feed is back');
+      const row = await store.getGame(g.id);
+      eq([row.liveOverride, row.liveScore], [undefined, null], 'the release is stored');
+      await seed(date, [], { at: fresh() });
+      const downAgain = (await call('GET', `/api/game/${g.id}`)).json;
+      eq([downAgain.liveOverride, downAgain.liveScore], [undefined, null], 'a later outage shows no stale host score');
     });
     await check('manual fallback: resume on a Manual board is 409', async () => {
       const g = await mk('2099-05-10', { scoring: 'manual' });

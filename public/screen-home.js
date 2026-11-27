@@ -202,7 +202,7 @@
         label: 'Connect', icon: DEVICES_ICON,
         onSelect: async () => {
           const game = await loadFull(g.id);
-          if (game) SBS.deviceChooser.open(game, opener);
+          if (game) SBS.deviceChooser.open(game, opener, { centered: true });
         }
       }
     ];

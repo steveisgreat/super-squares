@@ -100,6 +100,15 @@ phone, wide Game Day, the Party View strip's sheet, and taken-over live boards.
   *Update 2026-11-26:* one banner at the top of the Score tab says "Live scoring is Active / Paused /
   Down" (green dot, amber pause mark, red dot), with its one control beside it: "Pause live" (take
   over) or "Enable live" (back to the feed). Nothing sits under the score.
+  *Update 2026-11-26 (later):* no pause. A Live board is only **Active** (the feed scores) or
+  **Offline** (the feed stopped: the pad shows, and the host enters the score). The first good reading
+  after an outage takes the score back on its own (`lib/scores/slate.js` `applyToGame` returns
+  `resumed`, and the read stores the release); quarters the host entered meanwhile stay, and the feed
+  fills only the empty ones. "Pause live", "Enable live", and the phone's "You are entering scores by
+  hand" / "Take over" banner are removed. On Game Day the "Live scoring is ..." strip sits above the
+  tabs, shared by every tab (atop the side panel on a wide screen), and the board drops its MANUAL and
+  FEED OFFLINE bars there. To leave a wrong feed, the host switches the board to Manual in Edit game
+  (decision 026 update). The `resume` operation stays for older screens.
 - Keyboard letters on wide screens become Q W E R and U I O P, left to right down the buttons.
 
 Removed: the `#score` screen and keypad (old `#score-` links open the board's Score tab or Player

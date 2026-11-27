@@ -2239,10 +2239,7 @@ body.player-mode #app { padding: 0; }
 .sp-live-word { display: inline-flex; align-items: center; gap: 5px; margin-left: 2px; padding: 2px 9px 2px 7px; border-radius: 999px; vertical-align: 2px; font-size: var(--fs-sm); color: var(--sp-live-c); background: color-mix(in srgb, var(--sp-live-c) 14%, transparent); border: 1px solid color-mix(in srgb, var(--sp-live-c) 55%, transparent); box-shadow: 0 0 8px color-mix(in srgb, var(--sp-live-c) 35%, transparent); text-shadow: 0 0 6px color-mix(in srgb, var(--sp-live-c) 45%, transparent); }
 .sp-live-mark { flex: none; width: 0.6em; height: 0.6em; border-radius: 50%; background: var(--sp-live-c); box-shadow: 0 0 6px color-mix(in srgb, var(--sp-live-c) 55%, transparent); }
 .sp-live.is-active { --sp-live-c: var(--live); }
-.sp-live.is-paused { --sp-live-c: var(--warn); background: var(--warn-soft); border-color: var(--warn); }
 .sp-live.is-down { --sp-live-c: var(--bad-text); background: var(--danger-soft); border-color: var(--danger-border); }
-.sp-live.is-paused .sp-live-mark { width: 0.9em; height: 0.9em; border-radius: 0; background: none; box-shadow: none; }
-.sp-live-mark svg { width: 100%; height: 100%; display: block; }
 .sp-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
 .sp-title h3 { margin: 0; font-size: var(--fs-xl); flex: none; }
 .sp-winning { min-width: 0; text-align: right; font-size: var(--fs-sm); color: var(--muted); line-height: 1.25; display: flex; flex-direction: column; }
@@ -2340,13 +2337,9 @@ button.gd-tab {
 }
 button.gd-tab:hover { background: var(--panel2); color: var(--text); }
 button.gd-tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
-.gd-feed-banner {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
-  margin: 0 0 12px; padding: 10px 12px; border-radius: var(--radius);
-  background: var(--panel2); border: 1px solid var(--warn); color: var(--text);
-}
-.gd-feed-banner[hidden], .gd-phone .pick-layout > [hidden] { display: none; }
-.gd-feed-banner button { min-height: 40px; }
+/* The live strip above Game Day's tabs (phone) or atop its side panel (wide). */
+.gd-live-strip { margin: 0 0 12px; }
+.gd-live-strip[hidden], .gd-phone .pick-layout > [hidden] { display: none; }
 .gd-phone .pick-layout { display: block; }
 .gd-phone .card { padding: 10px; }
 /* The 10x10 grid and its axis numbers fit a 360 px viewport: no minimum cell width. */
@@ -3016,6 +3009,9 @@ button.pay-full:hover { background: var(--good-soft); color: var(--good); border
 .connect-card { box-sizing: border-box; box-shadow: var(--shadow-pop); overflow-y: auto; }
 .connect-sheet { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; max-width: none; width: 100%; max-height: calc(100% - 16px - var(--sat)); border-radius: var(--r-xl) var(--r-xl) 0 0; padding: 8px 16px calc(20px + var(--sab)); }
 .connect-pop { position: absolute; width: 400px; max-width: calc(100vw - 16px); }
+/* Centered (Connect from Home on a wide screen): dimmed and blurred like the other dialogs. */
+.connect-layer-center { background: rgba(0, 0, 0, 0.55); display: flex; padding: 24px 16px; box-sizing: border-box; overflow-y: auto; }
+.connect-center { margin: auto; width: 440px; max-width: 100%; max-height: none; overflow: visible; }
 .connect-grab { width: 40px; height: 5px; border-radius: var(--r-xs); background: var(--border-strong, var(--border)); margin: 0 auto 6px; }
 .connect-head { display: flex; align-items: center; justify-content: space-between; }
 .connect-head .room-title { margin: 0; font-size: var(--fs-xl); }
@@ -3275,12 +3271,12 @@ button.tv-tile-pair:focus { outline: 5px solid var(--accent); outline-offset: 4p
 /* Popup backdrop: every popup blurs the page behind it, on top of its own dim. The dialogs
    (overlayEl), the Connect bottom sheet, and the TV's quarter celebration. The draw reveal and the
    game-end summary are opaque, so they have nothing to blur. With reduced transparency: dim only. */
-.sbs-overlay, .connect-layer-sheet, .tv-celebration {
+.sbs-overlay, .connect-layer-sheet, .connect-layer-center, .tv-celebration {
   -webkit-backdrop-filter: blur(var(--blur-backdrop));
   backdrop-filter: blur(var(--blur-backdrop));
 }
 @media (prefers-reduced-transparency: reduce) {
-  .sbs-overlay, .connect-layer-sheet, .tv-celebration { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .sbs-overlay, .connect-layer-sheet, .connect-layer-center, .tv-celebration { -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
 /* ---- Theme page (R33) ----

@@ -80,9 +80,55 @@
   // keyboard?, quarters?, readOnly? }. setGame is called with the freshest copy after every
   // optimistic step and every server answer. `patch` replaces the API call; `onError` returning
   // true means it dealt with the error; `onDrawn` runs after this screen drew the final's winner.
-  // `keyboard` (Game Day only) adds the Keyboard scoring switch and the keys. `quarters: false`
+  // `liveNote: false` leaves the live strip to the screen. `keyboard` (Game Day only) adds the Keyboard scoring switch and the keys. `quarters: false`
   // leaves out the quarter list (Game Day has its own, with the payouts). `readOnly: false` hides
   // the pad on a board nobody is scoring by hand (the Party View strip).
+  // "Live scoring is Active / Offline" for a Live board that is locked and not over; null otherwise.
+  // Active: the feed is scoring. Offline: the feed stopped and the host enters the score until it
+  // returns, when it takes the score back on its own (decision 025 section 6). There is no pause.
+  function liveState(g) {
+    if (!g || GL.scoringMode(g) !== 'live' || g.status !== 'started') return null;
+    return g.liveFeed && g.liveFeed.available === false ? 'down' : 'active';
+  }
+  function fillLiveStrip(node, g) {
+    const state = liveState(g);
+    node.hidden = !state;
+    if (!state) return;
+    const copy = {
+      active: { word: 'Active', sub: 'Scoring is updating automatically' },
+      down: { word: 'Offline', sub: 'Enter the score until the feed comes back. It takes over again on its own.' },
+    }[state];
+    node.classList.add('sp-note', 'sp-live', 'is-' + state);
+    const text = el('div', 'sp-live-text');
+    const title = el('div', 'sp-live-title');
+    title.appendChild(document.createTextNode('Live scoring is '));
+    const word = el('span', 'sp-live-word');
+    const mark = el('span', 'sp-live-mark');
+    mark.setAttribute('aria-hidden', 'true');
+    word.append(mark, document.createTextNode(copy.word));
+    title.appendChild(word);
+    text.append(title, textEl('div', 'sp-live-sub', copy.sub));
+    node.appendChild(text);
+  }
+  // A strip for a screen to place itself (Game Day puts it above its tabs). update(g) redraws it
+  // only when its state changes.
+  function liveStrip() {
+    const node = el('div', 'sp-note sp-live gd-live-strip');
+    node.setAttribute('role', 'status');
+    let shown;
+    return {
+      el: node,
+      update(g) {
+        const st = liveState(g);
+        if (st === shown) return;
+        shown = st;
+        node.innerHTML = '';
+        node.className = 'sp-note sp-live gd-live-strip';
+        fillLiveStrip(node, g);
+      }
+    };
+  }
+
   function create(opts) {
     const root = el('section', 'score-panel');
     root.setAttribute('aria-label', 'Score');
@@ -533,52 +579,18 @@
       return b;
     }
 
-    // Tabler player-pause (MIT, outline), copied from @tabler/icons 3.19.0.
-    const PAUSE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"/><path d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"/></svg>';
-
-    // Where the score comes from: one banner per Live state, its one control on the right.
+    // Where the score comes from. On a Live board the one live strip (liveStrip below), unless the
+    // screen shows that strip itself above its tabs (Game Day: liveNote false).
     function drawNote(g, mode, scoring, finished) {
       noteEl.innerHTML = '';
       noteEl.className = 'sp-note';
-      noteEl.hidden = finished || (mode !== 'simulation' && mode !== 'live');
+      noteEl.hidden = finished || (mode !== 'simulation' && mode !== 'live') || (mode === 'live' && opts.liveNote === false);
       if (noteEl.hidden) return;
       if (mode === 'simulation') {
         noteEl.appendChild(textEl('span', '', 'This is a practice game with made-up scores. Each quarter fills in on its own.'));
         return;
       }
-      // Active: the feed is scoring. Paused: the host took over. Down: the feed stopped on its own.
-      const state = !scoring ? 'active' : g.liveOverride ? 'paused' : 'down';
-      const copy = {
-        active: { word: 'Active', sub: 'Scoring is updating automatically' },
-        paused: { word: 'Paused', sub: 'Enter every score and end each quarter yourself.' },
-        down: { word: 'Down', sub: 'Enter the score until the feed comes back.' },
-      }[state];
-      noteEl.classList.add('sp-live', 'is-' + state);
-      const text = el('div', 'sp-live-text');
-      const title = el('div', 'sp-live-title');
-      title.appendChild(document.createTextNode('Live scoring is '));
-      const word = el('span', 'sp-live-word');
-      const mark = el('span', 'sp-live-mark');
-      mark.setAttribute('aria-hidden', 'true');
-      if (state === 'paused') mark.innerHTML = PAUSE_SVG;
-      word.append(mark, document.createTextNode(copy.word));
-      title.appendChild(word);
-      text.append(title, textEl('div', 'sp-live-sub', copy.sub));
-      noteEl.appendChild(text);
-      if (state === 'active') {
-        const b = textEl('button', 'sp-btn', 'Pause live');
-        b.type = 'button';
-        b.setAttribute('data-spkey', 'take');
-        // No points: the server starts from its own copy of the feed, newer than this screen's.
-        b.addEventListener('click', () => send({ op: 'add', side: 'a', points: 0 }, { what: 'Live scoring is paused. You are keeping score now.' }));
-        noteEl.appendChild(b);
-      } else if (state === 'paused') {
-        const b = textEl('button', 'sp-btn', 'Enable live');
-        b.type = 'button';
-        b.setAttribute('data-spkey', 'resume');
-        b.addEventListener('click', () => send({ op: 'resume' }, { what: 'Live scoring is on again.' }));
-        noteEl.appendChild(b);
-      }
+      fillLiveStrip(noteEl, g);
     }
 
     // ---- Keyboard scoring (Game Day, wide screens with a mouse) ----
@@ -654,5 +666,5 @@
     return { el: root, update: draw, busy: () => pending > 0 || drawing, clearUndo, fix: openFix, drawWinner };
   }
 
-  SBS.scorePanel = { create };
+  SBS.scorePanel = { create, liveStrip };
 })();
