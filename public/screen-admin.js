@@ -385,7 +385,7 @@
     app.appendChild(main);
 
     const tools = el('div', 'adm-tools');
-    const picker = el('div', 'adm-ranges');
+    const picker = el('div', 'adm-ranges choice-strip');
     picker.setAttribute('role', 'group');
     picker.setAttribute('aria-label', 'Range');
     const refresh = textEl('button', 'secondary adm-refresh', 'Refresh');

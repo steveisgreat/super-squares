@@ -357,7 +357,7 @@
         } else {
           head.push(textEl('p', 'pm-note', g.status === 'setup' ? "Picking isn't open yet." : "The board is locked, so squares can't move. You can still mark people paid."));
         }
-        const tabs = el('div', 'pm-filter');
+        const tabs = el('div', 'pm-filter choice-strip');
         tabs.setAttribute('role', 'group');
         tabs.setAttribute('aria-label', 'Show');
         [['all', `Everyone (${all.length})`], ['owes', `Owes money (${owing.length})`]].forEach(([k, words]) => {

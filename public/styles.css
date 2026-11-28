@@ -2582,9 +2582,7 @@ button.pm-add { width: 100%; min-height: 50px; }
 .pm-picks-text span, .pm-info span { color: var(--muted); font-size: var(--fs-sm); }
 button.pm-limit { min-height: 44px; padding: 0 14px; flex: none; }
 .pm-note { margin: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-lg); line-height: 1.4; }
-.pm-filter { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: var(--r-lg); }
-button.pm-filter-btn { min-height: 44px; padding: 4px 6px; background: transparent; border: 0; box-shadow: none; border-radius: var(--r-md); color: var(--muted); font-weight: 700; font-size: var(--fs-md); }
-button.pm-filter-btn[aria-pressed="true"] { background: var(--panel3); color: var(--text); }
+.pm-filter.choice-strip > button { flex: 1 1 0; }
 .pm-row { display: flex; align-items: center; gap: 8px; padding: 8px 6px 8px 14px; min-height: 48px; }
 button.pm-info { min-height: 48px; padding: 2px 0; align-items: flex-start; justify-content: center; text-align: left; background: transparent; border: 0; box-shadow: none; color: var(--text); font-weight: 400; }
 .pm-info strong { font-weight: 700; }
@@ -3692,23 +3690,29 @@ button.win-slim { width: 100%; min-height: 44px; background: var(--panel); color
 .eg-total.is-bad { color: var(--danger); }
 button.eg-pill { flex: 1 0 auto; min-height: 44px; padding: 0 16px; border-radius: var(--r-xl); background: transparent; color: var(--text); border: 1px solid var(--border-strong); font-weight: 700; }
 button.eg-choice[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-/* A choice group is one square-cornered strip (Steve, 2026-11-28, look F): the strip draws the
-   outer border and clips; each segment draws its left and top divider and is pulled 1 px out
+/* A choice strip: one look for every one-of-several choice in the app (Steve, 2026-11-28, look F):
+   Edit game, the new-game form, the Players filter and the admin range picker. The strip draws
+   the outer border and clips; each segment draws its left and top divider and is pulled 1 px out
    under that border, so the first of each row hides its divider and the rest show a line between
    options (a later sibling paints over an earlier one, so a right-edge divider would be covered).
-   The picked segment is a translucent accent fill ringed in the full accent; the ring is an
-   inset outline so it covers that segment's own dividers and stays on after focus. */
-.eg-pills { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--border-strong); border-radius: 0; overflow: hidden; }
-.eg-pills button.eg-pill {
-  /* Shorter than buttons and fields (48 px) so a choice reads as a choice, not an action. */
-  min-height: 34px; padding: 0 12px; font-size: var(--fs-sm);
-  border: 0; border-radius: 0; margin: -1px 0 0 -1px;
+   Segments are 34 px, shorter than 48 px buttons and fields, so a choice does not read as an
+   action. The picked segment is a translucent accent fill ringed in the accent at 70%; the ring is
+   an inset outline so it covers that segment's own dividers and stays on after focus. */
+.choice-strip { display: flex; flex-wrap: wrap; gap: 0; padding: 0; border: 1px solid var(--border-strong); border-radius: 0; overflow: hidden; }
+.choice-strip > button, .choice-strip > .pill {
+  flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  min-height: 34px; padding: 0 12px; font-size: var(--fs-sm); font-weight: 700; text-align: center;
+  border: 0; border-radius: 0; box-shadow: none; margin: -1px 0 0 -1px;
   border-left: 1px solid var(--border-strong); border-top: 1px solid var(--border-strong);
   background: var(--panel2); color: var(--muted);
 }
-.eg-pills button.eg-pill:hover { background: var(--accent-soft); color: var(--text); border-color: var(--border-strong); }
-.eg-pills button.eg-pill:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-hi); }
-.eg-pills button.eg-pill[aria-pressed="true"] { background: rgba(var(--accent-rgb), 0.3); color: var(--text-strong); outline: 2px solid rgba(var(--accent-rgb), 0.8); outline-offset: -2px; }
+.choice-strip > button:hover, .choice-strip > .pill:hover { background: var(--accent-soft); color: var(--text); border-color: var(--border-strong); }
+.choice-strip > button:focus-visible, .choice-strip > .pill:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-hi); }
+.choice-strip > [aria-pressed="true"], .choice-strip > .pill.active {
+  background: rgba(var(--accent-rgb), 0.3); color: var(--text-strong);
+  outline: 2px solid rgba(var(--accent-rgb), 0.7); outline-offset: -2px;
+}
+.choice-strip > .pill.disabled { background: var(--panel2); color: var(--muted); }
 .eg-summary { display: flex; align-items: center; gap: 12px; }
 .eg-summary > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; overflow-wrap: anywhere; }
 .eg-summary button.eg-pill { flex: none; }
@@ -3819,10 +3823,7 @@ button.gd-bar-btn.gd-edit[aria-pressed="true"] { background: var(--accent-soft);
 /* ---- The admin usage page (R45b, screen-admin.js) ---- */
 .adm-main { max-width: 1200px; }
 .adm-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-.adm-ranges, .adm-fresh { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-button.adm-range { min-height: 44px; padding: 8px 14px; background: transparent; color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--r-pill); }
-button.adm-range:hover { background: var(--accent-soft); border-color: var(--accent); }
-button.adm-range[aria-pressed="true"] { background: var(--btn-fill); color: var(--btn-text); border-color: var(--btn-edge); }
+.adm-fresh { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 button.adm-refresh { min-height: 44px; }
 .adm-updated { color: var(--muted); font-size: var(--fs-sm); }
 .adm-status { min-height: 1.5em; margin: 10px 0; color: var(--muted); font-size: var(--fs-sm); }

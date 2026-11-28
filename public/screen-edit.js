@@ -520,7 +520,7 @@
       return wrap;
     }
     function pills(parent, key, label, choices, selected, onPick) {
-      const group = el('div', 'eg-pills');
+      const group = el('div', 'eg-pills choice-strip');
       group.setAttribute('role', 'group');
       group.setAttribute('aria-label', label);
       choices.forEach(([value, text]) => {
@@ -805,7 +805,7 @@
         let games = [];
         let picked = -1;
         let seq = 0;
-        const leagues = el('div', 'eg-pills');
+        const leagues = el('div', 'eg-pills choice-strip');
         leagues.setAttribute('role', 'group');
         leagues.setAttribute('aria-label', 'League');
         const dateWrap = el('label', 'eg-field', '<span>Date</span><input type="date">');

@@ -827,7 +827,7 @@
 
     form.innerHTML = `
       <label>League</label>
-      <div class="radio-group" id="league-group">
+      <div class="radio-group choice-strip" id="league-group">
         <div class="pill active" data-val="nfl">NFL</div>
         <div class="pill" data-val="nba">NBA</div>
         <div class="pill" data-val="other">Other</div>
@@ -878,21 +878,21 @@
       <div id="pct-total" class="pct-total"></div>
 
       <label>Square Pick Mode</label>
-      <div class="radio-group" id="pick-mode-group">
+      <div class="radio-group choice-strip" id="pick-mode-group">
         <div class="pill" data-val="manual">Manual Only</div>
         <div class="pill" data-val="auto">Auto Only</div>
         <div class="pill active" data-val="both">Both (player's choice)</div>
       </div>
 
       <label id="number-draw-label">Number Draw</label>
-      <div class="radio-group" id="number-draw-group" role="radiogroup" aria-labelledby="number-draw-label">
+      <div class="radio-group choice-strip" id="number-draw-group" role="radiogroup" aria-labelledby="number-draw-label">
         <div class="pill active" data-val="quick" role="radio" aria-checked="true" tabindex="0">Quick pick</div>
         <div class="pill" data-val="animated" role="radio" aria-checked="false" tabindex="0">Animated</div>
       </div>
       <p style="color:var(--muted); font-size:0.9rem;">Animated reveals the numbers one at a time on every screen when the board locks.</p>
 
       <label>Auto Cutoff Time?</label>
-      <div class="toggle-group" id="cutoff-toggle">
+      <div class="toggle-group choice-strip" id="cutoff-toggle">
         <div class="pill" data-val="yes">Yes</div>
         <div class="pill active" data-val="no">No</div>
       </div>
@@ -912,7 +912,7 @@
       </div>
 
       <label>Scoring</label>
-      <div class="radio-group" id="scoring-group" role="radiogroup" aria-label="Scoring">
+      <div class="radio-group choice-strip" id="scoring-group" role="radiogroup" aria-label="Scoring">
         <div class="pill active" data-val="manual" role="radio" tabindex="0" aria-checked="true">Manual</div>
         <div class="pill" data-val="live" role="radio" tabindex="0" aria-checked="false">Live</div>
         <div class="pill" data-val="simulation" role="radio" tabindex="0" aria-checked="false">Simulation</div>
