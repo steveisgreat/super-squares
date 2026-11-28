@@ -528,7 +528,7 @@
         btn.type = 'button';
         btn.dataset.eg = `${key}-${value}`;
         btn.setAttribute('aria-pressed', String(value === selected));
-        btn.addEventListener('click', () => { onPick(value); draw(); });
+        btn.addEventListener('click', () => { onPick(value); draw(btn.dataset.eg); });
         group.appendChild(btn);
       });
       parent.appendChild(group);
@@ -634,7 +634,7 @@
       const row = summary(sec, 'Rows and columns', [`${a} down, ${z} across`]);
       if (swapWhy) reason(sec, swapWhy);
       else if (s !== 'over') {
-        const btn = rowButton(row, 'swap', 'Swap', () => { setSwap(!draft.swap); draw(); });
+        const btn = rowButton(row, 'swap', 'Swap', () => { setSwap(!draft.swap); draw('swap'); });
         btn.setAttribute('aria-pressed', String(!!draft.swap));
         // A swap and a change of teams can't be one save.
         btn.disabled = !draft.swap && ['teamA', 'teamB', 'teamAColor', 'teamBColor'].some(k => draft[k]);
@@ -771,7 +771,7 @@
       const box = check.querySelector('input');
       box.dataset.eg = 'guest-on';
       box.checked = guest().on;
-      box.addEventListener('change', () => { setGuest({ on: box.checked }); draw(); });
+      box.addEventListener('change', () => { setGuest({ on: box.checked }); draw('guest-on'); });
       sec.appendChild(check);
       if (!guest().on) return;
       field(sec, 'guest-max', 'Most squares per person', 'number', guest().max, v => setGuest({ max: Number(v) }), { min: '1', max: '100', step: '1' });
@@ -938,9 +938,16 @@
       drawFoot();
     }
 
-    function draw() {
+    // `anchor` is the data-eg of the control the host just used. A choice can add or remove
+    // rows above it (Live scoring adds the game picker to the Game section), so after the
+    // redraw the screen is scrolled by however far that control moved: it stays under the
+    // finger and the screen does not jump. Without an anchor, the focused control is used.
+    function draw(anchor) {
       const act = document.activeElement;
       const key = act && root.contains(act) ? act.dataset.eg : null;
+      const pin = anchor || key;
+      const was = pin && root.querySelector(`[data-eg="${pin}"]`);
+      const pinY = was ? was.getBoundingClientRect().top : null;
       const top = body.scrollTop;
       const y = window.scrollY;
       refreshers = [];
@@ -954,6 +961,12 @@
       update();
       body.scrollTop = top;
       if (!opts.popup) window.scrollTo(0, y);
+      const now = pinY !== null && root.querySelector(`[data-eg="${pin}"]`);
+      if (now) {
+        body.scrollTop += now.getBoundingClientRect().top - pinY;
+        const left = now.getBoundingClientRect().top - pinY;
+        if (left && !opts.popup) window.scrollBy(0, left);
+      }
       const again = key && root.querySelector(`[data-eg="${key}"]`);
       if (again) again.focus({ preventScroll: true });
     }
