@@ -36,6 +36,7 @@
     return g.status === 'finished' && g.gameDate !== todayValue();
   }
   SBS.isArchivedGame = isArchived;
+  SBS.showMenu = (opener, o) => showMenu(opener, o);
 
   // "Today" for today, else the date as the board headers show it.
   function whenLabel(dateStr) {
@@ -109,10 +110,11 @@
     return SBS.ui.isPhone() || window.innerWidth < 600;
   }
 
-  // items: { label, icon, sub, danger, disabled, divider, onSelect }
+  // items: { label, icon, sub, danger, disabled, divider, onSelect }. o.dropdown: always the
+  // popover under the opener, even on a phone (Game Day's phone menu).
   function showMenu(opener, o) {
     if (openMenu) openMenu(true);
-    const sheet = useSheet();
+    const sheet = !o.dropdown && useSheet();
     const layer = el('div', 'connect-layer ' + (sheet ? 'connect-layer-sheet' : 'connect-layer-pop'));
     const box = el('div', 'card connect-card home-menu ' + (sheet ? 'connect-sheet' : 'connect-pop home-menu-pop'));
     box.setAttribute('role', 'dialog');

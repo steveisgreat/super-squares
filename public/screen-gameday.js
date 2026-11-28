@@ -58,6 +58,8 @@
       + '<rect x="10" y="81" width="44" height="6" rx="2" fill="#b7924a" stroke="#8a6c1a" stroke-width="1"/>'
     + '</svg>';
 
+  // Tabler outline "menu-2" (MIT, 24 px, pinned 3.19.0), for the phone top bar's menu.
+  const MENU_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l16 0"/><path d="M4 12l16 0"/><path d="M4 18l16 0"/></svg>';
   const QR_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
     <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
@@ -286,7 +288,30 @@
     }
     // Back on the same board after leaving it (the popup closed with the screen): carry on with its changes.
     if (gdEdit && gdEdit.id === game.id && !(gdPopup && gdPopup.isOpen())) setTimeout(showEditor, 0);
-    nav.append(editBtn, partyBtn, SBS.deviceChooser.button(game));
+    const connectBtn = SBS.deviceChooser.button(game);
+    if (phone) {
+      // A phone keeps the bar to Home, the matchup (centered) and one menu: Connect, Party View,
+      // Edit game. Each item does what its wide-screen button does; Edit hands focus back to the menu.
+      const menuBtn = el('button', 'gd-bar-btn gd-icon-only gd-menu', MENU_ICON);
+      menuBtn.type = 'button';
+      menuBtn.setAttribute('aria-label', 'Menu');
+      menuBtn.setAttribute('aria-haspopup', 'dialog');
+      menuBtn.setAttribute('aria-expanded', 'false');
+      const icon = (b) => b.querySelector('svg').outerHTML;
+      menuBtn.addEventListener('click', () => SBS.showMenu(menuBtn, {
+        label: 'Game Day menu',
+        dropdown: true,
+        items: [
+          { label: 'Connect', icon: icon(connectBtn), onSelect: () => SBS.deviceChooser.open(game, menuBtn) },
+          { label: 'Party View', icon: icon(partyBtn), onSelect: () => partyBtn.click() },
+          { label: 'Edit game', icon: icon(editBtn), onSelect: () => toggleEdit() }
+        ]
+      }));
+      gdEditBtn = menuBtn;
+      nav.append(menuBtn);
+    } else {
+      nav.append(editBtn, partyBtn, connectBtn);
+    }
     app.appendChild(bar);
     const main = el('div', 'main' + (phone ? ' gd-phone' : ''));
     app.appendChild(main);

@@ -279,7 +279,8 @@ check at 360 px and on the TV view.
 **R29. Game Day header: Connect and Party View** — `Sonnet` build, `Opus` design and review —
 ✅ built 2026-11-24 (Steve approved the mockup in a design session). Depends on: R25 ✅, R26 ✅.
 The Game Day top bar is Home, the matchup (one line: short team names when full ones would wrap),
-Party View and Connect; wide screens add a join-code chip (copies the link) and an "On the TV ·
+Party View and Connect (on a phone since 2026-11-28: Home, the matchup centered, and a ☰ menu
+dropping down Connect, Party View and Edit game); wide screens add a join-code chip (copies the link) and an "On the TV ·
 Stop" pill while presenting. Connect (was "What's in the room?") is a bottom sheet on a phone and
 a popover on wide screens, in three sections: Players (code, Share or Copy link, Show QR, Print a
 Letter QR sign; since 2026-11-25 a single View QR button opens the QR window, which has Print), TV

@@ -13,6 +13,11 @@
    in every block (or lives in the shared rule below), or a nested card would
    show the page's value. */
 :root, [data-theme] {
+  /* A square that won a quarter is yellow in every theme, so it never looks like the red
+     "not paid" ring (decision 028). --winner stays the theme's own color for everything else. */
+  --q-win-rgb: 255, 214, 10;
+  --q-win: rgb(var(--q-win-rgb));
+  --on-q-win: #111;
   --accent2: var(--good);
   --teamA: #ff6b6b;
   --teamA-alt: #ffb3b3;
@@ -995,15 +1000,15 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: var(--fs-2xl); }
 .cell.empty-pick:hover { box-shadow: inset 0 0 0 2px var(--pick-color, var(--accent2)), 0 0 8px var(--pick-color, var(--accent2)); }
 .cell.selected, .cell.empty-pick.selected:hover { background: var(--pick-color, var(--accent2)); color: var(--on-accent); box-shadow: none; }
 .cell.pushed { background: rgba(51, 18, 15, 0.75); color: var(--danger); }
-/* Certificate frame: a hairline winner-color rule, a sliver of the cell's own
-   background, then a soft band — reads as "this square was awarded
-   something" without covering a corner or animating. */
+/* Certificate frame: a yellow rule, a sliver of the cell's own background, then a soft
+   band — reads as "this square was awarded something" without covering a corner or
+   animating. --fill is the square's own background where a board tints it. */
 .cell.winner {
   color: var(--text);
   box-shadow:
-    inset 0 0 0 1px var(--winner),
-    inset 0 0 0 4px var(--panel2),
-    inset 0 0 0 5px rgba(var(--winner-rgb), 0.45);
+    inset 0 0 0 2px var(--q-win),
+    inset 0 0 0 4px var(--fill, var(--panel2)),
+    inset 0 0 0 6px rgba(var(--q-win-rgb), 0.5);
 }
 .cell .badges {
   position: absolute;
@@ -1024,7 +1029,18 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: var(--fs-2xl); }
 }
 /* Winning-quarter badges pick up the frame's color rather than the default
    black pill, tying the corner label back to the border around the cell. */
-.cell.winner .badge { background: var(--winner); color: var(--on-winner); }
+.cell.winner .badge { background: var(--q-win); color: var(--on-q-win); }
+/* Phone-width quarter corners (shown under 480 px, below): Q1 top-left, Q2 top-right,
+   Q3 bottom-left, Final bottom-right, 10 px each. A pushed quarter's corner is red. */
+.cell .qcorners { display: none; }
+.qc { position: absolute; width: 0; height: 0; --qc: var(--q-win); }
+.qc.is-push { --qc: var(--danger); }
+.qc.q1 { top: var(--qc-o, 0); left: var(--qc-o, 0); border-top: var(--qc-l, 10px) solid var(--qc); border-right: var(--qc-l, 10px) solid transparent; }
+.qc.q2 { top: var(--qc-o, 0); right: var(--qc-o, 0); border-top: var(--qc-l, 10px) solid var(--qc); border-left: var(--qc-l, 10px) solid transparent; }
+.qc.q3 { bottom: var(--qc-o, 0); left: var(--qc-o, 0); border-bottom: var(--qc-l, 10px) solid var(--qc); border-right: var(--qc-l, 10px) solid transparent; }
+.qc.q4 { bottom: var(--qc-o, 0); right: var(--qc-o, 0); border-bottom: var(--qc-l, 10px) solid var(--qc); border-left: var(--qc-l, 10px) solid transparent; }
+/* Not paid: corners shrink to 9 px and sit inside the dashed red ring. */
+.cell.is-unpaid .qcorners { --qc-l: 9px; --qc-o: 3px; }
 .cell .name-txt { padding-top: 8px; font-size: var(--fs-xs); line-height: 1.1; font-weight: 400; }
 /* A player's color arrives as --nc. In every theme but Neon it is softened toward the text color
    (--nc-mix) so a saturated color doesn't fight the theme. With no --nc the name just inherits. */
@@ -1035,17 +1051,24 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: var(--fs-2xl); }
   .fill-player-dot { background: color-mix(in srgb, var(--nc) var(--nc-mix), var(--text)); }
 }
 
-/* Unpaid squares: a quiet red ring around the cell — visible on a second
-   look, but not competing with the quarter-result badges or the winner
-   frame for attention. */
-.cell.is-unpaid { box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.5), 0 0 4px rgba(239, 68, 68, 0.25); }
+/* Unpaid squares: a dashed ring in the theme's red plus a small $ tag, so they differ
+   from a winner by shape as well as color. Won and not paid: the red stays at the edge
+   and the yellow frame steps inside it. */
+.cell.is-unpaid { outline: 2px dashed var(--danger); outline-offset: -2px; }
+.cell.is-unpaid::before {
+  content: '$'; content: '$' / '';
+  position: absolute; left: 3px; bottom: 3px;
+  padding: 2px 4px; border-radius: var(--r-xs);
+  background: var(--danger); color: #fff;
+  font-size: var(--fs-3xs); font-weight: 800; line-height: 1;
+  pointer-events: none;
+}
 .cell.is-unpaid.winner {
   box-shadow:
-    inset 0 0 0 1px var(--winner),
-    inset 0 0 0 4px var(--panel2),
-    inset 0 0 0 5px rgba(var(--winner-rgb), 0.45);
-  outline: 2px solid rgba(239, 68, 68, 0.7);
-  outline-offset: -1px;
+    inset 0 0 0 3px var(--fill, var(--panel2)),
+    inset 0 0 0 5px var(--q-win),
+    inset 0 0 0 7px var(--fill, var(--panel2)),
+    inset 0 0 0 8px rgba(var(--q-win-rgb), 0.5);
 }
 
 /* TV-only "where the game is heading" overlay (see compute.js
@@ -1071,10 +1094,12 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: var(--fs-2xl); }
 .cell.live-near::after { animation: tv-live-ping-near 3.2s ease-out infinite; }
 .cell.live-winner .name-txt { animation: tv-live-winner-font 2.4s ease-in-out infinite; }
 
+/* The square leading right now pulses in the theme's accent: never red (not paid) or
+   yellow (already won). */
 @keyframes tv-live-ping-winner {
-  0% { box-shadow: inset 0 0 0 1px var(--danger), 0 0 0 0 rgba(239, 68, 68, 0.55); }
-  70% { box-shadow: inset 0 0 0 1px var(--danger), 0 0 0 10px rgba(239, 68, 68, 0); }
-  100% { box-shadow: inset 0 0 0 1px var(--danger), 0 0 0 10px rgba(239, 68, 68, 0); }
+  0% { box-shadow: 0 0 0 1px var(--accent), 0 0 0 0 rgba(var(--accent-rgb), 0.55); }
+  70% { box-shadow: 0 0 0 1px var(--accent), 0 0 0 10px rgba(var(--accent-rgb), 0); }
+  100% { box-shadow: 0 0 0 1px var(--accent), 0 0 0 10px rgba(var(--accent-rgb), 0); }
 }
 @keyframes tv-live-ping-near {
   0% { box-shadow: inset 0 0 0 1px rgba(141, 189, 232, 0.55), 0 0 0 0 rgba(141, 189, 232, 0.4); }
@@ -1108,7 +1133,8 @@ body.tv-fullscreen .tv-header .live-score-bar { font-size: var(--fs-2xl); }
   height: 14px;
   border-radius: var(--r-xs);
   background: var(--panel2);
-  box-shadow: inset 0 0 0 2px var(--danger), 0 0 6px rgba(239, 68, 68, 0.55);
+  border: 2px dashed var(--danger);
+  box-sizing: border-box;
 }
 
 /* Payout tracking (R21): host-only, never on the TV or player views. */
@@ -1408,16 +1434,16 @@ body.tv-fullscreen .tv-quarters { margin-bottom: 6px; }
 .glass-board .cell.filled { background: var(--glass-fill); }
 .tv-screen .cell.winner,
 .glass-board .cell.winner {
-  background: rgba(var(--winner-rgb), 0.14);
-  box-shadow: 0 0 0 1.5px rgb(var(--winner-rgb)), 0 0 18px rgba(var(--winner-rgb), 0.55), inset 0 0 10px rgba(var(--winner-rgb), 0.3);
+  background: rgba(var(--q-win-rgb), 0.14);
+  box-shadow: 0 0 0 1.5px var(--q-win), 0 0 18px rgba(var(--q-win-rgb), 0.55), inset 0 0 10px rgba(var(--q-win-rgb), 0.3);
   animation: tv-neon-winner-glow 2.2s ease-in-out infinite;
 }
 @keyframes tv-neon-winner-glow {
-  0%, 100% { box-shadow: 0 0 0 1.5px rgb(var(--winner-rgb)), 0 0 18px rgba(var(--winner-rgb), 0.55), inset 0 0 10px rgba(var(--winner-rgb), 0.3); }
-  50% { box-shadow: 0 0 0 1.5px rgb(var(--winner-rgb)), 0 0 30px rgba(var(--winner-rgb), 0.9), inset 0 0 14px rgba(var(--winner-rgb), 0.5); }
+  0%, 100% { box-shadow: 0 0 0 1.5px var(--q-win), 0 0 18px rgba(var(--q-win-rgb), 0.55), inset 0 0 10px rgba(var(--q-win-rgb), 0.3); }
+  50% { box-shadow: 0 0 0 1.5px var(--q-win), 0 0 30px rgba(var(--q-win-rgb), 0.9), inset 0 0 14px rgba(var(--q-win-rgb), 0.5); }
 }
 .tv-screen .cell.winner .badge,
-.glass-board .cell.winner .badge { background: var(--winner); color: var(--on-winner); }
+.glass-board .cell.winner .badge { background: var(--q-win); color: var(--on-q-win); }
 /* Team-color gradient fade (set inline by board.js's badgeStyle()) stays
    underneath — a light translucent dark wash (inset box-shadow, painted
    above the background but below the label's own text/logo) takes it down
@@ -2746,6 +2772,12 @@ button.gd-onair {
 /* Game Day on a phone: the matchup alone, centered (no room for the description). */
 .gd-topbar-phone:not(.pick-topbar) .gd-meta { display: none; }
 .gd-topbar-phone:not(.pick-topbar) .gd-match { justify-content: center; }
+/* Game Day on a phone: Home, the matchup centered on the screen, the menu. Equal side columns keep
+   the matchup at the true center. */
+.topbar.gd-topbar-phone:not(.pick-topbar) { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 8px; }
+.gd-topbar-phone:not(.pick-topbar) .gd-head { align-items: center; }
+.gd-topbar-phone:not(.pick-topbar) .gd-match { max-width: 100%; }
+.gd-topbar-phone:not(.pick-topbar) .nav { justify-content: flex-end; }
 /* Both teams fit a small phone's top bar once Connect is its icon. */
 @media (max-width: 480px) {
   .gd-topbar-phone button.gd-bar-btn.gd-connect { width: 44px; padding: 0; }
@@ -3374,9 +3406,8 @@ label.theme-card.is-chosen .theme-check { display: inline-flex; }
 .glass-board .teamA-label .team-logo,
 .glass-board .teamB-label .team-logo { --logo-size: var(--g-logo) !important; padding: 3px; }
 .glass-board .teamB-label, .glass-board .teamA-label { border-radius: var(--r-sm); }
-/* Host screens keep the quiet red ring on a square not paid for (the legend's swatch matches). */
-.glass-board .cell.is-unpaid:not(.winner) { box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.8), 0 0 4px rgba(239, 68, 68, 0.25); }
-.glass-board .legend-chip { background: transparent; box-shadow: none; border: 2px solid var(--danger); width: 12px; height: 12px; border-radius: var(--r-xs); box-sizing: border-box; }
+/* Host screens show the shared dashed red ring on a square not paid for (the legend's swatch matches). */
+.glass-board .legend-chip { background: transparent; box-shadow: none; border: 2px dashed var(--danger); width: 12px; height: 12px; border-radius: var(--r-xs); box-sizing: border-box; }
 /* Picking: the hover plus sign, the pick color and the check keep working on the glass squares. */
 .glass-board .cell.empty-pick:hover { box-shadow: inset 0 0 0 2px var(--pick-color, var(--accent)); }
 .glass-board .cell.selected, .glass-board .cell.empty-pick.selected:hover { background: var(--pick-color, var(--accent)); box-shadow: none; }
@@ -3547,7 +3578,7 @@ button.gd-pay.is-paid { background: var(--good-soft); color: var(--good); border
 .pick-fill.is-tabbed .cell.head.corner, .gd-phone .cell.head.corner { background: var(--panel); }
 .pick-fill.is-tabbed .cell.filled, .gd-phone .cell.filled { background: var(--panel3); box-shadow: none; }
 @supports (color: color-mix(in srgb, red 50%, blue)) {
-  .pick-fill.is-tabbed .cell.filled, .gd-phone .cell.filled { background: color-mix(in srgb, var(--who, var(--muted)) 24%, var(--panel)); }
+  .pick-fill.is-tabbed .cell.filled, .gd-phone .cell.filled { --fill: color-mix(in srgb, var(--who, var(--muted)) 24%, var(--panel)); background: var(--fill); }
   .is-tabbed .cell .name-txt, .gd-phone .cell .name-txt { color: color-mix(in srgb, var(--nc, var(--text)) 60%, var(--text-strong)); }
 }
 /* Picking's "?" is the drawn numbers' square, only quieter. */
@@ -3555,12 +3586,11 @@ button.gd-pay.is-paid { background: var(--good-soft); color: var(--good); border
 .gd-phone .cell.pushed { background: #2b1515; }
 .pick-fill.is-tabbed .cell.empty-pick:hover, .pick-fill.is-tabbed .cell.is-tappable:hover { box-shadow: inset 0 0 0 2px var(--pick-color, var(--accent)); }
 .pick-fill.is-tabbed .cell.empty-pick[role=button].selected { background: var(--pick-color, var(--accent)); box-shadow: none; }
-.pick-fill.is-tabbed .cell.filled.is-unpaid, .gd-phone .cell.filled.is-unpaid { box-shadow: inset 0 0 0 2px var(--danger); }
-.gd-phone .cell.winner, .gd-phone .cell.filled.winner, .gd-phone .cell.filled.is-unpaid.winner { box-shadow: inset 0 0 0 2px var(--winner); }
-.gd-phone .cell.is-unpaid.winner { outline-offset: -4px; }
+.gd-phone .cell.winner, .gd-phone .cell.filled.winner { box-shadow: inset 0 0 0 2px var(--q-win); }
+.gd-phone .cell.filled.is-unpaid.winner { box-shadow: inset 0 0 0 3px var(--fill, var(--panel2)), inset 0 0 0 5px var(--q-win); }
 .gd-phone .cell .name-txt { padding-top: 0; font-size: var(--fs-3xs); line-height: 1.1; font-weight: 600; }
 .gd-phone .cell.winner .name-txt, .gd-phone .cell.pushed .name-txt { padding-top: 8px; }
-.gd-phone .legend-chip { background: transparent; box-shadow: none; border: 2px solid var(--danger); box-sizing: border-box; }
+.gd-phone .legend-chip { background: transparent; box-shadow: none; border: 2px dashed var(--danger); box-sizing: border-box; }
 /* Game Day's team bars are solid, as on the picking board. */
 .gd-phone .board-grid-outer { gap: 2px; }
 .gd-phone .board-scroll { overflow: visible; padding-bottom: 0; }
@@ -3732,16 +3762,18 @@ button.gd-bar-btn.gd-edit[aria-pressed="true"] { background: var(--accent-soft);
   .gd-phone .cell .nm-full, .pick-fill.is-tabbed .cell .nm-full, .tv-screen .cell .nm-full,
   .gd-phone .cell .badge, .tv-screen .tv-board-wrap .cell .badge { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .gd-phone .cell .nm-init, .pick-fill.is-tabbed .cell .nm-init, .tv-screen .cell .nm-init { display: inline; }
-  .gd-phone .cell .badges, .tv-screen .tv-board-wrap .cell .badges { top: 0; right: 0; width: 0; height: 0; gap: 0; border-top: 8px solid var(--winner); border-left: 8px solid transparent; }
-  .gd-phone .cell.pushed .badges, .tv-screen .tv-board-wrap .cell.pushed .badges { border-top-color: var(--danger); }
+  .gd-phone .cell .badges, .tv-screen .tv-board-wrap .cell .badges { top: 0; right: 0; width: 0; height: 0; gap: 0; }
+  .gd-phone .cell .qcorners, .tv-screen .tv-board-wrap .cell .qcorners { display: block; position: absolute; inset: 0; pointer-events: none; }
+  /* No room for the $ tag in a 27 px square, and the corners use all four: the dashed ring says it. */
+  .gd-phone .cell.is-unpaid::before, .pick-fill.is-tabbed .cell.is-unpaid::before { display: none; }
 }
 
 /* A phone on its side keeps full names, but in a square about 24 px tall a badge cannot be read:
    it becomes the same corner triangle, its text kept for screen readers. */
 @media (min-width: 480px) and (max-height: 479px) {
   .mirror-screen .tv-board-wrap .cell .badge { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .mirror-screen .tv-board-wrap .cell .badges { top: 0; right: 0; width: 0; height: 0; gap: 0; border-top: 8px solid var(--winner); border-left: 8px solid transparent; }
-  .mirror-screen .tv-board-wrap .cell.pushed .badges { border-top-color: var(--danger); }
+  .mirror-screen .tv-board-wrap .cell .badges { top: 0; right: 0; width: 0; height: 0; gap: 0; }
+  .mirror-screen .tv-board-wrap .cell .qcorners { display: block; position: absolute; inset: 0; pointer-events: none; }
   .mirror-screen .tv-board-wrap .cell.winner .name-txt,
   .mirror-screen .tv-board-wrap .cell.pushed .name-txt { font-size: var(--fs-2xs); line-height: 1; white-space: nowrap; }
 }

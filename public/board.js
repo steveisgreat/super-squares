@@ -90,6 +90,8 @@
   // Shown instead of the word "FINAL" inside a winning cell's ribbon, so the
   // overall winner reads at a glance instead of blending in with quarterly
   // wins.
+  // Which corner a quarter takes on a phone-width board: Q1 top-left ... Final bottom-right.
+  const QCORNER = { Q1: 1, Q2: 2, Q3: 3, FINAL: 4 };
   const TROPHY_SVG = `<svg viewBox="0 0 16 16" width="8" height="8" fill="currentColor" aria-hidden="true" style="vertical-align:-1px;">
     <path d="M4 2h8v3a4 4 0 0 1-8 0V2z"/>
     <path d="M4 3H2a2 2 0 0 0 2 3" stroke="currentColor" stroke-width="1.2" fill="none"/>
@@ -374,8 +376,10 @@
 
         const inner = sq ? nameTxt(game, sq.name) : (hasPush ? `<div class="name-txt">${nameSpans('PUSH', '\u2014')}</div>` : '');
         const badges = !labels.length ? '' : `<div class="badges">${labels.map(l => `<span class="badge">${l.label === 'FINAL' ? TROPHY_SVG : l.label}</span>`).join('')}</div>`;
+        // Phone-width boards show each quarter as its own corner (styles.css, under 480 px).
+        const corners = !labels.length ? '' : `<span class="qcorners" aria-hidden="true">${labels.map(l => `<span class="qc q${QCORNER[l.label]}${l.pushed ? ' is-push' : ''}"></span>`).join('')}</span>`;
 
-        const cellEl = el('div', cls, badges + inner);
+        const cellEl = el('div', cls, badges + corners + inner);
         const who = sq && (game.players || {})[sq.name];
         if (who && isColor(who.color)) cellEl.style.setProperty('--who', who.color);
         if (sq || hasPush) cellEl.dataset.who = sq ? sq.name : 'PUSH';
