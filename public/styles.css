@@ -798,32 +798,44 @@ button.paid-pill:hover { filter: brightness(1.2); }
    (computed in ui.js) — see teamBadge(). Background/text color come from
    inline style per instance since they vary per team, not per class. */
 .team-badge {
-  /* The logo's disc; the pill is 2 px shorter (a clear 1 px border above and below), so it comes
-     out from behind the logo. Sized by the caller, and never smaller than the name needs. */
+  /* An outlined pill (decision 029): no fill, a 2 px ring in the team color (--outline, ui.js
+     teamOutline) and the name in white. The ring is drawn from the middle of the logo rightward, so
+     its left end is hidden behind the logo and nothing stands outside the pill to be clipped. --d is
+     the logo's disc, sized by the caller and never smaller than the name needs. */
   --d: max(var(--disc, 26px), 1.6em);
+  position: relative;
   display: inline-flex;
   align-items: center;
   box-sizing: border-box;
   height: var(--d);
   gap: max(8px, 0.53em);
   padding: 0 max(8px, 0.53em) 0 0;
-  border: solid transparent;
-  border-width: 1px 0;
   border-radius: var(--r-pill);
-  background-color: var(--pill);
-  background-clip: padding-box;
-  box-shadow: inset 0 0 0 1px var(--edge, transparent);
+  color: var(--text-strong);
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
   vertical-align: middle;
 }
+.team-badge::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 0 calc(var(--d) / 2);
+  border: 2px solid var(--outline, var(--muted));
+  border-left: 0;
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  pointer-events: none;
+}
+/* No logo shown: the ring closes around the whole pill. */
+.team-badge.mode-nologo::before { left: 0; border-left: 2px solid var(--outline, var(--muted)); border-radius: var(--r-pill); }
 .team-badge .team-logo {
+  position: relative;
+  z-index: 1;
   flex-shrink: 0;
   box-sizing: border-box;
   width: var(--d);
   height: var(--d);
-  margin: -1px 0;
+  margin: 0;
   padding: calc(var(--d) * 0.07);
   border-radius: 50%;
   background: #f1f4f6;
@@ -831,7 +843,7 @@ button.paid-pill:hover { filter: brightness(1.2); }
 /* Most team fonts come in one weight. Without this the browser fakes the badge's bold by smearing
    the letters, which reads as blurry; a font that has a real bold still uses it. --caps centers
    the capitals (ui.js TEAM_CAPS). */
-.team-badge-name { position: relative; top: var(--caps, 0); white-space: nowrap; font-synthesis: none; }
+.team-badge-name { position: relative; z-index: 1; top: var(--caps, 0); white-space: nowrap; font-synthesis: none; }
 .team-badge-sm { font-size: var(--fs-xs); }
 .team-badge.mode-nologo, .mirror-header .live-center .team-badge { padding-left: max(8px, 0.53em); }
 @media (max-width: 480px) {

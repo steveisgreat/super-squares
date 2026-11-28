@@ -717,6 +717,20 @@
     return isColor(style.secondary) && contrast(style.secondary) >= 2 ? style.secondary : '#aab4be';
   }
 
+  // The color of a team pill's 2 px outline: the team's first color when it stands out from the dark
+  // page, else its second, else a light gray. A thin line needs more contrast than a filled edge did.
+  function teamOutline(game, side) {
+    const page = cardBg();
+    const contrast = (hex) => {
+      const a = relLuminance(hex) + 0.05, b = relLuminance(page) + 0.05;
+      return Math.max(a, b) / Math.min(a, b);
+    };
+    const style = teamStyle(game, side);
+    if (isColor(style.primary) && contrast(style.primary) >= 2.2) return style.primary;
+    if (isColor(style.secondary) && contrast(style.secondary) >= 2.2) return style.secondary;
+    return '#aab4be';
+  }
+
   // The capitals of each team font, in em: how far they sit from the middle of their line (positive
   // is low) and how tall they are. Measured once from the font files, so a pill can center the name
   // and draw every team's capitals the same height (at one font size they differ by a third).
@@ -765,18 +779,17 @@
     opts = opts || {};
     const name = side === 'A' ? game.teamA : game.teamB;
     const style = teamStyle(game, side);
-    const bg = style.primary;
-    const fg = readableTextColor(bg);
     const size = opts.logoSize || 20;
     const logo = teamLogoTag(game, side, size);
     const cls = 'team-badge' + (opts.cls ? ' ' + opts.cls : '');
-    // The logo's disc: the pill is 2 px shorter, so it reads as coming out from behind the logo.
+    // The logo's disc. The pill is outlined in the team color, or its second color where the first
+    // would vanish on the dark page (teamEdge), and the outline starts behind the logo (decision 029).
     const disc = size + (/team-badge-sm/.test(cls) ? 4 : 6);
-    const edge = teamEdge(game, side);
-    const vars = `--pill:${bg}; --disc:${disc}px;${edge ? ` --edge:${edge};` : ''}`;
+    const outline = teamOutline(game, side);
+    const vars = `--outline:${outline}; --disc:${disc}px;`;
     const [off, caps] = (style.font && TEAM_CAPS[style.font.replace(/'/g, '')]) || BODY_CAPS;
     const fontStyle = style.font ? ` font-family:${style.font}, var(--sans);` : '';
-    return `<span class="${cls}" style="${vars} color:${fg};">${logo}<span class="team-badge-name" style="--caps:${-off}em; font-size:${(CAP_HEIGHT / caps).toFixed(3)}em;${fontStyle}"><span class="badge-full">${escapeHtml(name)}</span><span class="badge-abbr">${escapeHtml(style.abbr)}</span></span></span>`;
+    return `<span class="${cls}" style="${vars}">${logo}<span class="team-badge-name" style="--caps:${-off}em; font-size:${(CAP_HEIGHT / caps).toFixed(3)}em;${fontStyle}"><span class="badge-full">${escapeHtml(name)}</span><span class="badge-abbr">${escapeHtml(style.abbr)}</span></span></span>`;
   }
 
   function legalLinks() {
@@ -826,10 +839,14 @@
   }
 
   let fitResizeTimer = null;
-  window.addEventListener('resize', () => {
+  const refitSoon = () => {
     clearTimeout(fitResizeTimer);
     fitResizeTimer = setTimeout(() => fitTeamBadges(document), 120);
-  });
+  };
+  window.addEventListener('resize', refitSoon);
+  // A team font that arrives after the first fit is wider than the fallback it replaced, so a
+  // matchup that fitted can now overflow (and be cut off): fit again once fonts finish loading.
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', refitSoon);
 
   // ---------- Fullscreen ----------
   // iPadOS Safari only exposes the webkit-prefixed calls, and iPhone Safari has
