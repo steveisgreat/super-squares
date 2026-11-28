@@ -3004,7 +3004,9 @@ button.grid-btn { display: none; min-height: 48px; margin-top: 8px; font-size: v
 
 /* The picking screen's top bar: the same Home, matchup and Connect as Game Day, with the matchup
    in the exact center whatever is on either side. */
-.pick-topbar.gd-topbar-phone .gd-meta { white-space: normal; line-height: 1.25; font-size: var(--fs-xs); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+/* On a phone the matchup stands alone, centered in the bar, as on Game Day: no date line under it. */
+.pick-topbar.gd-topbar-phone .gd-meta { display: none; }
+.pick-topbar.gd-topbar-phone .gd-head { justify-content: center; }
 .topbar.pick-topbar { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 10px; }
 .pick-topbar .home-btn { justify-self: start; }
 .pick-topbar .gd-head { align-items: center; text-align: center; gap: 3px; }
