@@ -298,8 +298,8 @@
 
 * { box-sizing: border-box; }
 
-/* The page draws under an iPhone's status bar, notch and home bar (viewport-fit=cover and the
-   Home Screen app's translucent bar). Whatever sits at an edge keeps clear of them with these;
+/* The page draws under an iPhone's notch and home bar (viewport-fit=cover); the Home Screen app
+   starts below the status bar (its "black" bar style). Whatever sits at an edge keeps clear of them with these;
    they are 0 everywhere else, and on browsers without env(). */
 :root { --sat: 0px; --sar: 0px; --sab: 0px; --sal: 0px; }
 @supports (padding: env(safe-area-inset-top, 0px)) {
@@ -360,7 +360,7 @@ body {
 .topbar {
   position: sticky;
   top: 0;
-  border-top: var(--sat) solid transparent; /* the bar's own color runs up under the status bar */
+  border-top: var(--sat) solid transparent; /* the bar's own color runs up under a notch or status bar, where the page draws under one */
   z-index: 50;
   display: flex;
   align-items: center;
