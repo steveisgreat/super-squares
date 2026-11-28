@@ -31,7 +31,7 @@
     if (view.id !== game.id) view = { id: game.id, tab: 'add' };
     const headerMeta = [escapeHtml(SBS.ui.shownDescription(game) || SBS.ui.formatGameDate(game.gameDate)), SBS.ui.kickoffNotice(game)].filter(Boolean).join(' &middot; ');
     // The top bar: Home, the matchup in the exact center, then (wide) the join chip, Edit game,
-    // Party View (not on a phone) and Connect.
+    // Party View and Connect; a phone folds Connect and Edit game into one menu.
     const bar = topbar('', [], { hideIcon: true });
     bar.classList.add('gd-topbar', 'pick-topbar');
     if (phone) bar.classList.add('gd-topbar-phone');
@@ -42,17 +42,35 @@
     bar.replaceChild(head, bar.querySelector('h1'));
     const nav = bar.querySelector('.nav');
     if (!phone && game.joinCode) nav.appendChild(SBS.playerView.joinChip(game));
-    nav.appendChild(SBS.editForm.barButton(phone, () => SBS.editForm.open(game.id, 'picking')));
-    if (!phone) {
+    const editBtn = SBS.editForm.barButton(phone, () => SBS.editForm.open(game.id, 'picking'));
+    const connectBtn = SBS.deviceChooser.button(game);
+    if (phone) {
+      // A phone keeps the bar to Home, the matchup and one menu, as on Game Day: Connect and
+      // Edit game. No Party View: the phone's mirror opens once the numbers are drawn.
+      const menuBtn = el('button', 'gd-bar-btn gd-icon-only gd-menu', SBS.ui.MENU_ICON);
+      menuBtn.type = 'button';
+      menuBtn.setAttribute('aria-label', 'Menu');
+      menuBtn.setAttribute('aria-haspopup', 'dialog');
+      menuBtn.setAttribute('aria-expanded', 'false');
+      const icon = (b) => b.querySelector('svg').outerHTML;
+      menuBtn.addEventListener('click', () => SBS.showMenu(menuBtn, {
+        label: 'Game menu',
+        dropdown: true,
+        items: [
+          { label: 'Connect', icon: icon(connectBtn), onSelect: () => SBS.deviceChooser.open(game, menuBtn) },
+          { label: 'Edit game', icon: icon(editBtn), onSelect: () => editBtn.click() }
+        ]
+      }));
+      nav.append(menuBtn);
+    } else {
       const partyBtn = el('button', 'gd-bar-btn gd-party', SBS.ui.MAXIMIZE_ICON + '<span>Party View</span>');
       partyBtn.type = 'button';
       partyBtn.title = 'Party View';
       partyBtn.setAttribute('aria-label', 'Party View');
       // 'board' is the origin whose Exit reopens this board.
       partyBtn.addEventListener('click', () => SBS.go({ screen: 'tv', id: game.id, from: 'board' }));
-      nav.appendChild(partyBtn);
+      nav.append(editBtn, partyBtn, connectBtn);
     }
-    nav.appendChild(SBS.deviceChooser.button(game));
     app.appendChild(bar);
     fitTeamBadges(bar);
 
