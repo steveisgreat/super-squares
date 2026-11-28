@@ -3688,7 +3688,8 @@ button.eg-choice[aria-pressed="true"] { background: var(--accent-soft); border-c
    outer border and clips; each segment draws its left and top divider and is pulled 1 px out
    under that border, so the first of each row hides its divider and the rest show a line between
    options (a later sibling paints over an earlier one, so a right-edge divider would be covered).
-   The picked segment is a translucent accent fill. */
+   The picked segment is a translucent accent fill ringed in the full accent; the ring is an
+   inset outline so it covers that segment's own dividers and stays on after focus. */
 .eg-pills { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--border-strong); border-radius: 0; overflow: hidden; }
 .eg-pills button.eg-pill {
   border: 0; border-radius: 0; margin: -1px 0 0 -1px;
@@ -3696,8 +3697,8 @@ button.eg-choice[aria-pressed="true"] { background: var(--accent-soft); border-c
   background: var(--panel2); color: var(--muted);
 }
 .eg-pills button.eg-pill:hover { background: var(--accent-soft); color: var(--text); border-color: var(--border-strong); }
-.eg-pills button.eg-pill[aria-pressed="true"] { background: rgba(var(--accent-rgb), 0.3); color: var(--text-strong); }
 .eg-pills button.eg-pill:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-hi); }
+.eg-pills button.eg-pill[aria-pressed="true"] { background: rgba(var(--accent-rgb), 0.3); color: var(--text-strong); outline: 2px solid var(--accent); outline-offset: -2px; }
 .eg-summary { display: flex; align-items: center; gap: 12px; }
 .eg-summary > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; overflow-wrap: anywhere; }
 .eg-summary button.eg-pill { flex: none; }
